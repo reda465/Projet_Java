@@ -1,7 +1,6 @@
 package service;
 
 import client.ClientReseau;
-import model.Utilisateur;
 import network.*;
 
 public class AuthService {
