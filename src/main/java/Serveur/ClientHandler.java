@@ -78,7 +78,7 @@ public class ClientHandler extends Thread {
 
     // ── REGISTER|nom_complet|numero_telephone|mot_de_passe ───────────────────
     private void handleRegister(String[] parts) {
-        if (parts.length < 4) { pw.println("REGISTER_FAIL"); return; }
+        if (parts.length < 4) { pw.println("REGISTER_FAIL|Erreur_Inscription"); return; }
 
         Utilisateur u = new Utilisateur();
         u.setNomComplet(parts[1]);
@@ -91,10 +91,10 @@ public class ClientHandler extends Thread {
                 return;
             }
             userDAO.Add(u);
-            pw.println("REGISTER_OK");
+            pw.println("REGISTER_OK|Inscription_Avec_Succes");
         } catch (SQLException e) {
             e.printStackTrace();
-            pw.println("REGISTER_FAIL");
+            pw.println("REGISTER_FAIL|Erreur_Inscription");
         }
     }
 
