@@ -1,24 +1,43 @@
 package com.ensa;
 
-import network.Commande;
-import network.Packet;
-
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-public class Main {
-    public static void main(String[] args) {
-        // Test création de Packet
-        Packet p = new Packet(Commande.CONNEXION, "0600000000|monpass");
-        String ligne = p.toString();
-        System.out.println("Envoyé : " + ligne);
+// TestFacade.java
+import client.*;
 
-        // Test reconstruction
-        Packet recu = Packet.fromString(ligne);
-        System.out.println("Commande : " + recu.getCommande());
-        System.out.println("Données : " + recu.getData());
+public class Main implements EcouteurClient {
+
+    public static void main(String[] args) {
+        new Main().tester();
+    }
+
+    public void tester() {
+        ClientHandlerAuth facade = ClientHandlerAuth.getInstance();
+
+        // Test connexion simulation
+        boolean ok = facade.connecterAuServeur("simul", 8080, this);
+        System.out.println("Connecté : " + ok);
 
         // Test inscription
-        Packet insc = new Packet(Commande.INSCRIPTION, "Dupont|Jean|0611223344|jeandupont|password123");
-        System.out.println("\nInscription : " + insc.toString());
+        facade.sInscrire("Dupont", "Jean", "0612345678", "pass123");
+
+        // Attendre un peu
+        try { Thread.sleep(1000); } catch (Exception e) {}
+    }
+
+    public void connexionReussie(model.Utilisateur moi) {
+        System.out.println(" Réussi : " + moi.getNomComplet());
+    }
+
+    public void erreur(String message) {
+        System.out.println(" Erreur : " + message);
+    }
+
+    public void messageRecu(String contenu) {
+        System.out.println(" Message : " + contenu);
+    }
+
+    public void deconnexion() {
+        System.out.println(" Déconnecté");
     }
 }
