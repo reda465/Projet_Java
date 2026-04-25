@@ -32,9 +32,8 @@ public class ClientHandler extends Thread {
             while ((ligne = br.readLine()) != null) {
                 System.out.println("[RECU] " + ligne);
                 String[] parts    = ligne.split("\\|", -1);
-                String   commande = parts[0];
 
-                switch (commande) {
+                switch (Protocol.valueOf(parts[0])) {
                     case Protocol.LOGIN    -> handleLogin(parts);
                     case Protocol.REGISTER -> handleRegister(parts);
                     case Protocol.LOGOUT   -> { handleLogout(); return; }
