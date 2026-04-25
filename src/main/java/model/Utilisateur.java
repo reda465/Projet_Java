@@ -1,4 +1,5 @@
 package model;
+import model.enums.*;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -11,16 +12,12 @@ import lombok.Setter;
 @AllArgsConstructor
 
 public class Utilisateur {
-
-    private int id;
-    private String nom;
-    private String prenom;
+    private int idUtilisateur;
+    private String nomComplet;
     private String numeroTelephone;
     private String motDePasse;
-    private boolean enLigne;
-
-    // Méthode utile
-    public String getNomComplet() {
-        return prenom + " " + nom;
-    }
+    private java.time.LocalDateTime dateInscription;
+    private java.time.LocalDateTime derniereConnexion;
+    private StatutUtilisateur Status;
+    private String photoProfil;
 }
