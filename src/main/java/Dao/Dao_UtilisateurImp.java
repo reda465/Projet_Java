@@ -1,7 +1,7 @@
 package Dao;
 
 import model.Utilisateur;
-import org.mindrot.jbcrypt.BCrypt;
+//import org.mindrot.jbcrypt.BCrypt;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -18,7 +18,7 @@ public class Dao_UtilisateurImp implements Dao_Utilisateur {
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, u.getNomComplet());
             ps.setString(2, u.getNumeroTelephone());
-            ps.setString(3, BCrypt.hashpw(u.getMotDePasse(), BCrypt.gensalt()));
+            //ps.setString(3, BCrypt.hashpw(u.getMotDePasse(), BCrypt.gensalt()));
             return ps.executeUpdate();
         }
     }
@@ -85,9 +85,10 @@ public class Dao_UtilisateurImp implements Dao_Utilisateur {
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 String hash = rs.getString("mot_de_passe");
-                if (BCrypt.checkpw(password, hash)) {
-                    return mapResultSet(rs);
-                }
+                //if (!BCrypt.checkpw(password, hash)) {
+                //    return null;
+                //}
+                return mapResultSet(rs);
             }
         }
         return null;

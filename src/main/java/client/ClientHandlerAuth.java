@@ -3,7 +3,6 @@ package client;
 import model.Utilisateur;
 import service.AuthService;
 
-
 public class ClientHandlerAuth {
 
     private static ClientHandlerAuth instance;
@@ -67,7 +66,6 @@ public class ClientHandlerAuth {
         }
         return null;
     }
-
     // ===== VÉRIFICATION =====
     private boolean verifierConnexion() {
         if (!connecteAuServeur || authService == null) {
