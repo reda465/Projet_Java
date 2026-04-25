@@ -11,36 +11,34 @@ public class ClientReseau {
     private PrintWriter stylo;
     private BufferedReader yeux;
     private boolean connecte = false;
-    private boolean modeSimulation = false;  // NOUVEAU
+    private boolean modeSimulation = false;
 
     private EcouteurClient ecouteur;
     private Utilisateur moi;
 
-    public ClientReseau(EcouteurClient ecouteur) {
+    public ClientReseau(EcouteurClient ecouteur){//lier a l'interface graphique pour les signales
         this.ecouteur = ecouteur;
     }
-
     // ===== CONNEXION NORMALE =====
     public void connecterAuServeur(String ip, int port) {
         try {
-            System.out.println("📞 Connexion au serveur " + ip + ":" + port + "...");
-
+            System.out.println("Connexion au serveur" + ip + ":" + port + "...");
             tuyau = new Socket(ip, port);
             stylo = new PrintWriter(tuyau.getOutputStream(), true);
             yeux = new BufferedReader(new InputStreamReader(tuyau.getInputStream()));
 
             connecte = true;
             modeSimulation = false;
-            System.out.println("✅ Connecté au serveur !");
+            System.out.println(" Connecté au serveur !");
 
             Thread ami = new Thread(new Ecouteur());
             ami.start();
 
         } catch (IOException e) {
-            System.out.println("❌ Erreur connexion : " + e.getMessage());
+            System.out.println(" Erreur connexion : " + e.getMessage());
             connecte = false;
 
-            if (ecouteur != null) {
+            if (ecouteur != null) {//ecouteur est null signifie que y'a pas de liaison entre UI et Client
                 ecouteur.erreur("Impossible de se connecter au serveur");
             }
         }
@@ -55,7 +53,7 @@ public class ClientReseau {
 
     // ===== ENVOYER =====
     public void envoyer(Packet packet) {
-        if (!connecte) {
+        if (!connecte) {//erreur du connection
             System.out.println("❌ Pas connecté !");
             return;
         }
@@ -113,8 +111,8 @@ public class ClientReseau {
                 moi = new Utilisateur();
                 moi.setId(Integer.parseInt(infos[0]));
                // moi.setUsername(infos[1]);
-                moi.setNom(infos[2]);
-                moi.setPrenom(infos[3]);
+                moi.setNom(infos[1]);
+                moi.setPrenom(infos[2]);
                 moi.setEnLigne(true);
 
                 System.out.println("✅ Authentifié ! ID = " + moi.getId());
@@ -182,8 +180,8 @@ public class ClientReseau {
                     moi = new Utilisateur();
                     moi.setId(Integer.parseInt(infos[0]));
                    // moi.setUsername(infos[1]);
-                    moi.setNom(infos[2]);
-                    moi.setPrenom(infos[3]);
+                    moi.setNom(infos[1]);
+                    moi.setPrenom(infos[2]);
                     moi.setEnLigne(true);
 
                     System.out.println("✅ Authentifié ! ID = " + moi.getId());
