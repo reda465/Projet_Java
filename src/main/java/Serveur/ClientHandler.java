@@ -14,7 +14,7 @@ public class ClientHandler extends Thread {
     private String telephoneConnecte; // null = pas encore authentifié
 
     private final UserManager      userManager = UserManager.getInstance();
-    private final Dao_UtilisateurImp userDAO   = new Dao_UtilisateurImp();
+    private final  Dao_UtilisateurImp userDAO   = new Dao_UtilisateurImp();
 
     public ClientHandler(Socket s) {
         this.socket = s;
