@@ -16,7 +16,7 @@ public class Dao_AppelImp implements DAO_Appel{
         st.setInt(1, appel.getIdAppel());
         st.setInt(2, appel.getIdAppelant());
         st.setInt(3, appel.getIdConversation());
-        st.setString(4, appel.getTypeAppel());
+        st.setString(4, (appel.getType_appel()).name());
 
         return 0;
     }

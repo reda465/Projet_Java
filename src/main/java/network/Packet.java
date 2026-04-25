@@ -1,43 +1,34 @@
 package network;
 
+import Serveur.Protocol;
 import lombok.Getter;
 import lombok.Setter;
+import Serveur.Protocol;
 
 @Getter
 @Setter
 public class Packet {
 
-    // ===== ATTRIBUTS (private = encapsulation, tu connais !) =====
-    private Commande commande;    // L'action demandée
-    private String data;           // Les données (ex: "0600000000|password")
-    private int expediteurId;       // Qui envoie (0 si pas encore connecté)
+    private Protocol commande;
+    private String data;
 
-    // ===== CONSTRUCTEUR =====
-    public Packet(Commande commande, String data) {
+    public Packet(Protocol commande, String data) {
         this.commande = commande;
         this.data = data;
-        this.expediteurId = 0;     // Par défaut, pas d'ID , sera modifier apres connexion au serveur
     }
-    // ===== MÉTHODE CLÉ : Transformer en String pour le réseau =====
-
-    // On envoie : "CONNEXION|0600000000|password|0"
-    // Format : COMMANDE|données|expediteurId
+    // ===== Transformer en String pour le réseau/serveur =====
+    // Format : COMMANDE|expediteurId|données
     public String toString() {
-        return commande + "|" + expediteurId + "|" + data;
+        return commande + "|" + data;
     }
 
     // Reconstruire un Packet depuis un String reçu
     public static Packet fromString(String ligne) {
-        String[] parts = ligne.split("\\|",3);  // Coupe aux "|"
+        String[] parts = ligne.split("\\|",2);  // Coupe aux "|"
 
-        // parts[0] = "CONNEXION"
-        // parts[1] = "0600000000|password"
-        // parts[2] = "0"
-
-        Commande cmd = Commande.valueOf(parts[0]);  // String → enum
-        String donnees = (parts.length > 2) ? parts[2] : "";
+        Protocol cmd = Protocol.valueOf(parts[0]);  // String → enum
+        String donnees = (parts.length > 1) ? parts[1] : "";
         Packet p = new Packet(cmd, donnees);
-        p.setExpediteurId(Integer.parseInt(parts[1]));
 
         return p;
     }

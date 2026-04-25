@@ -1,5 +1,6 @@
 package service;
 
+import Serveur.*;
 import client.ClientReseau;
 import network.*;
 
@@ -12,56 +13,39 @@ public class AuthService {
     }
 
     // ===== INSCRIPTION =====
-    // Remplir le formulaire et l'envoyer
-    public void inscrire(String nom, String prenom, String numero, String password) {
+    public String inscrire(String nomComplet, String numero, String password) {
 
-        // 1. Vérifier que tout est rempli
-        if (nom.isEmpty() || prenom.isEmpty() || numero.isEmpty() || password.isEmpty()) {
-            System.out.println(" Tous les champs sont obligatoires !");
-            return;
+        if (nomComplet.isEmpty() || numero.isEmpty() || password.isEmpty()) {
+            return "Tous les champs sont obligatoires !"; // Retourne l'erreur à l'UI
         }
 
-        // 2. Vérifier le numéro (10 chiffres par exemple)
         if (numero.length() != 10) {
-            System.out.println(" Le numéro doit faire 10 chiffres !");
-            return;
+            return "Le numéro doit faire 10 chiffres !"; // Retourne l'erreur à l'UI
         }
 
-        // 3. Préparer les données
-        // Format : "nom|prenom|numero|password"
-        String data = nom + "|" + prenom + "|" + numero + "|" + password;
-
-        // 4. Créer le colis
-        Packet p = new Packet(Commande.INSCRIPTION, data);
-
-        // 5. Envoyer
+        String data = nomComplet+ "|" + numero + "|" + password;
+        Packet p = new Packet(Protocol.REGISTER, data);
         client.envoyer(p);
-        System.out.println(" Inscription envoyée pour " +nom + prenom);
+
+        return "OK"; // Indique que la demande est bien partie
     }
 
     // ===== CONNEXION =====
-    public void connecter(String numero, String password) {
+    public String connecter(String numero, String password) {
 
-        // 1. Vérifier
         if (numero.isEmpty() || password.isEmpty()) {
-            System.out.println(" Remplis tous les champs !");
-            return;
+            return "Remplis tous les champs !";
         }
 
-        // 2. Préparer
         String data = numero + "|" + password;
-
-        // 3. Créer le colis
-        Packet p = new Packet(Commande.CONNEXION, data);
-
-        // 4. Envoyer
+        Packet p = new Packet(Protocol.LOGIN, data);
         client.envoyer(p);
-        System.out.println(" Connexion demandee pour " + numero);
-    }
 
+        return "OK";
+    }
     // ===== DÉCONNEXION =====
     public void deconnecter() {
-        Packet p = new Packet(Commande.DECONNEXION, "");
+        Packet p = new Packet(Protocol.LOGOUT, "");
         client.envoyer(p);
         client.deconnecter();
     }

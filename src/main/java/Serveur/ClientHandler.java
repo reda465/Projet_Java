@@ -31,10 +31,9 @@ public class ClientHandler extends Thread {
 
             while ((ligne = br.readLine()) != null) {
                 System.out.println("[RECU] " + ligne);
-                String[] parts    = ligne.split("\\" + Protocol.SEP, -1);
-                String   commande = parts[0];
+                String[] parts    = ligne.split("\\|", -1);
 
-                switch (commande) {
+                switch (Protocol.valueOf(parts[0])) {
                     case Protocol.LOGIN    -> handleLogin(parts);
                     case Protocol.REGISTER -> handleRegister(parts);
                     case Protocol.LOGOUT   -> { handleLogout(); return; }
@@ -65,9 +64,7 @@ public class ClientHandler extends Thread {
                 userDAO.updateDerniereConnexion(u.getIdUtilisateur());
 
                 // LOGIN_OK|nom_complet|numero_telephone
-                pw.println(Protocol.LOGIN_OK
-                        + Protocol.SEP + u.getNomComplet()
-                        + Protocol.SEP + u.getNumeroTelephone());
+                pw.println(Protocol.LOGIN_OK + "|" + u.getNomComplet() + "|" + u.getNumeroTelephone());
 
                 broadcastUsersList();
             } else {
@@ -119,9 +116,7 @@ public class ClientHandler extends Thread {
 
     // ── Broadcast liste connectés ─────────────────────────────────────────────
     private void broadcastUsersList() {
-        userManager.broadcast(
-                Protocol.USERS_LIST + Protocol.SEP + userManager.getOnlineUsersList()
-        );
+        userManager.broadcast(Protocol.USERS_LIST + "|" + userManager.getOnlineUsersList());
     }
 
     // ── Envoyer un message à CE client ───────────────────────────────────────
