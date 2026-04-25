@@ -1,5 +1,6 @@
 package client;
 
+import Serveur.Commande;
 import network.*;
 import model.*;
 import java.io.*;

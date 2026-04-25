@@ -1,7 +1,5 @@
 package client;
 
-import model.Utilisateur;
-
 public interface EcouteurClient {
     // Quand la connexion réussit
     void connexionReussie(Utilisateur moi);

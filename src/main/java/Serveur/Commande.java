@@ -1,6 +1,5 @@
-package network;
+package Serveur;
 
-// enum = ÉNUMÉRATION = liste de valeurs fixes
 public enum Commande {
     // Authentification
     INSCRIPTION,      // "Je veux m'inscrire"
