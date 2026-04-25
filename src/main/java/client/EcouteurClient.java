@@ -1,5 +1,5 @@
 package client;
-
+import
 public interface EcouteurClient {
 
     // Quand la connexion réussit
