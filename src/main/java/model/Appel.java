@@ -1,5 +1,5 @@
 package model;
-
+import model.enums.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
