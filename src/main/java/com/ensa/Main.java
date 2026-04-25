@@ -1,43 +1,119 @@
-package com.ensa;
+package com.ensa ;
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-// TestFacade.java
-import client.*;
+import client.ClientReseauCALL;
+import client.EcouteurClient;
+import model.Utilisateur;
+import service.CallAudiooService;
 
-public class Main implements EcouteurClient {
+/**
+ * Main de TEST pour l'appel audio.
+ * Pas besoin de serveur : on simule un loopback local.
+ *
+ * Ce que ça fait :
+ *  - Crée un faux ClientReseau (mode simulation, sans connexion réelle)
+ *  - Lance le micro + haut-parleur via CallAudiooService
+ *  - Ce que tu parles dans le micro est joué directement dans les speakers
+ *  - Après 10 secondes, l'appel s'arrête automatiquement
+ */
+public class Main {
 
-    public static void main(String[] args) {
-        new Main().tester();
-    }
+    public static void main(String[] args) throws InterruptedException {
 
-    public void tester() {
-        ClientHandlerAuth facade = ClientHandlerAuth.getInstance();
+        System.out.println("=== TEST APPEL AUDIO (mode local, sans serveur) ===");
 
-        // Test connexion simulation
-        boolean ok = facade.connecterAuServeur("simul", 8080, this);
-        System.out.println("Connecté : " + ok);
+        // -------------------------------------------------------
+        // 1. Créer un EcouteurClient minimal (implémentation vide)
+        // -------------------------------------------------------
+        EcouteurClient ecouteurFactice = new EcouteurClient() {
 
-        // Test inscription
-        facade.sInscrire("Dupont", "Jean", "0612345678", "pass123");
+            @Override
+            public void connexionReussie(Utilisateur moi) {
+                System.out.println("[ECOUTEUR] Connexion réussie : " + moi.getNom());
+            }
 
-        // Attendre un peu
-        try { Thread.sleep(1000); } catch (Exception e) {}
-    }
+            @Override
+            public void erreur(String message) {
+                System.out.println("[ECOUTEUR] Erreur : " + message);
+            }
 
-    public void connexionReussie(model.Utilisateur moi) {
-        System.out.println(" Réussi : " + moi.getNomComplet());
-    }
+            @Override
+            public void messageRecu(String contenu) {
+                System.out.println("[ECOUTEUR] Message reçu : " + contenu);
+            }
 
-    public void erreur(String message) {
-        System.out.println(" Erreur : " + message);
-    }
+            @Override
+            public void deconnexion() {
+                System.out.println("[ECOUTEUR] Déconnecté.");
+            }
 
-    public void messageRecu(String contenu) {
-        System.out.println(" Message : " + contenu);
-    }
+            @Override
+            public void audioCallStart(String info) {
+                System.out.println("[ECOUTEUR] Appel audio démarré : " + info);
+            }
 
-    public void deconnexion() {
-        System.out.println(" Déconnecté");
+            @Override
+            public void audioCallStop(String info) {
+                System.out.println("[ECOUTEUR] Appel audio arrêté : " + info);
+            }
+
+            @Override
+            public void audioRecu(byte[] audio) {
+                // Dans un vrai test avec serveur, les données arrivent ici
+                System.out.println("[ECOUTEUR] Audio reçu : " + audio.length + " octets");
+            }
+
+            @Override
+            public void videoRecu(byte[] frameData) {
+
+            }
+        };
+
+        // -------------------------------------------------------
+        // 2. Créer un ClientReseau en mode SIMULATION (sans socket)
+        //    On surcharge envoyer() pour jouer l'audio localement
+        // -------------------------------------------------------
+        CallAudiooService[] serviceRef = new CallAudiooService[1]; // tableau pour capture en lambda
+
+        ClientReseauCALL clientSimule = new ClientReseauCALL(ecouteurFactice) {
+
+            @Override
+            public void envoyer(network.Packet packet) {
+                // Au lieu d'envoyer sur le réseau, on joue directement en local
+                if (packet.getCommande() == network.Commande.Data_AUDIO) {
+                    byte[] audio = (byte[]) packet.getData();
+                    if (serviceRef[0] != null) {
+                        serviceRef[0].jouerAudio(audio);  // loopback : micro → speakers
+                    }
+                } else {
+                    System.out.println("[CLIENT SIMULE] Packet ignoré : " + packet.getCommande());
+                }
+            }
+
+            @Override
+            public boolean isConnecte() {
+                return true; // on dit qu'on est "connecté" pour ne pas bloquer
+            }
+        };
+
+        // -------------------------------------------------------
+        // 3. Créer le service audio et démarrer l'appel
+        // -------------------------------------------------------
+        CallAudiooService audioService = new CallAudiooService(clientSimule);
+        serviceRef[0] = audioService;
+
+        System.out.println("[MAIN] Démarrage de l'appel audio dans 1 seconde...");
+        Thread.sleep(1000);
+
+        audioService.startCall("alice", "bob");
+
+        System.out.println("[MAIN] Appel en cours pendant 10 secondes... Parlez dans le micro !");
+        Thread.sleep(10_000);
+
+        // -------------------------------------------------------
+        // 4. Arrêter l'appel
+        // -------------------------------------------------------
+        audioService.stopCall("alice", "bob");
+
+        System.out.println("[MAIN] Test terminé.");
     }
 }

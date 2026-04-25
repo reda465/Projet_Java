@@ -9,7 +9,7 @@ public class ClientHandlerAuth {
     // ===== SINGLETON : une seule instance =====
     private static ClientHandlerAuth instance;
 
-    private ClientReseau clientReseau;
+    private ClientReseauCALL clientReseau;
     private AuthService authService;
     private boolean connecteAuServeur = false;
 
@@ -29,7 +29,7 @@ public class ClientHandlerAuth {
 
         // Mode simulation pour tester sans vrai serveur
         if (ip.equalsIgnoreCase("simul")) {
-            clientReseau = new ClientReseau(ecouteur);
+            clientReseau = new ClientReseauCALL(ecouteur);
             clientReseau.activerSimulation();
             authService = new AuthService(clientReseau);
             connecteAuServeur = true;
@@ -37,7 +37,7 @@ public class ClientHandlerAuth {
         }
 
         // Connexion normale
-        clientReseau = new ClientReseau(ecouteur);
+        clientReseau = new ClientReseauCALL(ecouteur);
         clientReseau.connecterAuServeur(ip, port);
 
         if (clientReseau.isConnecte()) {
