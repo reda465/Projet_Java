@@ -3,7 +3,6 @@ package client;
 import model.Utilisateur;
 import service.AuthService;
 
-
 public class ClientHandlerAuth {
 
     // ===== SINGLETON : une seule instance =====
