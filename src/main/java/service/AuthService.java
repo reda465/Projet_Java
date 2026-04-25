@@ -1,22 +1,21 @@
 package service;
 
-import client.ClientReseauCALL;
+import Serveur.*;
+import client.ClientReseau;
 import network.*;
 
-import javax.sound.sampled.*;
-
 public class AuthService {
-    private ClientReseauCALL client;
+    private ClientReseau client;
 
     // Constructeur : on reçoit le client réseau déjà connecté
-    public AuthService(ClientReseauCALL client) {
+    public AuthService(ClientReseau client) {
         this.client = client;
     }
 
     // ===== INSCRIPTION =====
-    public String inscrire(String nom, String prenom, String numero, String password) {
+    public String inscrire(String nomComplet, String numero, String password) {
 
-        if (nom.isEmpty() || prenom.isEmpty() || numero.isEmpty() || password.isEmpty()) {
+        if (nomComplet.isEmpty() || numero.isEmpty() || password.isEmpty()) {
             return "Tous les champs sont obligatoires !"; // Retourne l'erreur à l'UI
         }
 
@@ -24,8 +23,8 @@ public class AuthService {
             return "Le numéro doit faire 10 chiffres !"; // Retourne l'erreur à l'UI
         }
 
-        String data = nom + "|" + prenom + "|" + numero + "|" + password;
-        Packet p = new Packet(Commande.INSCRIPTION, data);
+        String data = nomComplet+ "|" + numero + "|" + password;
+        Packet p = new Packet(Protocol.REGISTER, data);
         client.envoyer(p);
 
         return "OK"; // Indique que la demande est bien partie
@@ -34,182 +33,17 @@ public class AuthService {
     // ===== CONNEXION =====
     public String connecter(String numero, String password) {
 
-        if (numero.isEmpty() || password.isEmpty()) {
-            return "Remplis tous les champs !";
-        }
 
         String data = numero + "|" + password;
-        Packet p = new Packet(Commande.CONNEXION, data);
+        Packet p = new Packet(Protocol.LOGIN, data);
         client.envoyer(p);
 
         return "OK";
     }
     // ===== DÉCONNEXION =====
     public void deconnecter() {
-        Packet p = new Packet(Commande.DECONNEXION, "");
+        Packet p = new Packet(Protocol.LOGOUT, "");
         client.envoyer(p);
         client.deconnecter();
-    }
-
-    public static class AudioService {
-
-        private ClientReseauCALL clientReseau;
-
-        // AUDIO CONFIG
-        private AudioFormat format;
-        private TargetDataLine microphone;
-        private SourceDataLine speakers;
-
-        private Thread captureThread;
-        private boolean enAppel = false;
-
-        public AudioService(ClientReseauCALL clientReseau) {
-            this.clientReseau = clientReseau;
-
-            // format audio standard (IMPORTANT client/serveur identique)
-            format = new AudioFormat(44100, 16, 1, true, false);
-        }
-
-        // =====================================================
-        // 1. DEMARRER APPEL AUDIO
-        // =====================================================
-        public void startCall(String caller, String receiver) {
-            enAppel = true;
-
-            Packet packet = new Packet(
-                    Commande.Debuter_AUDIO_CALL,
-                    caller + ";" + receiver
-            );
-
-            clientReseau.envoyer(packet);
-
-            demarrerMicro();
-            demarrerLectureAudio();
-
-            System.out.println("[AUDIO] Appel démarré");
-        }
-
-        // =====================================================
-        // 2. TERMINER APPEL AUDIO
-        // =====================================================
-        public void stopCall(String caller, String receiver) {
-            enAppel = false;
-
-            Packet packet = new Packet(
-                    Commande.Arreter_AUDIO_CALL,
-                    caller + ";" + receiver
-            );
-
-            clientReseau.envoyer(packet);
-
-            stopMicro();
-            stopAudio();
-
-            System.out.println("[AUDIO] Appel terminé");
-        }
-
-        // =====================================================
-        // 3. MICRO (CAPTURE + ENVOI)
-        // =====================================================
-        private void demarrerMicro() {
-
-            captureThread = new Thread(() -> {
-
-                try {
-                    DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
-
-                    microphone = (TargetDataLine) AudioSystem.getLine(info);
-                    microphone.open(format);
-                    microphone.start();
-
-                    System.out.println("[MIC] Micro ouvert");
-
-                    byte[] buffer = new byte[4096];
-
-                    while (enAppel) {
-
-                        int bytesRead = microphone.read(buffer, 0, buffer.length);
-
-                        if (bytesRead > 0) {
-
-                            envoyerAudio(buffer);
-                        }
-                    }
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            });
-
-            captureThread.start();
-        }
-
-        // ENVOI AUDIO
-        public void envoyerAudio(byte[] data) {
-
-            Packet packet = new Packet(
-                    Commande.Data_AUDIO,
-                    data
-            );
-
-            clientReseau.envoyer(packet);
-        }
-
-        // =====================================================
-        // 4. LECTURE AUDIO (RECEPTION)
-        // =====================================================
-        private void demarrerLectureAudio() {
-
-            try {
-                DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
-
-                speakers = (SourceDataLine) AudioSystem.getLine(info);
-                speakers.open(format);
-                speakers.start();
-
-                System.out.println("[SPEAKER] Haut-parleur prêt");
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        // méthode appelée depuis ClientReseau quand AUDIO_DATA arrive
-        public void jouerAudio(byte[] data) {
-
-            if (speakers != null) {
-                speakers.write(data, 0, data.length);
-            }
-        }
-
-        // =====================================================
-        // 5. STOP MICRO
-        // =====================================================
-        private void stopMicro() {
-
-            try {
-                if (microphone != null) {
-                    microphone.stop();
-                    microphone.close();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        // =====================================================
-        // 6. STOP AUDIO
-        // =====================================================
-        private void stopAudio() {
-
-            try {
-                if (speakers != null) {
-                    speakers.stop();
-                    speakers.close();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
     }
 }

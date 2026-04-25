@@ -6,10 +6,9 @@ import service.AuthService;
 
 public class ClientHandlerAuth {
 
-    // ===== SINGLETON : une seule instance =====
     private static ClientHandlerAuth instance;
 
-    private ClientReseauCALL clientReseau;
+    private ClientReseau clientReseau;
     private AuthService authService;
     private boolean connecteAuServeur = false;
 
@@ -27,17 +26,8 @@ public class ClientHandlerAuth {
     // ===== 1. CONNEXION AU SERVEUR =====
     public boolean connecterAuServeur(String ip, int port, EcouteurClient ecouteur) {
 
-        // Mode simulation pour tester sans vrai serveur
-        if (ip.equalsIgnoreCase("simul")) {
-            clientReseau = new ClientReseauCALL(ecouteur);
-            clientReseau.activerSimulation();
-            authService = new AuthService(clientReseau);
-            connecteAuServeur = true;
-            return true;
-        }
-
         // Connexion normale
-        clientReseau = new ClientReseauCALL(ecouteur);
+        clientReseau = new ClientReseau(ecouteur);
         clientReseau.connecterAuServeur(ip, port);
 
         if (clientReseau.isConnecte()) {
@@ -57,24 +47,18 @@ public class ClientHandlerAuth {
         return authService.connecter(numero, password);
     }
     // ===== 3. INSCRIPTION =====
-    public String sInscrire(String nom, String prenom, String numero, String password) {
+    public String sInscrire(String nomComplet, String numero, String password) {
         if (!verifierConnexion()) {
             return "Erreur : Pas connecté au serveur !";
         }
-        return authService.inscrire(nom, prenom, numero, password);
+        return authService.inscrire(nomComplet, numero, password);
     }
-
     // ===== 3. DÉCONNEXION =====
     public void seDeconnecter() {
         if (authService != null) {
             authService.deconnecter();
         }
         connecteAuServeur = false;
-    }
-
-    // ===== 4. INFOS =====
-    public boolean isConnecteAuServeur() {
-        return connecteAuServeur;
     }
 
     public Utilisateur getUtilisateurConnecte() {
@@ -87,7 +71,6 @@ public class ClientHandlerAuth {
     // ===== VÉRIFICATION =====
     private boolean verifierConnexion() {
         if (!connecteAuServeur || authService == null) {
-            System.out.println(" Pas connecté au serveur !");
             return false;
         }
         return true;

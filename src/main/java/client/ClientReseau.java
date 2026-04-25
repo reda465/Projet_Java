@@ -9,7 +9,7 @@ import Serveur.*;
 
 public class ClientReseau {
 
-    private Socket tuyau;
+    private Socket tuyau;''
     private PrintWriter stylo;
     private BufferedReader yeux;
     private boolean connecte = false;
