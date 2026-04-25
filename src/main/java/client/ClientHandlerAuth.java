@@ -66,7 +66,6 @@ public class ClientHandlerAuth {
         }
         return null;
     }
-
     // ===== VÉRIFICATION =====
     private boolean verifierConnexion() {
         if (!connecteAuServeur || authService == null) {
