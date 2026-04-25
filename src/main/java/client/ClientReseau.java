@@ -1,9 +1,11 @@
+
 package client;
 
 import network.*;
 import model.*;
 import java.io.*;
 import java.net.*;
+import Serveur.*;
 
 public class ClientReseau {
 
@@ -11,7 +13,6 @@ public class ClientReseau {
     private PrintWriter stylo;
     private BufferedReader yeux;
     private boolean connecte = false;
-    private boolean modeSimulation = false;
 
     private EcouteurClient ecouteur;
     private Utilisateur moi;
@@ -22,15 +23,11 @@ public class ClientReseau {
     // ===== CONNEXION NORMALE =====
     public void connecterAuServeur(String ip, int port) {
         try {
-            System.out.println("Connexion au serveur" + ip + ":" + port + "...");
             tuyau = new Socket(ip, port);
             stylo = new PrintWriter(tuyau.getOutputStream(), true);
             yeux = new BufferedReader(new InputStreamReader(tuyau.getInputStream()));
 
             connecte = true;
-            modeSimulation = false;
-            System.out.println(" Connecté au serveur !");
-
             Thread ami = new Thread(new Ecouteur());
             ami.start();
 
@@ -44,89 +41,22 @@ public class ClientReseau {
         }
     }
 
-    // ===== MODE SIMULATION (pour tester sans serveur) =====
-    public void activerSimulation() {
-        this.modeSimulation = true;
-        this.connecte = true;  // Forcer à true !
-        System.out.println("🎮 Mode simulation activé");
-    }
 
     // ===== ENVOYER =====
     public void envoyer(Packet packet) {
         if (!connecte) {//erreur du connection
-            System.out.println("❌ Pas connecté !");
             return;
         }
 
-        if (modeSimulation) {
-            // En simulation, on simule une réponse immédiate
-            System.out.println("📤 [SIMULATION] Envoyé : " + packet.getCommande());
-            simulerReponse(packet);
-            return;
-        }
-
-        // Vrai réseau
         if (stylo != null) {
             stylo.println(packet.toString());
-            System.out.println("📤 Envoyé : " + packet.getCommande());
-        }
-    }
-
-    // ===== SIMULER UNE RÉPONSE DU SERVEUR =====
-    private void simulerReponse(Packet envoye) {
-        // Attendre un peu pour simuler le réseau
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {}
-
-        Packet reponse = null;
-
-        switch (envoye.getCommande()) {
-            case INSCRIPTION:
-                // Simuler : inscription réussie
-                reponse = new Packet(Commande.SUCCES, "99|nouveauuser|Nom|Prénom");
-                System.out.println("📥 [SIMULATION] Réponse : SUCCES");
-                break;
-
-            case CONNEXION:
-                // Simuler : connexion réussie
-                reponse = new Packet(Commande.SUCCES, "1|onk|nom|mer");
-                System.out.println("📥 [SIMULATION] Réponse : SUCCES");
-                break;
-
-            case DECONNEXION:
-                reponse = new Packet(Commande.SUCCES, "deconnecte");
-                break;
-        }
-
-        if (reponse != null && ecouteur != null) {
-            traiterPacketSimulation(reponse);
-        }
-    }
-
-    private void traiterPacketSimulation(Packet p) {
-        switch (p.getCommande()) {
-            case SUCCES:
-                String[] infos = p.getData().split("\\|");
-                moi = new Utilisateur();
-                moi.setId(Integer.parseInt(infos[0]));
-               // moi.setUsername(infos[1]);
-                moi.setNom(infos[1]);
-                moi.setPrenom(infos[2]);
-                moi.setEnLigne(true);
-
-                System.out.println("✅ Authentifié ! ID = " + moi.getId());
-                if (ecouteur != null) {
-                    ecouteur.connexionReussie(moi);
-                }
-                break;
+            System.out.println(" Envoyé : " + packet.getCommande());
         }
     }
 
     // ===== DÉCONNEXION =====
     public void deconnecter() {
         connecte = false;
-        modeSimulation = false;
 
         if (tuyau != null) {
             try {
@@ -159,49 +89,45 @@ public class ClientReseau {
             try {
                 String ligne;
                 while (connecte && (ligne = yeux.readLine()) != null) {
-                    System.out.println("📥 Reçu : " + ligne);
                     Packet recu = Packet.fromString(ligne);
                     traiterPacket(recu);
                 }
             } catch (IOException e) {
-                System.out.println("🔌 Connexion perdue.");
-            }
-
-            connecte = false;
-            if (ecouteur != null) {
-                ecouteur.deconnexion();
+                connecte = false;
+                if (ecouteur != null) {
+                    ecouteur.deconnexion();
+                }
             }
         }
 
         private void traiterPacket(Packet p) {
             switch (p.getCommande()) {
-                case SUCCES:
+                case LOGIN_OK:
                     String[] infos = p.getData().split("\\|");
                     moi = new Utilisateur();
-                    moi.setId(Integer.parseInt(infos[0]));
-                   // moi.setUsername(infos[1]);
-                    moi.setNom(infos[1]);
-                    moi.setPrenom(infos[2]);
-                    moi.setEnLigne(true);
-
-                    System.out.println("✅ Authentifié ! ID = " + moi.getId());
+                    moi.setNomComplet(infos[0]);
+                    moi.setNumeroTelephone(infos[1]);
                     if (ecouteur != null) {
                         ecouteur.connexionReussie(moi);
                     }
                     break;
 
-                case ERREUR:
-                    System.out.println("❌ Refusé : " + p.getData());
+                case LOGIN_FAIL:
+                    if (ecouteur != null) {
+                        ecouteur.erreur(p.getData());
+                    }
+                    break;
+                case REGISTER_OK:
+                    if (ecouteur != null) {
+                        ecouteur.inscriptionReussie(p.getData());
+                    }
+                    break;
+                case REGISTER_FAIL:
                     if (ecouteur != null) {
                         ecouteur.erreur(p.getData());
                     }
                     break;
 
-                case RECEPTION_MESSAGE:
-                    if (ecouteur != null) {
-                        ecouteur.messageRecu(p.getData());
-                    }
-                    break;
             }
         }
     }

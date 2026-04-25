@@ -13,5 +13,16 @@ public enum Commande {
 
     // Messages
     ENVOI_MESSAGE,    // "J'envoie un message"
-    RECEPTION_MESSAGE // "Je reçois un message"
+    RECEPTION_MESSAGE,// "Je reçois un message"
+
+    //Appel Audio
+    Debuter_AUDIO_CALL,
+    Arreter_AUDIO_CALL,
+    Data_AUDIO,
+
+    //Appel Video
+    Debuter_Video_CALL,
+    Arreter_Video_CALL,
+    Data_Appel_Video
+
 }
