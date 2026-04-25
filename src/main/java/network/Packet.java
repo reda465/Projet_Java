@@ -1,5 +1,6 @@
 package network;
 
+import Serveur.Commande;
 import lombok.Getter;
 import lombok.Setter;
 
