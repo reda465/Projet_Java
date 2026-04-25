@@ -15,7 +15,7 @@ public class Main implements EcouteurClient {
         ClientHandlerAuth facade = ClientHandlerAuth.getInstance();
 
         // Test connexion simulation
-        boolean ok = facade.connecterAuServeur("simul", 8080, this);
+        boolean ok = facade.connecterAuServeur("192.168.56.1", 5000, this);
         System.out.println("Connecté : " + ok);
 
         // Test inscription
