@@ -1,8 +1,5 @@
 package com.ensa;
 
-import network.Commande;
-import network.Packet;
-
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 // TestFacade.java
@@ -15,14 +12,14 @@ public class Main implements EcouteurClient {
     }
 
     public void tester() {
-        ChatClientFacade facade = ChatClientFacade.getInstance();
+        ClientHandlerAuth facade = ClientHandlerAuth.getInstance();
 
         // Test connexion simulation
         boolean ok = facade.connecterAuServeur("simul", 8080, this);
         System.out.println("Connecté : " + ok);
 
         // Test inscription
-        facade.sInscrire("Dupont", "Jean", "0612345678", "jeandupont", "pass123");
+        facade.sInscrire("Dupont", "Jean", "0612345678", "pass123");
 
         // Attendre un peu
         try { Thread.sleep(1000); } catch (Exception e) {}

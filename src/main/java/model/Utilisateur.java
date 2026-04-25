@@ -19,7 +19,6 @@ public class Utilisateur {
     private String motDePasse;
     private boolean enLigne;
 
-    // Méthode utile
     public String getNomComplet() {
         return prenom + " " + nom;
     }

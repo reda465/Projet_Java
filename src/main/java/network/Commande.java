@@ -1,7 +1,6 @@
 package network;
 
 // enum = ÉNUMÉRATION = liste de valeurs fixes
-// C'est comme dire : les seules couleurs possibles sont ROUGE, VERT, BLEU
 public enum Commande {
     // Authentification
     INSCRIPTION,      // "Je veux m'inscrire"

@@ -4,36 +4,27 @@ import model.Utilisateur;
 import service.AuthService;
 
 
-public class ChatClientFacade {
+public class ClientHandlerAuth {
 
     // ===== SINGLETON : une seule instance =====
-    // (comme le président, il n'y en a qu'un)
-    private static ChatClientFacade instance;
+    private static ClientHandlerAuth instance;
 
     private ClientReseau clientReseau;
     private AuthService authService;
     private boolean connecteAuServeur = false;
 
     // Constructeur privé (personne ne peut créer directement)
-    private ChatClientFacade() {}
+    private ClientHandlerAuth() {}
 
     // Obtenir l'instance unique
-    public static ChatClientFacade getInstance() {
+    public static ClientHandlerAuth getInstance() {
         if (instance == null) {
-            instance = new ChatClientFacade();
+            instance = new ClientHandlerAuth();
         }
         return instance;
     }
 
     // ===== 1. CONNEXION AU SERVEUR =====
-    /**
-     * L'UI appelle ça au démarrage (bouton "Se connecter au serveur")
-     *
-     * @param ip Adresse du serveur (ex: "localhost", "192.168.1.5")
-     * @param port Port (ex: 8080)
-     * @param ecouteur L'UI qui veut être prévenue des événements
-     * @return true si connecté, false sinon
-     */
     public boolean connecterAuServeur(String ip, int port, EcouteurClient ecouteur) {
 
         // Mode simulation pour tester sans vrai serveur
@@ -59,23 +50,18 @@ public class ChatClientFacade {
     }
 
     // ===== 2. AUTHENTIFICATION =====
-    /**
-     * L'UI appelle ça quand l'utilisateur clique "Se connecter"
-     *
-     * @param numero Numéro de téléphone
-     * @param password Mot de passe
-     */
-    public void seConnecter(String numero, String password) {
-        if (!verifierConnexion()) return;
-        authService.connecter(numero, password);
+    public String seConnecter(String numero, String password) {
+        if (!verifierConnexion()) {
+            return "Erreur : Pas connecté au serveur !";
+        }
+        return authService.connecter(numero, password);
     }
-
-    /**
-     * L'UI appelle ça quand l'utilisateur clique "S'inscrire"
-     */
-    public void sInscrire(String nom, String prenom, String numero, String password) {
-        if (!verifierConnexion()) return;
-        authService.inscrire(nom, prenom, numero, password);
+    // ===== 3. INSCRIPTION =====
+    public String sInscrire(String nom, String prenom, String numero, String password) {
+        if (!verifierConnexion()) {
+            return "Erreur : Pas connecté au serveur !";
+        }
+        return authService.inscrire(nom, prenom, numero, password);
     }
 
     // ===== 3. DÉCONNEXION =====
