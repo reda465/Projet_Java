@@ -1,5 +1,4 @@
 package javafx;
-
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -28,12 +27,10 @@ public class signup {
 
         VBox header = new VBox(6, logo, title);
         header.setAlignment(Pos.CENTER);
-
         // Champs
         TextField nom = new TextField();
         nom.setPromptText("Nom");
         nom.setStyle(fs);
-
         TextField prenom = new TextField();
         prenom.setPromptText("Prénom");
         prenom.setStyle(fs);
