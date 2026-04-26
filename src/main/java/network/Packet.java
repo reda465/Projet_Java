@@ -11,17 +11,18 @@ import java.util.Base64;
 @Setter
 public class Packet {
 
-    private Commande commande;
+    private Protocol protocol;
     private Object data;
-    private int expediteurId;       // Qui envoie (0 si pas encore connecté)
-    private Protocol commande;
-    private String data;
+    private int expediteurId;// Qui envoie (0 si pas encore connecté)
+    private String type;
 
-    public Packet(Commande commande, Object data) {
-    public Packet(Protocol commande, String data) {
-        this.commande = commande;
+
+
+    public Packet(Protocol protocol, Object data) {
+        this.protocol = protocol;
         this.data = data;
         this.expediteurId = 0;     // Par défaut, pas d'ID , sera modifier apres connexion au serveur
+        this.type = (data instanceof byte[]) ? "BYTES" : "STRING";
     }
 
 
@@ -39,33 +40,33 @@ public class Packet {
             contenu = (data != null) ? data.toString() : "";
         }
 
-        return commande + "|" + expediteurId + "|" + type + "|" + contenu;
-        return commande + "|" + data;
+        return protocol + "|" + expediteurId + "|" + type + "|" + contenu;
     }
 
     // Reconstruire un Packet depuis un String reçu
     public static Packet fromString(String ligne) {
         String[] parts = ligne.split("\\|",4);  // Coupe aux "|"
 
-        Commande cmd = Commande.valueOf(parts[0]);
-        int id = Integer.parseInt(parts[1]);// String → enum
+        Protocol protocol = Protocol.valueOf(parts[0]);
+        int expediteurId = Integer.parseInt(parts[1]);
         String type = (parts.length > 2) ? parts[2] : "STRING";
         String contenu = (parts.length > 3) ? parts[3] : "";
-        String[] parts = ligne.split("\\|",2);  // Coupe aux "|"
+        //String[] parts = ligne.split("\\|",2);  // Coupe aux "|"
 
-        Object donnees;
+        Object data;
 
         if (type.equals("BYTES")) {
-            donnees = Base64.getDecoder().decode(contenu);
+            data = Base64.getDecoder().decode(contenu);
         } else {
-            donnees = contenu;
+            data = contenu;
         }
 
-        Protocol cmd = Protocol.valueOf(parts[0]);  // String → enum
-        String donnees = (parts.length > 1) ? parts[1] : "";
-        Packet p = new Packet(cmd, donnees);
-        p.setExpediteurId(id);
-
+      //  Packet p = Protocol.valueOf(parts[0]);  // String → enum
+       // String donnees = (parts.length > 1) ? parts[1] : "";
+        //Packet p = new Packet(cmd, donnees);
+        //p.setExpediteurId(id);
+        Packet p = new Packet(protocol, data);
+        p.setExpediteurId(expediteurId);
         return p;
     }
 }

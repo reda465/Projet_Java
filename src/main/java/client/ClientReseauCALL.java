@@ -1,4 +1,4 @@
-package client;
+/*package client;
 
 import network.*;
 import model.*;
@@ -63,6 +63,10 @@ public class ClientReseauCALL {
             System.out.println("❌ Pas connecté !");
             return;
         }
+        if (moi != null) {
+            packet.setExpediteurId(moi.getIdUtilisateur());
+        }
+
 
         if (stylo != null) {
             stylo.println(packet.toString());
@@ -110,12 +114,12 @@ public class ClientReseauCALL {
                 String[] infos = data.split("\\|");
 
                 moi = new Utilisateur();
-                moi.setId(Integer.parseInt(infos[0]));
-                moi.setNom(infos[1]);
-                moi.setPrenom(infos[2]);
-                moi.setEnLigne(true);
+                moi.setIdUtilisateur(Integer.parseInt(infos[0]));
+                moi.setNomComplet(infos[1]);
+                moi.setNumeroTelephone(infos[2]);
+                moi.setStatus(true);
 
-                System.out.println("✅ [SIMULATION] Authentifié ! ID = " + moi.getId());
+                System.out.println("✅ [SIMULATION] Authentifié ! ID = " + moi.getIdUtilisateur());
 
                 if (ecouteur != null) {
                     ecouteur.connexionReussie(moi);
@@ -197,7 +201,7 @@ public class ClientReseauCALL {
                     moi.setPrenom(infos[2]);
                     moi.setEnLigne(true);
 
-                    System.out.println("✅ Authentifié ! ID = " + moi.getId());
+                    System.out.println("✅ Authentifié ! ID = " + moi.getIdUtilisateur());
 
                     if (ecouteur != null) {
                         ecouteur.connexionReussie(moi);
@@ -281,4 +285,4 @@ public class ClientReseauCALL {
 
         }
     }
-}
+}*/

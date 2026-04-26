@@ -15,6 +15,13 @@ public enum Commande {
     ENVOI_MESSAGE,    // "J'envoie un message"
     RECEPTION_MESSAGE,// "Je reçois un message"
 
+    LOGIN_OK,
+    LOGIN_FAIL,
+    REGISTER_FAIL,
+    REGISTER_OK,
+
+
+
     //Appel Audio
     Debuter_AUDIO_CALL,
     Arreter_AUDIO_CALL,
@@ -23,6 +30,7 @@ public enum Commande {
     //Appel Video
     Debuter_Video_CALL,
     Arreter_Video_CALL,
-    Data_Appel_Video
+    Data_Appel_Video,
+
 
 }
