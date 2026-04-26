@@ -1,25 +1,47 @@
 package Serveur;
 
 public enum Protocol {
-    // Auth
-    LOGIN ,
-    REGISTER,
-    REGISTER_OK ,
-    REGISTER_FAIL ,
-    LOGIN_OK ,
-    LOGIN_FAIL ,
-    LOGOUT ,
 
-    // Utilisateurs
+    // ==========================
+    // AUTHENTIFICATION
+    // ==========================
+    LOGIN,
+    REGISTER,
+    LOGOUT,
+
+    LOGIN_OK,
+    LOGIN_FAIL,
+
+    REGISTER_OK,
+    REGISTER_FAIL,
+
+    // ==========================
+    // UTILISATEURS CONNECTÉS
+    // ==========================
     USERS_LIST,
 
-    // Messagerie
-    MSG_SEND ,
-    MSG_RECEIVE ,
+    // ==========================
+    // MESSAGERIE
+    // ==========================
+    MSG_SEND,
+    MSG_RECEIVE,
 
-    // Appels
+    // ==========================
+    // APPELS (DEMANDE/REPONSE)
+    // ==========================
     CALL_REQUEST,
-    CALL_ACCEPT ,
-    CALL_REFUSE ,
-    CALL_END
+    CALL_ACCEPT,
+    CALL_REFUSE,
+    CALL_END,
+
+    // ==========================
+    // DONNÉES AUDIO/VIDEO
+    // ==========================
+    AUDIO_DATA,
+    VIDEO_FRAME,
+
+    // ==========================
+    // ERREUR GENERALE
+    // ==========================
+    ERROR
 }
