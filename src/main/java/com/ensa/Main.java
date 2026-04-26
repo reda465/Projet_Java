@@ -19,6 +19,7 @@ public class Main implements EcouteurClient {
         System.out.println("Connecté : " + ok);
 
         // Test inscription
+        facade.sInscrire("Dupont",  "0612345678", "pass123");
 
         // Attendre un peu
         try { Thread.sleep(1000); } catch (Exception e) {}
