@@ -12,6 +12,7 @@ public class ClientHandler extends Thread {
     private final Socket socket;
     private PrintWriter pw;
     private String telephoneConnecte; // null = pas encore authentifié
+    private final MessageRouter messageRouter = MessageRouter.getInstance();
 
     private final UserManager      userManager = UserManager.getInstance();
     private final Dao_UtilisateurImp userDAO   = new Dao_UtilisateurImp();
@@ -67,8 +68,10 @@ public class ClientHandler extends Thread {
                 pw.println(Protocol.LOGIN_OK + "|" + u.getNomComplet() + "|" + u.getNumeroTelephone());
 
                 broadcastUsersList();
+                messageRouter.delivrerMessagesEnAttente(telephoneConnecte);
+
             } else {
-                pw.println(Protocol.LOGIN_FAIL);
+                pw.println(Protocol.LOGIN_FAIL+"|ErreurLogin");
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -110,10 +113,19 @@ public class ClientHandler extends Thread {
     }
 
     // ── MSG_SEND — sprint suivant ─────────────────────────────────────────────
-    private void handleMessage(String[] parts) {
-        // Implémenté au sprint messagerie
-    }
+        private void handleMessage(String[] parts) {
+            if (parts.length < 3) return;
 
+            String telephoneDest = parts[1];
+            String contenu = parts[2];
+
+            try {
+                messageRouter.envoyerMessage(telephoneConnecte, telephoneDest, contenu);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                pw.println("MSG_FAIL|Erreur_Envoi");
+            }
+        }
     // ── Broadcast liste connectés ─────────────────────────────────────────────
     private void broadcastUsersList() {
         userManager.broadcast(Protocol.USERS_LIST + "|" + userManager.getOnlineUsersList());

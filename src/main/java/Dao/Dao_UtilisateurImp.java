@@ -73,7 +73,17 @@ public class Dao_UtilisateurImp implements Dao_Utilisateur {
         }
         return liste;
     }
-
+    /** Retrouve un utilisateur par son numéro — sans vérifier le mot de passe */
+    public Utilisateur findByTelephone(String tel) throws SQLException {
+        String sql = "SELECT * FROM utilisateurs WHERE numero_telephone=?";
+        try (Connection c = DataBase.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, tel);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) return mapResultSet(rs);
+        }
+        return null;
+    }
     // ── METHODES SPECIFIQUES ─────────────────────────────────────────────────
 
     /** Authentification : vérifie le téléphone + BCrypt. Retourne null si échec. */
@@ -122,8 +132,15 @@ public class Dao_UtilisateurImp implements Dao_Utilisateur {
         u.setNumeroTelephone(rs.getString("numero_telephone"));
         u.setMotDePasse(rs.getString("mot_de_passe"));
         u.setPhotoProfil(rs.getString("photo_profil"));
-        u.setDateInscription(rs.getTimestamp("date_inscription").toLocalDateTime());
-        u.setDerniereConnexion(rs.getTimestamp("derniere_connexion").toLocalDateTime());
+
+        Timestamp dateInscription = rs.getTimestamp("date_inscription");
+        if (dateInscription != null)
+            u.setDateInscription(dateInscription.toLocalDateTime());
+
+        Timestamp derniereConnexion = rs.getTimestamp("derniere_connexion");
+        if (derniereConnexion != null)
+            u.setDerniereConnexion(derniereConnexion.toLocalDateTime());
+
         return u;
     }
 }
