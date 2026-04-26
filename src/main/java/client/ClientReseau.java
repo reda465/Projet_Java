@@ -1,15 +1,18 @@
 
 package client;
 
+import lombok.Getter;
+import lombok.Setter;
 import network.*;
 import model.*;
 import java.io.*;
 import java.net.*;
-import Serveur.*;
-
+//import Serveur.*;
+@Setter
+@Getter
 public class ClientReseau {
 
-    private Socket tuyau;''
+    private Socket tuyau;
     private PrintWriter stylo;
     private BufferedReader yeux;
     private boolean connecte = false;
@@ -26,14 +29,16 @@ public class ClientReseau {
             tuyau = new Socket(ip, port);
             stylo = new PrintWriter(tuyau.getOutputStream(), true);
             yeux = new BufferedReader(new InputStreamReader(tuyau.getInputStream()));
-
+            System.out.println("Connexion au serveur " + ip + ":" + port);
             connecte = true;
+            System.out.println("✅ Connecté au serveur");
             Thread ami = new Thread(new Ecouteur());
             ami.start();
 
         } catch (IOException e) {
-            System.out.println(" Erreur connexion : " + e.getMessage());
             connecte = false;
+            System.out.println(" Erreur connexion : " + e.getMessage());
+
 
             if (ecouteur != null) {//ecouteur est null signifie que y'a pas de liaison entre UI et Client
                 ecouteur.erreur("Impossible de se connecter au serveur");
@@ -47,40 +52,30 @@ public class ClientReseau {
         if (!connecte) {//erreur du connection
             return;
         }
+        if (moi != null) {
+            packet.setExpediteurId(moi.getIdUtilisateur());
+        }
 
         if (stylo != null) {
             stylo.println(packet.toString());
-            System.out.println(" Envoyé : " + packet.getCommande());
+            System.out.println(" Envoyé : " + packet.getProtocol());
         }
     }
 
     // ===== DÉCONNEXION =====
     public void deconnecter() {
         connecte = false;
-
+        try{
         if (tuyau != null) {
-            try {
-                tuyau.close();
-            } catch (IOException e) {}
-        }
+            tuyau.close();
+        } } catch (IOException e) {}
 
         if (ecouteur != null) {
             ecouteur.deconnexion();
         }
     }
 
-    // ===== GETTERS =====
-    public boolean isConnecte() {
-        return connecte;  // Maintenant true en simulation !
-    }
 
-    public Utilisateur getMoi() {
-        return moi;
-    }
-
-    public void setMoi(Utilisateur moi) {
-        this.moi = moi;
-    }
 
     // ===== CLASSE INTERNE : ÉCOUTEUR RÉSEAU =====
     private class Ecouteur implements Runnable {
@@ -101,9 +96,9 @@ public class ClientReseau {
         }
 
         private void traiterPacket(Packet p) {
-            switch (p.getCommande()) {
+            switch (p.getProtocol()) {
                 case LOGIN_OK:
-                    String[] infos = p.getData().split("\\|");
+                    String[] infos =(String) p.getData().split("\\|");
                     moi = new Utilisateur();
                     moi.setNomComplet(infos[0]);
                     moi.setNumeroTelephone(infos[1]);
@@ -114,18 +109,48 @@ public class ClientReseau {
 
                 case LOGIN_FAIL:
                     if (ecouteur != null) {
-                        ecouteur.erreur(p.getData());
+                        ecouteur.erreur((String) p.getData());
                     }
                     break;
                 case REGISTER_OK:
                     if (ecouteur != null) {
-                        ecouteur.inscriptionReussie(p.getData());
+                        ecouteur.inscriptionReussie((String) p.getData());
                     }
                     break;
                 case REGISTER_FAIL:
                     if (ecouteur != null) {
-                        ecouteur.erreur(p.getData());
+                        ecouteur.erreur((String) p.getData());
                     }
+                    break;
+                case MSG_RECEIVE:
+                    if (ecouteur != null) {
+                        ecouteur.messageRecu((String) p.getData());
+                    }
+                    break;
+                case VIDEO_FRAME:
+                    if (ecouteur != null) {
+                        ecouteur.videoRecu((byte[]) p.getData());
+                    }
+                    break;
+                case CALL_REQUEST:
+                    System.out.println("[CALL] Demande appel reçue : " + p.getData());
+                    // tu peux appeler une méthode dans l'interface pour afficher popup
+                    break;
+
+                case CALL_ACCEPT:
+                    System.out.println("[CALL] Appel accepté : " + p.getData());
+                    break;
+
+                case CALL_REFUSE:
+                    System.out.println("[CALL] Appel refusé : " + p.getData());
+                    break;
+
+                case CALL_END:
+                    System.out.println("[CALL] Appel terminé : " + p.getData());
+                    break;
+
+                default:
+                    System.out.println("⚠️ Packet non géré : " + p.getProtocol());
                     break;
 
             }
