@@ -127,11 +127,11 @@ public class ClientReseau {
                         ecouteur.messageRecu((String) p.getData());
                     }
                     break;
-                case VIDEO_FRAME:
+                /*case VIDEO_FRAME:
                     if (ecouteur != null) {
                         ecouteur.videoRecu((byte[]) p.getData());
                     }
-                    break;
+                    break;*/
                 case CALL_REQUEST:
                     System.out.println("[CALL] Demande appel reçue : " + p.getData());
                     // tu peux appeler une méthode dans l'interface pour afficher popup
