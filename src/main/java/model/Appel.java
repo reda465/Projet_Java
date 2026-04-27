@@ -5,8 +5,9 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-
 public class Appel {
+    // SUPPRIMER les enums locaux ! Utiliser ceux de model.enums
+
     private int idAppel;
     private int idAppelant;
     private int idConversation;

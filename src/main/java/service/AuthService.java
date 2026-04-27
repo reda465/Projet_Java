@@ -33,9 +33,6 @@ public class AuthService {
     // ===== CONNEXION =====
     public String connecter(String numero, String password) {
 
-        if (numero.isEmpty() || password.isEmpty()) {
-            return "Remplis tous les champs !";
-        }
 
         String data = numero + "|" + password;
         Packet p = new Packet(Protocol.LOGIN, data);
