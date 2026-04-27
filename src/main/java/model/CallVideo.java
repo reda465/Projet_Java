@@ -58,7 +58,7 @@ public class CallVideo {
 
     @Override
     public String toString() {
-        return "Appel vidéo : " + caller.getNom() + " -> " + receiver.getNom()
+        return "Appel vidéo : " + caller.getNomComplet() + " -> " + receiver.getNomComplet()
                 + " | Etat : " + etat;
     }
 }

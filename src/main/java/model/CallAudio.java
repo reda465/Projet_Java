@@ -57,7 +57,7 @@ public class CallAudio {
 
     @Override
     public String toString() {
-        return "Appel audio : " + caller.getNom() + " -> " + receiver.getNom()
+        return "Appel audio : " + caller.getNomComplet() + " -> " + receiver.getNomComplet()
                 + " | Etat : " + etat;
     }
 }

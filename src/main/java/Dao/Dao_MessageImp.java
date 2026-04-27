@@ -1,32 +1,34 @@
 package Dao;
 
-import model.Appel;
-import model.enums.StatutAppel;
-import model.enums.TypeAppel;
-
+import model.Message;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Dao_AppelImp implements DAO_Appel {
+public class Dao_MessageImp implements DAO_Message {
 
     // ── ADD ──────────────────────────────────────────────────────────────────
-    // Retourne l'id généré — nécessaire pour mettre à jour l'appel après
     @Override
-    public int Add(Appel a) throws SQLException {
-        String sql = "INSERT INTO appels (id_appelant, id_conversation, type_appel, statut) "
-                + "VALUES (?, ?, ?, ?)";
+    public int Add(Message m) throws SQLException {
+        String sql = "INSERT INTO messages (id_conversation, id_expediteur, type_message, contenu_texte, "
+                + "url_fichier, nom_fichier, taille_fichier) VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (Connection c = DataBase.getConnection();
              PreparedStatement ps = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setInt(1, a.getIdAppelant());
-            ps.setInt(2, a.getIdConversation());
-            ps.setString(3, a.getTypeAppel().name());
-            ps.setString(4, a.getStatut().name());
+            ps.setInt(1, m.getIdConversation());
+            ps.setInt(2, m.getIdExpediteur());
+            ps.setString(3, m.getTypeMessage());
+            ps.setString(4, m.getContenuTexte());
+            ps.setString(5, m.getUrlFichier());
+            ps.setString(6, m.getNomFichier());
+            if (m.getTailleFichier() != null)
+                ps.setLong(7, m.getTailleFichier());
+            else
+                ps.setNull(7, Types.BIGINT);
             ps.executeUpdate();
 
             ResultSet keys = ps.getGeneratedKeys();
             if (keys.next()) {
-                a.setIdAppel(keys.getInt(1));
+                m.setIdMessage(keys.getInt(1));
                 return keys.getInt(1);
             }
         }
@@ -35,32 +37,31 @@ public class Dao_AppelImp implements DAO_Appel {
 
     // ── MODIFY ───────────────────────────────────────────────────────────────
     @Override
-    public int Modify(Appel a) throws SQLException {
-        String sql = "UPDATE appels SET statut=?, duree_secondes=? WHERE id_appel=?";
+    public int Modify(Message m) throws SQLException {
+        String sql = "UPDATE messages SET contenu_texte=? WHERE id_message=?";
         try (Connection c = DataBase.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, a.getStatut().name());
-            ps.setInt(2, a.getDureeSecondes());
-            ps.setInt(3, a.getIdAppel());
+            ps.setString(1, m.getContenuTexte());
+            ps.setInt(2, m.getIdMessage());
             return ps.executeUpdate();
         }
     }
 
     // ── DELETE ───────────────────────────────────────────────────────────────
     @Override
-    public int Delete(Appel a) throws SQLException {
-        String sql = "DELETE FROM appels WHERE id_appel=?";
+    public int Delete(Message m) throws SQLException {
+        String sql = "DELETE FROM messages WHERE id_message=?";
         try (Connection c = DataBase.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setInt(1, a.getIdAppel());
+            ps.setInt(1, m.getIdMessage());
             return ps.executeUpdate();
         }
     }
 
     // ── GET BY ID ─────────────────────────────────────────────────────────────
     @Override
-    public Appel getByID(Integer id) throws SQLException {
-        String sql = "SELECT * FROM appels WHERE id_appel=?";
+    public Message getByID(Integer id) throws SQLException {
+        String sql = "SELECT * FROM messages WHERE id_message=?";
         try (Connection c = DataBase.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, id);
@@ -72,9 +73,9 @@ public class Dao_AppelImp implements DAO_Appel {
 
     // ── GET ALL ───────────────────────────────────────────────────────────────
     @Override
-    public List<Appel> getAll() throws SQLException {
-        List<Appel> liste = new ArrayList<>();
-        String sql = "SELECT * FROM appels ORDER BY date_appel DESC";
+    public List<Message> getAll() throws SQLException {
+        List<Message> liste = new ArrayList<>();
+        String sql = "SELECT * FROM messages ORDER BY date_envoi ASC";
         try (Connection c = DataBase.getConnection();
              PreparedStatement ps = c.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -85,35 +86,10 @@ public class Dao_AppelImp implements DAO_Appel {
 
     // ── METHODES SPECIFIQUES ──────────────────────────────────────────────────
 
-    /** Appelé quand l'appelé accepte ou refuse */
-    public void updateStatut(int idAppel, StatutAppel statut) throws SQLException {
-        String sql = "UPDATE appels SET statut=? WHERE id_appel=?";
-        try (Connection c = DataBase.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, statut.name());
-            ps.setInt(2, idAppel);
-            ps.executeUpdate();
-        }
-    }
-
-    /** Appelé quand l'appel se termine — met à jour statut + durée */
-    public void terminerAppel(int idAppel, StatutAppel statut,
-                              int dureeSecondes) throws SQLException {
-        String sql = "UPDATE appels SET statut=?, duree_secondes=? WHERE id_appel=?";
-        try (Connection c = DataBase.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, statut.name());
-            ps.setInt(2, dureeSecondes);
-            ps.setInt(3, idAppel);
-            ps.executeUpdate();
-        }
-    }
-
-    /** Historique des appels d'une conversation */
-    public List<Appel> getByConversation(int idConversation) throws SQLException {
-        List<Appel> liste = new ArrayList<>();
-        String sql = "SELECT * FROM appels WHERE id_conversation=? "
-                + "ORDER BY date_appel DESC";
+    /** Tous les messages d'une conversation — chargés au moment où on ouvre le chat */
+    public List<Message> getByConversation(int idConversation) throws SQLException {
+        List<Message> liste = new ArrayList<>();
+        String sql = "SELECT * FROM messages WHERE id_conversation=? ORDER BY date_envoi ASC";
         try (Connection c = DataBase.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, idConversation);
@@ -123,20 +99,37 @@ public class Dao_AppelImp implements DAO_Appel {
         return liste;
     }
 
+    /** Les N derniers messages d'une conversation */
+    public List<Message> getDerniersMessages(int idConversation, int limite) throws SQLException {
+        List<Message> liste = new ArrayList<>();
+        String sql = "SELECT * FROM messages WHERE id_conversation=? "
+                + "ORDER BY date_envoi DESC LIMIT ?";
+        try (Connection c = DataBase.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idConversation);
+            ps.setInt(2, limite);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) liste.add(mapResultSet(rs));
+        }
+        return liste;
+    }
+
     // ── MAPPING ───────────────────────────────────────────────────────────────
-    private Appel mapResultSet(ResultSet rs) throws SQLException {
-        Appel a = new Appel();
-        a.setIdAppel(rs.getInt("id_appel"));
-        a.setIdAppelant(rs.getInt("id_appelant"));
-        a.setIdConversation(rs.getInt("id_conversation"));
-        a.setTypeAppel(TypeAppel.valueOf(rs.getString("type_appel")));
-        a.setStatut(StatutAppel.valueOf(rs.getString("statut")));
-        a.setDureeSecondes(rs.getInt("duree_secondes"));
+    private Message mapResultSet(ResultSet rs) throws SQLException {
+        Message m = new Message();
+        m.setIdMessage(rs.getInt("id_message"));
+        m.setIdConversation(rs.getInt("id_conversation"));
+        m.setIdExpediteur(rs.getInt("id_expediteur"));
+        m.setTypeMessage(rs.getString("type_message"));
+        m.setContenuTexte(rs.getString("contenu_texte"));
+        m.setUrlFichier(rs.getString("url_fichier"));
+        m.setNomFichier(rs.getString("nom_fichier"));
+        m.setTailleFichier(rs.getLong("taille_fichier"));
 
-        Timestamp dateAppel = rs.getTimestamp("date_appel");
-        if (dateAppel != null)
-            a.setDateAppel(dateAppel.toLocalDateTime());
+        Timestamp dateEnvoi = rs.getTimestamp("date_envoi");
+        if (dateEnvoi != null)
+            m.setDateEnvoi(dateEnvoi.toLocalDateTime());
 
-        return a;
+        return m;
     }
 }

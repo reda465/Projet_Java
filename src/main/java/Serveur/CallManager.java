@@ -1,139 +1,183 @@
 package Serveur;
 
-import network.Packet;
-import Serveur.Protocol;
+import Dao.Dao_AppelImp;
+import Dao.DaoConversationImp;
+import Dao.Dao_UtilisateurImp;
+import model.Appel;
+import model.Conversation;
+import model.Utilisateur;
+import model.enums.StatutAppel;
+import model.enums.TypeAppel;
 
-import java.io.PrintWriter;
+import java.sql.SQLException;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class CallManager {
 
-    // Stocker les clients connectés : userId -> PrintWriter
-    private final ConcurrentHashMap<Integer, PrintWriter> clients = new ConcurrentHashMap<>();
+    private static CallManager instance;
 
-    // =====================================================
-    // Ajouter un client connecté
-    // =====================================================
-    public void registerClient(int userId, PrintWriter writer) {
-        clients.put(userId, writer);
-        System.out.println("[CALL_MANAGER] Client enregistré : " + userId);
+    // telephone appelant → timestamp de début d'appel (pour calculer la durée)
+    private final ConcurrentHashMap<String, Long> appelsEnCours
+            = new ConcurrentHashMap<>();
+
+    // telephone appelant → idAppel en DB
+    private final ConcurrentHashMap<String, Integer> idAppels
+            = new ConcurrentHashMap<>();
+
+    private final UserManager       userManager    = UserManager.getInstance();
+    private final Dao_AppelImp      appelDAO       = new Dao_AppelImp();
+    private final DaoConversationImp convDAO       = new DaoConversationImp();
+    private final Dao_UtilisateurImp utilisateurDAO = new Dao_UtilisateurImp();
+
+    private CallManager() {}
+
+    public static synchronized CallManager getInstance() {
+        if (instance == null) instance = new CallManager();
+        return instance;
     }
 
-    // =====================================================
-    // Supprimer un client
-    // =====================================================
-    public void removeClient(int userId) {
-        clients.remove(userId);
-        System.out.println("[CALL_MANAGER] Client supprimé : " + userId);
-    }
+    // ── CALL_REQUEST|telephoneDest|typeAppel ──────────────────────────────────
+    public void demanderAppel(String telephoneAppelant,
+                              String telephoneDest,
+                              String typeAppel) throws SQLException {
 
-    // =====================================================
-    // Envoyer un packet à un utilisateur
-    // =====================================================
-    private void envoyerA(int destinataireId, Packet packet) {
-        PrintWriter writer = clients.get(destinataireId);
-
-        if (writer != null) {
-            writer.println(packet.toString());
-        } else {
-            System.out.println("[CALL_MANAGER] Destinataire introuvable : " + destinataireId);
+        // 1. Vérifier que le destinataire est en ligne
+        ClientHandler destHandler = userManager.getHandler(telephoneDest);
+        if (destHandler == null) {
+            // Destinataire hors ligne → notifier l'appelant
+            ClientHandler appelantHandler = userManager.getHandler(telephoneAppelant);
+            if (appelantHandler != null)
+                appelantHandler.sendMessage(
+                        Protocol.CALL_END.name() + "|" + telephoneDest + "|HORS_LIGNE");
+            return;
         }
+
+        // 2. Retrouver les utilisateurs
+        Utilisateur appelant    = utilisateurDAO.findByTelephone(telephoneAppelant);
+        Utilisateur destinataire = utilisateurDAO.findByTelephone(telephoneDest);
+        if (appelant == null || destinataire == null) return;
+
+        // 3. Trouver ou créer la conversation
+        Conversation conv = convDAO.findIndividuelle(
+                appelant.getIdUtilisateur(),
+                destinataire.getIdUtilisateur());
+
+        if (conv == null) {
+            conv = new Conversation();
+            conv.setTypeConversation("individuelle");
+            conv.setNomGroupe(null);
+            conv.setIdCreateur(null);
+            int idConv = convDAO.Add(conv);
+            conv.setIdConversation(idConv);
+            convDAO.ajouterParticipant(idConv, appelant.getIdUtilisateur());
+            convDAO.ajouterParticipant(idConv, destinataire.getIdUtilisateur());
+        }
+
+        // 4. Persister l'appel en DB avec statut "en_cours"
+        Appel appel = new Appel();
+        appel.setIdAppelant(appelant.getIdUtilisateur());
+        appel.setIdConversation(conv.getIdConversation());
+        appel.setTypeAppel(TypeAppel.valueOf(typeAppel));
+        appel.setStatut(StatutAppel.en_cours);
+        appelDAO.Add(appel);
+
+        // 5. Stocker en mémoire pour calculer la durée plus tard
+        appelsEnCours.put(telephoneAppelant, System.currentTimeMillis());
+        idAppels.put(telephoneAppelant, appel.getIdAppel());
+
+        // 6. Notifier le destinataire
+        // Format : CALL_REQUEST|telephoneAppelant|nomAppelant|typeAppel|idAppel
+        destHandler.sendMessage(
+                Protocol.CALL_REQUEST.name() + "|"
+                        + appelant.getNumeroTelephone() + "|"
+                        + appelant.getNomComplet()      + "|"
+                        + typeAppel                     + "|"
+                        + appel.getIdAppel()
+        );
+
+        System.out.println("[APPEL] " + telephoneAppelant
+                + " → " + telephoneDest + " (" + typeAppel + ")");
     }
 
-    // =====================================================
-    // CALL REQUEST
-    // data = "type;fromId;toId"
-    // =====================================================
-    public void callRequest(String data) {
-        // Exemple data: "audio;1;2" ou "video;1;2"
-        String[] parts = data.split(";");
+    // ── CALL_ACCEPT|telephoneAppelant ─────────────────────────────────────────
+    public void accepterAppel(String telephoneAccepteur,
+                              String telephoneAppelant) throws SQLException {
 
-        String type = parts[0];
-        int fromId = Integer.parseInt(parts[1]);
-        int toId = Integer.parseInt(parts[2]);
+        // 1. Mettre à jour le statut en DB
+        Integer idAppel = idAppels.get(telephoneAppelant);
+        if (idAppel != null)
+            appelDAO.updateStatut(idAppel, StatutAppel.accepte);
 
-        Packet p = new Packet(Protocol.CALL_REQUEST, type + ";" + fromId + ";" + toId);
-        p.setExpediteurId(fromId);
+        // 2. Notifier l'appelant que son appel est accepté
+        ClientHandler appelantHandler = userManager.getHandler(telephoneAppelant);
+        if (appelantHandler != null)
+            appelantHandler.sendMessage(
+                    Protocol.CALL_ACCEPT.name() + "|" + telephoneAccepteur);
 
-        envoyerA(toId, p);
-
-        System.out.println("[CALL_MANAGER] CALL_REQUEST envoyé de " + fromId + " vers " + toId);
+        System.out.println("[APPEL] Accepté par " + telephoneAccepteur);
     }
 
-    // =====================================================
-    // CALL ACCEPT
-    // data = "type;fromId;toId"
-    // =====================================================
-    public void callAccept(String data) {
-        String[] parts = data.split(";");
+    // ── CALL_REFUSE|telephoneAppelant ─────────────────────────────────────────
+    public void refuserAppel(String telephoneRefuseur,
+                             String telephoneAppelant) throws SQLException {
 
-        String type = parts[0];
-        int fromId = Integer.parseInt(parts[1]);
-        int toId = Integer.parseInt(parts[2]);
+        // 1. Mettre à jour le statut en DB
+        Integer idAppel = idAppels.get(telephoneAppelant);
+        if (idAppel != null) {
+            appelDAO.updateStatut(idAppel, StatutAppel.refuse);
+            idAppels.remove(telephoneAppelant);
+            appelsEnCours.remove(telephoneAppelant);
+        }
 
-        Packet p = new Packet(Protocol.CALL_ACCEPT, type + ";" + fromId + ";" + toId);
-        p.setExpediteurId(toId);
+        // 2. Notifier l'appelant du refus
+        ClientHandler appelantHandler = userManager.getHandler(telephoneAppelant);
+        if (appelantHandler != null)
+            appelantHandler.sendMessage(
+                    Protocol.CALL_REFUSE.name() + "|" + telephoneRefuseur);
 
-        envoyerA(fromId, p);
-
-        System.out.println("[CALL_MANAGER] CALL_ACCEPT envoyé de " + toId + " vers " + fromId);
+        System.out.println("[APPEL] Refusé par " + telephoneRefuseur);
     }
 
-    // =====================================================
-    // CALL REFUSE
-    // data = "type;fromId;toId"
-    // =====================================================
-    public void callRefuse(String data) {
-        String[] parts = data.split(";");
+    // ── CALL_END|telephoneDest ────────────────────────────────────────────────
+    public void terminerAppel(String telephoneAppelant,
+                              String telephoneDest) throws SQLException {
 
-        String type = parts[0];
-        int fromId = Integer.parseInt(parts[1]);
-        int toId = Integer.parseInt(parts[2]);
+        // 1. Calculer la durée
+        Long debut = appelsEnCours.remove(telephoneAppelant);
+        Integer idAppel = idAppels.remove(telephoneAppelant);
 
-        Packet p = new Packet(Protocol.CALL_REFUSE, type + ";" + fromId + ";" + toId);
-        p.setExpediteurId(toId);
+        int dureeSecondes = 0;
+        if (debut != null)
+            dureeSecondes = (int) ((System.currentTimeMillis() - debut) / 1000);
 
-        envoyerA(fromId, p);
+        // 2. Mettre à jour en DB
+        if (idAppel != null)
+            appelDAO.terminerAppel(idAppel, StatutAppel.accepte, dureeSecondes);
 
-        System.out.println("[CALL_MANAGER] CALL_REFUSE envoyé de " + toId + " vers " + fromId);
+        // 3. Notifier l'autre participant
+        ClientHandler destHandler = userManager.getHandler(telephoneDest);
+        if (destHandler != null)
+            destHandler.sendMessage(
+                    Protocol.CALL_END.name() + "|" + telephoneAppelant);
+
+        System.out.println("[APPEL] Terminé — durée : " + dureeSecondes + "s");
     }
 
-    // =====================================================
-    // CALL END
-    // data = "type;fromId;toId"
-    // =====================================================
-    public void callEnd(String data) {
-        String[] parts = data.split(";");
+    // ── Appel manqué (appelant annule avant réponse) ──────────────────────────
+    public void annulerAppel(String telephoneAppelant,
+                             String telephoneDest) throws SQLException {
 
-        String type = parts[0];
-        int fromId = Integer.parseInt(parts[1]);
-        int toId = Integer.parseInt(parts[2]);
+        Integer idAppel = idAppels.remove(telephoneAppelant);
+        appelsEnCours.remove(telephoneAppelant);
 
-        Packet p = new Packet(Protocol.CALL_END, type + ";" + fromId + ";" + toId);
-        p.setExpediteurId(fromId);
+        if (idAppel != null)
+            appelDAO.updateStatut(idAppel, StatutAppel.manque);
 
-        envoyerA(toId, p);
+        ClientHandler destHandler = userManager.getHandler(telephoneDest);
+        if (destHandler != null)
+            destHandler.sendMessage(
+                    Protocol.CALL_END.name() + "|" + telephoneAppelant + "|ANNULE");
 
-        System.out.println("[CALL_MANAGER] CALL_END envoyé de " + fromId + " vers " + toId);
-    }
-
-    // =====================================================
-    // AUDIO DATA
-    // =====================================================
-    public void transferAudio(int fromId, int toId, byte[] audioData) {
-        Packet p = new Packet(Protocol.AUDIO_DATA, audioData);
-        p.setExpediteurId(fromId);
-
-        envoyerA(toId, p);
-    }
-
-    // =====================================================
-    // VIDEO FRAME
-    // =====================================================
-    public void transferVideo(int fromId, int toId, byte[] frameData) {
-        Packet p = new Packet(Protocol.VIDEO_FRAME, frameData);
-        p.setExpediteurId(fromId);
-
-        envoyerA(toId, p);
+        System.out.println("[APPEL] Annulé par " + telephoneAppelant);
     }
 }
