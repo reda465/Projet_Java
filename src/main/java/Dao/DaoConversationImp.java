@@ -33,6 +33,7 @@ public class DaoConversationImp implements DAO_Conversation {
         return -1;
     }
 
+    // ── MODIFY ───────────────────────────────────────────────────────────────
     @Override
     public int Modify(Conversation conv) throws SQLException {
         String sql = "UPDATE conversations SET nom_groupe=?, date_dernier_message=? "
@@ -49,6 +50,7 @@ public class DaoConversationImp implements DAO_Conversation {
         }
     }
 
+    // ── DELETE ───────────────────────────────────────────────────────────────
     @Override
     public int Delete(Conversation conv) throws SQLException {
         String sql = "DELETE FROM conversations WHERE id_conversation=?";
@@ -59,6 +61,7 @@ public class DaoConversationImp implements DAO_Conversation {
         }
     }
 
+    // ── GET BY ID ─────────────────────────────────────────────────────────────
     @Override
     public Conversation getByID(Integer id) throws SQLException {
         String sql = "SELECT * FROM conversations WHERE id_conversation=?";
@@ -71,6 +74,7 @@ public class DaoConversationImp implements DAO_Conversation {
         return null;
     }
 
+    // ── GET ALL ───────────────────────────────────────────────────────────────
     @Override
     public List<Conversation> getAll() throws SQLException {
         List<Conversation> liste = new ArrayList<>();
