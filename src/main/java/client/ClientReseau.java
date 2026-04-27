@@ -98,7 +98,7 @@ public class ClientReseau {
         private void traiterPacket(Packet p) {
             switch (p.getProtocol()) {
                 case LOGIN_OK:
-                    String[] infos =(String) p.getData().split("\\|");
+                    String[] infos = ((String) p.getData()).split("\\|");
                     moi = new Utilisateur();
                     moi.setNomComplet(infos[0]);
                     moi.setNumeroTelephone(infos[1]);
