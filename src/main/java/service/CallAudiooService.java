@@ -1,12 +1,13 @@
 package service;
 
-import client.ClientReseauCALL;
+import Serveur.Protocol;
+import client.ClientReseau;
 import network.Commande;
 import network.Packet;
 import javax.sound.sampled.*;
 public class CallAudiooService {
 
-        private ClientReseauCALL clientReseau;
+        private ClientReseau clientReseau;
 
         // AUDIO CONFIG
         private AudioFormat format;
@@ -16,7 +17,7 @@ public class CallAudiooService {
         private Thread captureThread;
         private boolean enAppel = false;
 
-        public CallAudiooService(ClientReseauCALL clientReseau) {
+        public CallAudiooService(ClientReseau clientReseau) {
             this.clientReseau = clientReseau;
 
             // format audio standard (IMPORTANT client/serveur identique)
@@ -30,7 +31,7 @@ public class CallAudiooService {
             enAppel = true;
 
             Packet packet = new Packet(
-                    Commande.Debuter_AUDIO_CALL,
+                    Protocol.CALL_REQUEST,
                     caller + ";" + receiver
             );
 
@@ -49,14 +50,14 @@ public class CallAudiooService {
             enAppel = false;
 
             Packet packet = new Packet(
-                    Commande.Arreter_AUDIO_CALL,
+                   Protocol.CALL_END,
                     caller + ";" + receiver
             );
 
             clientReseau.envoyer(packet);
 
             stopMicro();
-            stopAudio();
+            //stopAudio();
 
             System.out.println("[AUDIO] Appel terminé");
         }
@@ -98,8 +99,8 @@ public class CallAudiooService {
         }
 
         // ENVOI AUDIO
-        public void envoyerAudio(byte[] data) {
-            Packet packet = new Packet(Commande.Data_AUDIO, data);
+       public void envoyerAudio(byte[] data) {
+            Packet packet = new Packet(Protocol.Call_AUDIO_DATA, data);
             clientReseau.envoyer(packet);
         }
 

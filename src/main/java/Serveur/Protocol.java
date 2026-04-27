@@ -22,19 +22,9 @@ public enum Protocol {
     CALL_ACCEPT ,
     CALL_REFUSE ,
     CALL_CANCEL , // ← pour distinguer annulation et fin d'appel
-    CALL_END
-    CALL_ACCEPT,
-    CALL_REFUSE,
     CALL_END,
 
-    // ==========================
-    // DONNÉES AUDIO/VIDEO
-    // ==========================
-    AUDIO_DATA,
-    VIDEO_FRAME,
 
-    // ==========================
-    // ERREUR GENERALE
-    // ==========================
-    ERROR
+
+
 }

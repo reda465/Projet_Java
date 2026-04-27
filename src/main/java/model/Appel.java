@@ -5,10 +5,9 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-
 public class Appel {
-    enum TypeAppel {audio,video}
-    enum Status{manque, accepte, refuse, en_cours}
+    // SUPPRIMER les enums locaux ! Utiliser ceux de model.enums
+
     private int idAppel;
     private int idAppelant;
     private int idConversation;
