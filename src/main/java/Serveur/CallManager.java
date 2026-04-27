@@ -24,6 +24,10 @@ public class CallManager {
     private final ConcurrentHashMap<String, Integer> idAppels
             = new ConcurrentHashMap<>();
 
+    // Map pour relier les deux participants (pour le transfert audio)
+    private final ConcurrentHashMap<String, String> participantMap
+            = new ConcurrentHashMap<>();
+
     private final UserManager       userManager    = UserManager.getInstance();
     private final Dao_AppelImp      appelDAO       = new Dao_AppelImp();
     private final DaoConversationImp convDAO       = new DaoConversationImp();
@@ -114,6 +118,10 @@ public class CallManager {
             appelantHandler.sendMessage(
                     Protocol.CALL_ACCEPT.name() + "|" + telephoneAccepteur);
 
+        // 3. Lier les deux participants pour l'audio
+        participantMap.put(telephoneAccepteur, telephoneAppelant);
+        participantMap.put(telephoneAppelant, telephoneAccepteur);
+
         System.out.println("[APPEL] Accepté par " + telephoneAccepteur);
     }
 
@@ -160,6 +168,10 @@ public class CallManager {
             destHandler.sendMessage(
                     Protocol.CALL_END.name() + "|" + telephoneAppelant);
 
+        // 4. Retirer du map de participants
+        participantMap.remove(telephoneAppelant);
+        participantMap.remove(telephoneDest);
+
         System.out.println("[APPEL] Terminé — durée : " + dureeSecondes + "s");
     }
 
@@ -178,6 +190,13 @@ public class CallManager {
             destHandler.sendMessage(
                     Protocol.CALL_END.name() + "|" + telephoneAppelant + "|ANNULE");
 
+        participantMap.remove(telephoneAppelant);
+        participantMap.remove(telephoneDest);
+
         System.out.println("[APPEL] Annulé par " + telephoneAppelant);
+    }
+
+    public String getOtherParticipant(String telephone) {
+        return participantMap.get(telephone);
     }
 }

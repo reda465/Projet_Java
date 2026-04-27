@@ -148,6 +148,20 @@ public class ClientReseau {
                 case CALL_END:
                     System.out.println("[CALL] Appel terminé : " + p.getData());
                     break;
+                case Call_AUDIO_DATA:
+                    byte[] audio = (byte[]) p.getData();
+                    System.out.println("[AUDIO] Données reçues : " + audio.length + " octets");
+                    if (ecouteur != null) {
+                        ecouteur.audioRecu(audio);
+                    }
+                    break;
+                case Call_VIDEO_DATA:
+                    byte[] video = (byte[]) p.getData();
+                    System.out.println("[VIDEO] Données reçues : " + video.length + " octets");
+                    if (ecouteur != null) {
+                        ecouteur.videoRecu(video);
+                    }
+                    break;
 
                 default:
                     System.out.println("⚠️ Packet non géré : " + p.getProtocol());

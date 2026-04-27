@@ -44,6 +44,8 @@ public class ClientHandler extends Thread {
                     case CALL_REFUSE  -> handleCallRefuse(parts);
                     case CALL_END     -> handleCallEnd(parts);
                     case CALL_CANCEL  -> handleCallCancel(parts);
+                    case Call_AUDIO_DATA -> handleMediaData(ligne);
+                    case Call_VIDEO_DATA -> handleMediaData(ligne);
 
                     default                -> pw.println("UNKNOWN_COMMAND");
                 }
@@ -141,22 +143,23 @@ public class ClientHandler extends Thread {
     public void sendMessage(String message) {
         if (pw != null) pw.println(message);
     }
+    // ── GESTION DES APPELS (Adaptée au format Packet) ─────────────────────────
     private void handleCallRequest(String[] parts) {
-        if (parts.length < 3) return;
-        String telephoneDest = parts[1];
-        String typeAppel     = parts[2]; // "audio" ou "video"
+        if (parts.length < 4) return;
+        String[] data = parts[3].split(";");
+        String telephoneDest = (data.length > 1) ? data[1] : parts[3];
+        String typeAppel = "audio"; // Par défaut si non précisé
         try {
             callManager.demanderAppel(telephoneConnecte, telephoneDest, typeAppel);
         } catch (SQLException e) {
             e.printStackTrace();
-            pw.println(Protocol.CALL_END.name() + "|ERREUR");
+            pw.println(new network.Packet(Protocol.CALL_END, "ERREUR").toString());
         }
     }
 
-    // ── CALL_ACCEPT|telephoneAppelant ────────────────────────────────────────
     private void handleCallAccept(String[] parts) {
-        if (parts.length < 2) return;
-        String telephoneAppelant = parts[1];
+        if (parts.length < 4) return;
+        String telephoneAppelant = parts[3];
         try {
             callManager.accepterAppel(telephoneConnecte, telephoneAppelant);
         } catch (SQLException e) {
@@ -164,10 +167,9 @@ public class ClientHandler extends Thread {
         }
     }
 
-    // ── CALL_REFUSE|telephoneAppelant ────────────────────────────────────────
     private void handleCallRefuse(String[] parts) {
-        if (parts.length < 2) return;
-        String telephoneAppelant = parts[1];
+        if (parts.length < 4) return;
+        String telephoneAppelant = parts[3];
         try {
             callManager.refuserAppel(telephoneConnecte, telephoneAppelant);
         } catch (SQLException e) {
@@ -175,10 +177,10 @@ public class ClientHandler extends Thread {
         }
     }
 
-    // ── CALL_END|telephoneDest ────────────────────────────────────────────────
     private void handleCallEnd(String[] parts) {
-        if (parts.length < 2) return;
-        String telephoneDest = parts[1];
+        if (parts.length < 4) return;
+        String[] data = parts[3].split(";");
+        String telephoneDest = (data.length > 1) ? data[1] : parts[3];
         try {
             callManager.terminerAppel(telephoneConnecte, telephoneDest);
         } catch (SQLException e) {
@@ -186,14 +188,24 @@ public class ClientHandler extends Thread {
         }
     }
 
-    // ── CALL_CANCEL|telephoneDest ─────────────────────────────────────────────
     private void handleCallCancel(String[] parts) {
-        if (parts.length < 2) return;
-        String telephoneDest = parts[1];
+        if (parts.length < 4) return;
+        String telephoneDest = parts[3];
         try {
             callManager.annulerAppel(telephoneConnecte, telephoneDest);
         } catch (SQLException e) {
             e.printStackTrace();
+        }
+    }
+
+    // Relayer l'audio/vidéo à l'autre participant
+    private void handleMediaData(String ligne) {
+        String otherParticipant = callManager.getOtherParticipant(telephoneConnecte);
+        if (otherParticipant != null) {
+            ClientHandler destHandler = userManager.getHandler(otherParticipant);
+            if (destHandler != null) {
+                destHandler.sendMessage(ligne); // Transfère le packet entier (avec données base64)
+            }
         }
     }
 }
