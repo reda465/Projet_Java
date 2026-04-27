@@ -15,5 +15,7 @@ public class Appel {
     private java.time.LocalDateTime dateAppel;
     private TypeAppel type_appel;
     private int dureeSecondes;
+    private TypeAppel TypeAppel;
+    private StatutAppel statut;       // manque, accepte, refuse, en_cours
     private TypeAppel statut;
 }

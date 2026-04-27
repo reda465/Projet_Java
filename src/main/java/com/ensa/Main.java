@@ -21,6 +21,8 @@ public class Main {
 
         System.out.println("=== TEST APPEL AUDIO (mode local, sans serveur) ===");
 
+        // Test inscription
+        facade.sInscrire("Dupont",  "0612345678", "pass123");
         // -------------------------------------------------------
         // 1. Créer un EcouteurClient minimal (implémentation vide)
         // -------------------------------------------------------
