@@ -51,8 +51,8 @@ public class CallManager {
             // Destinataire hors ligne → notifier l'appelant
             ClientHandler appelantHandler = userManager.getHandler(telephoneAppelant);
             if (appelantHandler != null)
-                appelantHandler.sendMessage(
-                        Protocol.CALL_END.name() + "|" + telephoneDest + "|HORS_LIGNE");
+                appelantHandler.sendMessage(new network.Packet(
+                        Protocol.CALL_END, telephoneDest + "|HORS_LIGNE"));
             return;
         }
 
@@ -90,14 +90,13 @@ public class CallManager {
         idAppels.put(telephoneAppelant, appel.getIdAppel());
 
         // 6. Notifier le destinataire
-        // Format : CALL_REQUEST|telephoneAppelant|nomAppelant|typeAppel|idAppel
-        destHandler.sendMessage(
-                Protocol.CALL_REQUEST.name() + "|"
-                        + appelant.getNumeroTelephone() + "|"
+        destHandler.sendMessage(new network.Packet(
+                Protocol.CALL_REQUEST,
+                appelant.getNumeroTelephone() + "|"
                         + appelant.getNomComplet()      + "|"
                         + typeAppel                     + "|"
                         + appel.getIdAppel()
-        );
+        ));
 
         System.out.println("[APPEL] " + telephoneAppelant
                 + " → " + telephoneDest + " (" + typeAppel + ")");
@@ -115,8 +114,8 @@ public class CallManager {
         // 2. Notifier l'appelant que son appel est accepté
         ClientHandler appelantHandler = userManager.getHandler(telephoneAppelant);
         if (appelantHandler != null)
-            appelantHandler.sendMessage(
-                    Protocol.CALL_ACCEPT.name() + "|" + telephoneAccepteur);
+            appelantHandler.sendMessage(new network.Packet(
+                    Protocol.CALL_ACCEPT, telephoneAccepteur));
 
         // 3. Lier les deux participants pour l'audio
         participantMap.put(telephoneAccepteur, telephoneAppelant);
@@ -140,8 +139,8 @@ public class CallManager {
         // 2. Notifier l'appelant du refus
         ClientHandler appelantHandler = userManager.getHandler(telephoneAppelant);
         if (appelantHandler != null)
-            appelantHandler.sendMessage(
-                    Protocol.CALL_REFUSE.name() + "|" + telephoneRefuseur);
+            appelantHandler.sendMessage(new network.Packet(
+                    Protocol.CALL_REFUSE, telephoneRefuseur));
 
         System.out.println("[APPEL] Refusé par " + telephoneRefuseur);
     }
@@ -165,8 +164,8 @@ public class CallManager {
         // 3. Notifier l'autre participant
         ClientHandler destHandler = userManager.getHandler(telephoneDest);
         if (destHandler != null)
-            destHandler.sendMessage(
-                    Protocol.CALL_END.name() + "|" + telephoneAppelant);
+            destHandler.sendMessage(new network.Packet(
+                    Protocol.CALL_END, telephoneAppelant));
 
         // 4. Retirer du map de participants
         participantMap.remove(telephoneAppelant);
@@ -187,8 +186,8 @@ public class CallManager {
 
         ClientHandler destHandler = userManager.getHandler(telephoneDest);
         if (destHandler != null)
-            destHandler.sendMessage(
-                    Protocol.CALL_END.name() + "|" + telephoneAppelant + "|ANNULE");
+            destHandler.sendMessage(new network.Packet(
+                    Protocol.CALL_END, telephoneAppelant + "|ANNULE"));
 
         participantMap.remove(telephoneAppelant);
         participantMap.remove(telephoneDest);

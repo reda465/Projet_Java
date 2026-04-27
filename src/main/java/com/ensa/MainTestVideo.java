@@ -1,5 +1,5 @@
-
-    package com.ensa;
+/*
+package com.ensa;
 
 import client.ClientReseauCALL;
 import client.EcouteurClient;
@@ -123,4 +123,4 @@ import java.util.Scanner;
         }
 
 
-    }
+    }*/

@@ -10,6 +10,8 @@ public class Message {
     private int idMessage;
     private int idConversation;
     private int idExpediteur;
+    private String telephoneExpediteur;
+    private String telephoneDestinataire;
     private String typeMessage;
     private String contenuTexte;
     private String urlFichier;

@@ -81,18 +81,18 @@ public class MessageRouter {
         // 4. Mettre à jour date_dernier_message
         convDAO.updateDateDernierMessage(conv.getIdConversation());
 
-        // 5. Construire la ligne protocole pour le destinataire
+        // 5. Construire le packet pour le destinataire
         // Format : MSG_RECEIVE|telephoneExp|nomExp|contenu|idMessage
-        String ligne = Protocol.MSG_RECEIVE.name()        + "|"
-                + expediteur.getNumeroTelephone()    + "|"
+        network.Packet packet = new network.Packet(Protocol.MSG_RECEIVE,
+                expediteur.getNumeroTelephone()    + "|"
                 + expediteur.getNomComplet()         + "|"
                 + contenu                            + "|"
-                + msg.getIdMessage();
+                + msg.getIdMessage());
 
         // 6. Destinataire en ligne → direct | hors ligne → file d'attente
         ClientHandler destHandler = userManager.getHandler(telephoneDest);
         if (destHandler != null) {
-            destHandler.sendMessage(ligne);
+            destHandler.sendMessage(packet);
             System.out.println("[MSG] Livré directement à " + telephoneDest);
         } else {
             fileDAO.ajouterEnAttente(msg.getIdMessage(),
@@ -130,13 +130,13 @@ public class MessageRouter {
             Utilisateur expediteur = utilisateurDAO.getByID(msg.getIdExpediteur());
             if (expediteur == null) continue;
 
-            String ligne = Protocol.MSG_RECEIVE.name()        + "|"
-                    + expediteur.getNumeroTelephone()    + "|"
+            network.Packet packet = new network.Packet(Protocol.MSG_RECEIVE,
+                    expediteur.getNumeroTelephone()    + "|"
                     + expediteur.getNomComplet()         + "|"
                     + msg.getContenuTexte()              + "|"
-                    + msg.getIdMessage();
+                    + msg.getIdMessage());
 
-            handler.sendMessage(ligne);
+            handler.sendMessage(packet);
         }
 
         // 5. Marquer tous comme délivrés en DB

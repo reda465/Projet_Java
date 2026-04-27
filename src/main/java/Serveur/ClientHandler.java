@@ -32,22 +32,26 @@ public class ClientHandler extends Thread {
 
             while ((ligne = br.readLine()) != null) {
                 System.out.println("[RECU] " + ligne);
-                String[] parts    = ligne.split("\\|", -1);
+                try {
+                    network.Packet packet = network.Packet.fromString(ligne);
 
-                switch (Protocol.valueOf(parts[0])) {
-                    case Protocol.LOGIN    -> handleLogin(parts);
-                    case Protocol.REGISTER -> handleRegister(parts);
-                    case Protocol.LOGOUT   -> { handleLogout(); return; }
-                    case Protocol.MSG_SEND -> handleMessage(parts);
-                    case CALL_REQUEST -> handleCallRequest(parts);
-                    case CALL_ACCEPT  -> handleCallAccept(parts);
-                    case CALL_REFUSE  -> handleCallRefuse(parts);
-                    case CALL_END     -> handleCallEnd(parts);
-                    case CALL_CANCEL  -> handleCallCancel(parts);
-                    case Call_AUDIO_DATA -> handleMediaData(ligne);
-                    case Call_VIDEO_DATA -> handleMediaData(ligne);
+                    switch (packet.getProtocol()) {
+                        case LOGIN    -> handleLogin(packet);
+                        case REGISTER -> handleRegister(packet);
+                        case LOGOUT   -> { handleLogout(); return; }
+                        case MSG_SEND -> handleMessage(packet);
+                        case CALL_REQUEST -> handleCallRequest(packet);
+                        case CALL_ACCEPT  -> handleCallAccept(packet);
+                        case CALL_REFUSE  -> handleCallRefuse(packet);
+                        case CALL_END     -> handleCallEnd(packet);
+                        case CALL_CANCEL  -> handleCallCancel(packet);
+                        case Call_AUDIO_DATA -> handleMediaData(ligne);
+                        case Call_VIDEO_DATA -> handleMediaData(ligne);
 
-                    default                -> pw.println("UNKNOWN_COMMAND");
+                        default                -> sendMessage(new network.Packet(Protocol.LOGIN_FAIL, "UNKNOWN_COMMAND"));
+                    }
+                } catch (Exception e) {
+                    System.out.println("Erreur parsing packet: " + ligne);
                 }
             }
 
@@ -59,11 +63,14 @@ public class ClientHandler extends Thread {
     }
 
     // ── LOGIN|numero_telephone|mot_de_passe ──────────────────────────────────
-    private void handleLogin(String[] parts) {
-        if (parts.length < 3) { pw.println(Protocol.LOGIN_FAIL); return; }
+    private void handleLogin(network.Packet packet) {
+        String data = (String) packet.getData();
+        if (data == null || data.isEmpty()) return;
+        String[] parts = data.split("\\|");
+        if (parts.length < 2) { sendMessage(new network.Packet(Protocol.LOGIN_FAIL, "")); return; }
 
-        String tel      = parts[1];
-        String password = parts[2];
+        String tel      = parts[0];
+        String password = parts[1];
 
         try {
             Utilisateur u = userDAO.findByTelAndPassword(tel, password);
@@ -73,39 +80,42 @@ public class ClientHandler extends Thread {
                 userDAO.updateDerniereConnexion(u.getIdUtilisateur());
 
                 // LOGIN_OK|nom_complet|numero_telephone
-                pw.println(Protocol.LOGIN_OK + "|" + u.getNomComplet() + "|" + u.getNumeroTelephone());
+                sendMessage(new network.Packet(Protocol.LOGIN_OK, u.getNomComplet() + "|" + u.getNumeroTelephone()));
 
                 broadcastUsersList();
                 messageRouter.delivrerMessagesEnAttente(telephoneConnecte);
 
             } else {
-                pw.println(Protocol.LOGIN_FAIL+"|ErreurLogin");
+                sendMessage(new network.Packet(Protocol.LOGIN_FAIL, "ErreurLogin"));
             }
         } catch (SQLException e) {
             e.printStackTrace();
-            pw.println(Protocol.LOGIN_FAIL);
+            sendMessage(new network.Packet(Protocol.LOGIN_FAIL, ""));
         }
     }
 
     // ── REGISTER|nom_complet|numero_telephone|mot_de_passe ───────────────────
-    private void handleRegister(String[] parts) {
-        if (parts.length < 4) { pw.println("REGISTER_FAIL|Erreur_Inscription"); return; }
+    private void handleRegister(network.Packet packet) {
+        String data = (String) packet.getData();
+        if (data == null || data.isEmpty()) return;
+        String[] parts = data.split("\\|");
+        if (parts.length < 3) { sendMessage(new network.Packet(Protocol.REGISTER_FAIL, "Erreur_Inscription")); return; }
 
         Utilisateur u = new Utilisateur();
-        u.setNomComplet(parts[1]);
-        u.setNumeroTelephone(parts[2]);
-        u.setMotDePasse(parts[3]);
+        u.setNomComplet(parts[0]);
+        u.setNumeroTelephone(parts[1]);
+        u.setMotDePasse(parts[2]);
 
         try {
             if (userDAO.telephoneExiste(u.getNumeroTelephone())) {
-                pw.println("REGISTER_FAIL|TELEPHONE_EXISTE");
+                sendMessage(new network.Packet(Protocol.REGISTER_FAIL, "TELEPHONE_EXISTE"));
                 return;
             }
             userDAO.Add(u);
-            pw.println("REGISTER_OK|Inscription_Avec_Succes");
+            sendMessage(new network.Packet(Protocol.REGISTER_OK, "Inscription_Avec_Succes"));
         } catch (SQLException e) {
             e.printStackTrace();
-            pw.println("REGISTER_FAIL|Erreur_Inscription");
+            sendMessage(new network.Packet(Protocol.REGISTER_FAIL, "Erreur_Inscription"));
         }
     }
 
@@ -121,45 +131,51 @@ public class ClientHandler extends Thread {
     }
 
     // ── MSG_SEND — sprint suivant ─────────────────────────────────────────────
-        private void handleMessage(String[] parts) {
-            if (parts.length < 3) return;
+    private void handleMessage(network.Packet packet) {
+        String data = (String) packet.getData();
+        if (data == null || data.isEmpty()) return;
+        String[] parts = data.split("\\|");
+        if (parts.length < 2) return;
 
-            String telephoneDest = parts[1];
-            String contenu = parts[2];
+        String telephoneDest = parts[0];
+        String contenu = parts[1];
 
-            try {
-                messageRouter.envoyerMessage(telephoneConnecte, telephoneDest, contenu);
-            } catch (SQLException e) {
-                e.printStackTrace();
-                pw.println("MSG_FAIL|Erreur_Envoi");
-            }
+        try {
+            messageRouter.envoyerMessage(telephoneConnecte, telephoneDest, contenu);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            sendMessage(new network.Packet(Protocol.MSG_SEND, "Erreur_Envoi"));
         }
+    }
     // ── Broadcast liste connectés ─────────────────────────────────────────────
     private void broadcastUsersList() {
-        userManager.broadcast(Protocol.USERS_LIST + "|" + userManager.getOnlineUsersList());
+        userManager.broadcast(new network.Packet(Protocol.USERS_LIST, userManager.getOnlineUsersList()));
     }
 
     // ── Envoyer un message à CE client ───────────────────────────────────────
     public void sendMessage(String message) {
         if (pw != null) pw.println(message);
     }
+    public void sendMessage(network.Packet packet) {
+        if (pw != null) pw.println(packet.toString());
+    }
     // ── GESTION DES APPELS (Adaptée au format Packet) ─────────────────────────
-    private void handleCallRequest(String[] parts) {
-        if (parts.length < 4) return;
-        String[] data = parts[3].split(";");
-        String telephoneDest = (data.length > 1) ? data[1] : parts[3];
+    private void handleCallRequest(network.Packet packet) {
+        String data = (String) packet.getData();
+        if (data == null || data.isEmpty()) return;
+        String[] parts = data.split(";");
+        String telephoneDest = (parts.length > 1) ? parts[1] : data;
         String typeAppel = "audio"; // Par défaut si non précisé
         try {
             callManager.demanderAppel(telephoneConnecte, telephoneDest, typeAppel);
         } catch (SQLException e) {
             e.printStackTrace();
-            pw.println(new network.Packet(Protocol.CALL_END, "ERREUR").toString());
+            sendMessage(new network.Packet(Protocol.CALL_END, "ERREUR"));
         }
     }
 
-    private void handleCallAccept(String[] parts) {
-        if (parts.length < 4) return;
-        String telephoneAppelant = parts[3];
+    private void handleCallAccept(network.Packet packet) {
+        String telephoneAppelant = (String) packet.getData();
         try {
             callManager.accepterAppel(telephoneConnecte, telephoneAppelant);
         } catch (SQLException e) {
@@ -167,9 +183,8 @@ public class ClientHandler extends Thread {
         }
     }
 
-    private void handleCallRefuse(String[] parts) {
-        if (parts.length < 4) return;
-        String telephoneAppelant = parts[3];
+    private void handleCallRefuse(network.Packet packet) {
+        String telephoneAppelant = (String) packet.getData();
         try {
             callManager.refuserAppel(telephoneConnecte, telephoneAppelant);
         } catch (SQLException e) {
@@ -177,10 +192,11 @@ public class ClientHandler extends Thread {
         }
     }
 
-    private void handleCallEnd(String[] parts) {
-        if (parts.length < 4) return;
-        String[] data = parts[3].split(";");
-        String telephoneDest = (data.length > 1) ? data[1] : parts[3];
+    private void handleCallEnd(network.Packet packet) {
+        String data = (String) packet.getData();
+        if (data == null || data.isEmpty()) return;
+        String[] parts = data.split(";");
+        String telephoneDest = (parts.length > 1) ? parts[1] : data;
         try {
             callManager.terminerAppel(telephoneConnecte, telephoneDest);
         } catch (SQLException e) {
@@ -188,9 +204,8 @@ public class ClientHandler extends Thread {
         }
     }
 
-    private void handleCallCancel(String[] parts) {
-        if (parts.length < 4) return;
-        String telephoneDest = parts[3];
+    private void handleCallCancel(network.Packet packet) {
+        String telephoneDest = (String) packet.getData();
         try {
             callManager.annulerAppel(telephoneConnecte, telephoneDest);
         } catch (SQLException e) {

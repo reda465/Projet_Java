@@ -35,7 +35,7 @@ public class UserManager {
         return String.join(",", connectedUsers.keySet());
     }
 
-    public void broadcast(String message) {
-        connectedUsers.values().forEach(h -> h.sendMessage(message));
+    public void broadcast(network.Packet packet) {
+        connectedUsers.values().forEach(h -> h.sendMessage(packet));
     }
 }
