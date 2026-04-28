@@ -6,7 +6,7 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Dao_MessageFileAttenteImp implements DAO_Message {
+public class Dao_MessageFileAttenteImp {
 
     /** Ajoute un message en file d'attente pour un destinataire hors ligne */
     public int ajouterEnAttente(int idMessage, int idDestinataire) throws SQLException {
@@ -56,28 +56,4 @@ public class Dao_MessageFileAttenteImp implements DAO_Message {
         }
     }
 
-    @Override
-    public int Add(Message message) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public int Modify(Message message) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public int Delete(Message message) throws SQLException {
-        return 0;
-    }
-
-    @Override
-    public Message getByID(Integer integer) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public List<Message> getAll() throws SQLException {
-        return List.of();
-    }
 }

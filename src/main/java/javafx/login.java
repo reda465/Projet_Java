@@ -183,6 +183,27 @@ public class login extends Application implements EcouteurClient {
             message.setText("Déconnecté du serveur");
         });
     }
+
+    @Override
+    public void appelEntrant(String numero, String type) {
+
+    }
+
+    @Override
+    public void appelAccepte(String numero) {
+
+    }
+
+    @Override
+    public void appelRefuse(String numero) {
+
+    }
+
+    @Override
+    public void appelTermine(String numero) {
+
+    }
+
     // ===== STYLES =====
     static String fieldStyle() {
         return "-fx-background-color:#ECFFF5;" +

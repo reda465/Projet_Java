@@ -1,11 +1,11 @@
-package com.ensa ;
+/*package com.ensa ;
 
-import client.ClientReseauCALL;
+
 import client.EcouteurClient;
 import model.Utilisateur;
-import service.CallAudiooService;
 
-/**
+
+
  * Main de TEST pour l'appel audio.
  * Pas besoin de serveur : on simule un loopback local.
  *
@@ -14,7 +14,7 @@ import service.CallAudiooService;
  *  - Lance le micro + haut-parleur via CallAudiooService
  *  - Ce que tu parles dans le micro est joué directement dans les speakers
  *  - Après 10 secondes, l'appel s'arrête automatiquement
- */
+
 public class Main {
 
     public static void main(String[] args) throws InterruptedException {
@@ -117,3 +117,4 @@ public class Main {
         System.out.println("[MAIN] Test terminé.");
     }
 }
+*/
