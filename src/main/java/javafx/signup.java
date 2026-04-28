@@ -161,4 +161,24 @@ public class signup implements EcouteurClient {
             btn.setDisable(false);
         });
     }
+
+    @Override
+    public void appelEntrant(String numero, String type) {
+
+    }
+
+    @Override
+    public void appelAccepte(String numero) {
+
+    }
+
+    @Override
+    public void appelRefuse(String numero) {
+
+    }
+
+    @Override
+    public void appelTermine(String numero) {
+
+    }
 }

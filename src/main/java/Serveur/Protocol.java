@@ -21,6 +21,5 @@ public enum Protocol {
     CALL_REQUEST,
     CALL_ACCEPT ,
     CALL_REFUSE ,
-    CALL_CANCEL , // ← pour distinguer annulation et fin d'appel
     CALL_END
 }

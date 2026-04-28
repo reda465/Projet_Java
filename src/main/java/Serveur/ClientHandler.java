@@ -73,7 +73,6 @@ public class ClientHandler extends Thread {
                 // LOGIN_OK|nom_complet|numero_telephone
                 pw.println(Protocol.LOGIN_OK + "|" + u.getNomComplet() + "|" + u.getNumeroTelephone());
 
-                broadcastUsersList();
                 messageRouter.delivrerMessagesEnAttente(telephoneConnecte);
 
             } else {
