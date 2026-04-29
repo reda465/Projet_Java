@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 import network.*;
 import model.*;
+import service.CallService;
 import service.MessageService;
 
 import java.io.*;
@@ -26,6 +27,7 @@ public class ClientReseau {
     private EcouteurClient ecouteur;
     private Utilisateur moi;
     private MessageService messageService;
+    private CallService callService;
 
 
     public ClientReseau(EcouteurClient ecouteur){//lier a l'interface graphique pour les signales
@@ -146,36 +148,36 @@ public class ClientReseau {
                     }
                     break;
                 case CALL_REQUEST:
-                    if (parts.length >= 2 && ecouteur != null) {
-                        ecouteur.appelEntrant(parts[0], parts[1]);
-                    }
-                    break;
-                case CALL_ACCEPT:
-                    if (ecouteur != null) ecouteur.appelAccepte(parts[0]);
-                    break;
-                ///////////
-                case CALL_REQUEST:
-                    // Format: numAppelant|numDest|type|idAppel|ipAppelant
-                    if (parts.length >= 5 && ecouteur != null) {
+                    if (parts.length >= 4 && ecouteur != null) {
                         String numAppelant = parts[0];
+                        String nomAppelant = parts[1];
                         String typeAppel = parts[2];
-                        String ipAppelant = parts[4];
-                        ecouteur.appelEntrant(numAppelant, typeAppel, ipAppelant);
+                        ecouteur.appelEntrant(numAppelant, nomAppelant, typeAppel, "");
+
+                        if (callService != null) {
+                            callService.recevoirAppel(numAppelant, nomAppelant, typeAppel, "");
+                        }
                     }
-                    break;
                 case CALL_ACCEPT:
                     // Format: numAccepteur|ipAccepteur
                     if (parts.length >= 2 && ecouteur != null) {
                         String ipAccepteur = parts[1];
+                        if (callService != null) {
+                            callService.onAccepte(ipAccepteur);
+                        }
                         ecouteur.appelAccepte(ipAccepteur);
                     }
                     break;
-                    ///////////////
                 case CALL_REFUSE:
                     if (ecouteur != null) ecouteur.appelRefuse();
+                    if (callService != null) callService.onTermine();
                     break;
                 case CALL_END:
-                    if (ecouteur != null) ecouteur.appelTermine(parts[0]);
+                    if (parts.length >= 1 && ecouteur != null) {
+                        String telephone = parts[0];
+                        ecouteur.appelTermine(telephone);
+                        if (callService != null) callService.onTermine();
+                    }
                     break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());

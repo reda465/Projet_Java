@@ -192,8 +192,10 @@ public class TestConsole implements EcouteurClient {
     }
 
     @Override
-    public void appelEntrant(String numeroAppelant, String type) {
-        System.out.println("\n📞 APPEL ENTRANT de " + numeroAppelant);
+    public void appelEntrant(String numero, String type, String ipAppelant , String ip) {
+            System.out.println("\n📞 APPEL ENTRANT de " + numero);
+            System.out.println("   Type : " + type);
+            System.out.println("   IP : " + ipAppelant);
     }
 
     @Override
@@ -202,9 +204,10 @@ public class TestConsole implements EcouteurClient {
     }
 
     @Override
-    public void appelRefuse(String numero) {
+    public void appelRefuse() {
 
     }
+
 
     @Override
     public void appelTermine(String numero) {

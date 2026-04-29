@@ -74,7 +74,7 @@ public class Test implements EcouteurClient {
     }
 
     @Override
-    public void appelRefuse(String numero) {
+    public void appelRefuse() {
 
     }
 
@@ -95,4 +95,10 @@ public class Test implements EcouteurClient {
     public void deconnexion() {
         System.out.println(">>> DÉCONNECTÉ");
     }
+
+    @Override
+    public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
+
+    }
+
 }

@@ -19,6 +19,7 @@ public class CallService {
     private Appel appelEnCours;
     private boolean communicationActive = false;
     private String ipCorrespondant;
+    private String numeroCorrespondant;
 
     private static final int PORT_LOCAL = 5001;
     private static final int PORT_DISTANT = 5002;
@@ -40,12 +41,12 @@ public class CallService {
         appelEnCours.setStatut(StatutAppel.en_cours);
         appelEnCours.setDateAppel(LocalDateTime.now());
 
-        envoyer(Protocol.CALL_REQUEST, localUser.getNumeroTelephone() + "|" + numeroDest + "|" + type);
+        envoyer(Protocol.CALL_REQUEST, numeroDest + "|" + type);
         System.out.println("[APPEL] Demande envoyée à " + numeroDest);
     }
 
     // On m'appelle (reçu du serveur)
-    public void recevoirAppel(String numAppelant, String typeAppel, String ipAppelant) {
+    public void recevoirAppel(String numAppelant, String nomAppelant, String typeAppel, String ipAppelant){
         if (appelEnCours != null) {
             envoyer(Protocol.CALL_REFUSE, numAppelant);
             return;
@@ -54,19 +55,20 @@ public class CallService {
         appelEnCours = new Appel();
         appelEnCours.setTypeAppel(TypeAppel.valueOf(typeAppel));
         appelEnCours.setStatut(StatutAppel.en_cours);
+        this.numeroCorrespondant = numAppelant;
         this.ipCorrespondant = ipAppelant;
 
         System.out.println("[APPEL] Entrant de " + numAppelant + " (" + ipAppelant + ")");
     }
 
     // J'accepte l'appel entrant
-    public void accepter() {
+    public void accepte(){
         if (appelEnCours == null) return;
 
         appelEnCours.setStatut(StatutAppel.accepte);
         communicationActive = true;
 
-        envoyer(Protocol.CALL_ACCEPT, localUser.getNumeroTelephone());
+        envoyer(Protocol.CALL_ACCEPT, numeroCorrespondant); // celui qui a appelé
         audioUDP.demarrer(ipCorrespondant, PORT_DISTANT, PORT_LOCAL);
 
         System.out.println("[APPEL] Accepté, UDP démarré");
@@ -87,16 +89,16 @@ public class CallService {
     // Refuser / Raccrocher / Terminer
     public void refuser() {
         if (appelEnCours == null) return;
-        envoyer(Protocol.CALL_REFUSE, localUser.getNumeroTelephone());
+        envoyer(Protocol.CALL_REFUSE, numeroCorrespondant);
         arreter();
     }
 
     public void raccrocher() {
         if (appelEnCours == null) return;
-        envoyer(Protocol.CALL_END, localUser.getNumeroTelephone());
+        envoyer(Protocol.CALL_END, numeroCorrespondant);
         arreter();
     }
-
+    // ========== L'AUTRE A RACCROCHÉ ==========
     public void onTermine() {
         arreter();
         System.out.println("[APPEL] Terminé");
@@ -111,8 +113,12 @@ public class CallService {
         appelEnCours = null;
         communicationActive = false;
         ipCorrespondant = null;
+        numeroCorrespondant = null;
     }
 
     public boolean isEnAppel() { return appelEnCours != null; }
     public boolean isCommunicationActive() { return communicationActive; }
+    public boolean isAppelEntrant() {
+        return appelEnCours != null && !communicationActive && ipCorrespondant != null;
+    }
 }
