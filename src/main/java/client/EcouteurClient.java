@@ -1,5 +1,6 @@
 package client;
 
+import model.Message;
 import model.Utilisateur;
 import model.Contact;
 import model.Conversation;
@@ -17,7 +18,7 @@ public interface EcouteurClient {
     void messageRecu(String numeroDest, String message);
 
     void conversationsRecues(List<Conversation> conversations);
-
+    void messagesRecus(List<Message> messages); // Pour une conversation donnée
     //Contact
     void contactAjoute(Contact contact);           // Quand un contact est ajouté
     void listeContactsRecue(List<Contact> contacts);
