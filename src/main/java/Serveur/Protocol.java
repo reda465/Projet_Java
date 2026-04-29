@@ -19,7 +19,8 @@ public enum Protocol {
 
     //conversation
     GET_CONVERSATIONS,   // client demande sa liste de conversations
-    CONVERSATIONS_LIST,  // serveur répond avec la liste
+    CONVERSATIONS_LIST,
+    CONVERSATIONS_RECUES,// serveur répond avec la liste
     GET_MESSAGES,        // client demande les messages d'une conversation
     MESSAGES_LIST,
 
