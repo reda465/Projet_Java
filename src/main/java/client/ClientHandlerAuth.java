@@ -1,7 +1,10 @@
 package client;
 
+import Serveur.Protocol;
 import model.Utilisateur;
+import network.Packet;
 import service.AuthService;
+import service.MessageService;
 
 public class ClientHandlerAuth {
 
@@ -9,6 +12,7 @@ public class ClientHandlerAuth {
 
     private ClientReseau clientReseau;
     private AuthService authService;
+    private MessageService messageService;
     private boolean connecteAuServeur = false;
 
     // Constructeur privé (personne ne peut créer directement)
@@ -31,6 +35,7 @@ public class ClientHandlerAuth {
 
         if (clientReseau.isConnecte()) {
             authService = new AuthService(clientReseau);
+            messageService = new MessageService(clientReseau);
             connecteAuServeur = true;
             return true;
         }
@@ -59,6 +64,35 @@ public class ClientHandlerAuth {
         }
         connecteAuServeur = false;
     }
+    public void envoyerMessage(String numeroDestinataire, String contenu) {
+        if (!verifierConnexion()) {
+            System.out.println("Erreur : Pas connecté au serveur !");
+            return;
+        }
+        if (messageService == null) {
+            System.out.println("Erreur : Service de messagerie non initialisé !");
+            return;
+        }
+        if (clientReseau.getMoi() == null) {
+            System.out.println("Erreur : Pas authentifié !");
+            return;
+        }
+        messageService.envoyerMessage(numeroDestinataire, contenu);
+    }
+
+    // ===== 7. LISTE UTILISATEURS (NOUVEAU) =====
+    public void demanderListeUtilisateurs() {
+        if (!verifierConnexion()) return;
+        Packet p = new Packet(Protocol.USERS_LIST, "");
+        clientReseau.envoyer(p);
+    }
+
+    public void demanderConversations() {
+        if (!verifierConnexion()) return;
+
+        Packet p = new Packet(Protocol.LISTE_CONVERSATIONS, "");
+        clientReseau.envoyer(p);
+    }
 
     public Utilisateur getUtilisateurConnecte() {
         if (clientReseau != null) {
@@ -66,6 +100,7 @@ public class ClientHandlerAuth {
         }
         return null;
     }
+
     // ===== VÉRIFICATION =====
     private boolean verifierConnexion() {
         if (!connecteAuServeur || authService == null) {

@@ -1,8 +1,8 @@
 package javafx;
-
 import client.ClientHandlerAuth;
 import client.ClientReseau;
 import client.EcouteurClient;
+import model.Conversation;
 import model.Utilisateur;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -18,6 +18,7 @@ import javafx.collections.*;
 import network.Packet;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 public class Discussion extends Application implements EcouteurClient {
     // ── État réseau ──────────────────────────────────────────────────────────
     private static ClientReseau client;
@@ -56,9 +57,6 @@ public class Discussion extends Application implements EcouteurClient {
     public Scene creerScene(Stage stage) {
         this.primaryStage = stage;
 
-        /* ===================================================================
-         *  SIDEBAR
-         * =================================================================*/
         VBox sidebar = new VBox(0);
         sidebar.setPrefWidth(300);
         sidebar.setStyle(
@@ -79,9 +77,7 @@ public class Discussion extends Application implements EcouteurClient {
         Button addContactBtn = new Button("👤+");
         styleIconBtn(addContactBtn, "#25D366", "#128C7E");
         addContactBtn.setTooltip(new Tooltip("Ajouter un contact"));
-
         sideHeader.getChildren().addAll(spacerHeader, addContactBtn);
-
         // -- Barre de recherche --
         TextField search = new TextField();
         search.setPromptText("🔍  Rechercher");
@@ -97,7 +93,6 @@ public class Discussion extends Application implements EcouteurClient {
         HBox.setHgrow(search, Priority.ALWAYS);
         searchBox.setPadding(new Insets(8, 10, 8, 10));
         searchBox.setStyle("-fx-background-color: #ffffff;");
-
         // -- Liste conversations VIDE au départ --
         convList = new ListView<>();
         convList.setStyle(
@@ -113,12 +108,10 @@ public class Discussion extends Application implements EcouteurClient {
         placeholder.setTextFill(Color.web("#8696a0"));
         placeholder.setFont(Font.font("Segoe UI", 13));
         convList.setPlaceholder(placeholder);
-
         // Bouton → popup Ajouter_contacte
         addContactBtn.setOnAction(e ->
                 Ajouter_contacte.show(stage, convList, client)
         );
-
         // Clic sur un contact → ouvre la conversation
         convList.setOnMouseClicked(e -> {
             HBox selected = convList.getSelectionModel().getSelectedItem();
@@ -132,10 +125,6 @@ public class Discussion extends Application implements EcouteurClient {
         });
 
         sidebar.getChildren().addAll(sideHeader, searchBox, convList);
-
-        /* ===================================================================
-         *  PANNEAU DE CHAT
-         * =================================================================*/
         VBox chatPanel = new VBox(0);
         VBox.setVgrow(chatPanel, Priority.ALWAYS);
         chatPanel.setStyle("-fx-background-color: #e5ddd5;");
@@ -231,21 +220,16 @@ public class Discussion extends Application implements EcouteurClient {
 
         return new Scene(root, 900, 620);
     }
-
     // ── Ouvrir une conversation ───────────────────────────────────────────────
-
     private void ouvrirConversation(String numero, String nom) {
         contactActif = numero;
         chatName.setText(nom);
         chatStatus.setText("en ligne");
         chatStatus.setTextFill(Color.web("#ffffff"));
-
         // Mettre à jour l'avatar avec la première lettre du nom
         mettreAJourAvatar(chatAvatar, String.valueOf(nom.charAt(0)).toUpperCase(), "#25D366");
-
         // Vider la zone de messages
         messagesBox.getChildren().clear();
-
         // Activer la saisie
         msgField.setDisable(false);
         sendBtn.setDisable(false);
@@ -455,6 +439,24 @@ public class Discussion extends Application implements EcouteurClient {
         alert.setHeaderText(null);
         alert.setContentText(msg);
         alert.showAndWait();
+    }
+    @Override
+    public void conversationsRecues(List<Conversation> conversations) {
+        Platform.runLater(() -> {
+            convList.getItems().clear();
+            if (conversations == null || conversations.isEmpty()) return;
+            String[] colors = {"#25D366", "#128C7E", "#075E54", "#34B7F1"};
+            for (Conversation conv : conversations) {
+                String nom     = conv.getNomContact();
+                String numero  = conv.getNumeroContact();
+                String dernier = conv.getDernierMessage() != null
+                        ? conv.getDernierMessage() : "";
+                String color   = colors[(int)(Math.random() * colors.length)];
+
+                HBox item = makeConvItem(nom, numero, dernier, color);
+                convList.getItems().add(item);
+            }
+        });
     }
 
     public static void main(String[] args) { launch(args); }

@@ -1,18 +1,23 @@
 package Serveur;
 
+import lombok.Getter;
+import lombok.Setter;
 import model.Utilisateur;
 
 import java.io.*;
 import java.net.Socket;
 import java.sql.SQLException;
 import Dao.*;
+@Getter
+@Setter
 
 public class ClientHandler extends Thread {
 
     private final Socket socket;
     private PrintWriter pw;
     private String telephoneConnecte; // null = pas encore authentifié
-
+    private final MessageRouter messageRouter = MessageRouter.getInstance();
+    private final CallManager callManager = CallManager.getInstance();
     private final UserManager      userManager = UserManager.getInstance();
     private final  Dao_UtilisateurImp userDAO   = new Dao_UtilisateurImp();
 
@@ -38,6 +43,12 @@ public class ClientHandler extends Thread {
                     case Protocol.REGISTER -> handleRegister(parts);
                     case Protocol.LOGOUT   -> { handleLogout(); return; }
                     case Protocol.MSG_SEND -> handleMessage(parts);
+                    case CALL_REQUEST -> handleCallRequest(parts);
+                    case CALL_ACCEPT  -> handleCallAccept(parts);
+                    case CALL_REFUSE  -> handleCallRefuse(parts);
+                    case CALL_END     -> handleCallEnd(parts);
+                    case CALL_CANCEL  -> handleCallCancel(parts);
+
                     default                -> pw.println("UNKNOWN_COMMAND");
                 }
             }
@@ -66,9 +77,10 @@ public class ClientHandler extends Thread {
                 // LOGIN_OK|nom_complet|numero_telephone
                 pw.println(Protocol.LOGIN_OK + "|" + u.getNomComplet() + "|" + u.getNumeroTelephone());
 
-                broadcastUsersList();
+                messageRouter.delivrerMessagesEnAttente(telephoneConnecte);
+
             } else {
-                pw.println(Protocol.LOGIN_FAIL);
+                pw.println(Protocol.LOGIN_FAIL+"|ErreurLogin");
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -110,10 +122,19 @@ public class ClientHandler extends Thread {
     }
 
     // ── MSG_SEND — sprint suivant ─────────────────────────────────────────────
-    private void handleMessage(String[] parts) {
-        // Implémenté au sprint messagerie
-    }
+        private void handleMessage(String[] parts) {
+            if (parts.length < 3) return;
 
+            String telephoneDest = parts[1];
+            String contenu = parts[2];
+
+            try {
+                messageRouter.envoyerMessage(telephoneConnecte, telephoneDest, contenu);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                pw.println("MSG_FAIL|Erreur_Envoi");
+            }
+        }
     // ── Broadcast liste connectés ─────────────────────────────────────────────
     private void broadcastUsersList() {
         userManager.broadcast(Protocol.USERS_LIST + "|" + userManager.getOnlineUsersList());
@@ -122,5 +143,60 @@ public class ClientHandler extends Thread {
     // ── Envoyer un message à CE client ───────────────────────────────────────
     public void sendMessage(String message) {
         if (pw != null) pw.println(message);
+    }
+    private void handleCallRequest(String[] parts) {
+        if (parts.length < 3) return;
+        String telephoneDest = parts[1];
+        String typeAppel     = parts[2]; // "audio" ou "video"
+        try {
+            callManager.demanderAppel(telephoneConnecte, telephoneDest, typeAppel);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            pw.println(Protocol.CALL_END.name() + "|ERREUR");
+        }
+    }
+
+    // ── CALL_ACCEPT|telephoneAppelant ────────────────────────────────────────
+    private void handleCallAccept(String[] parts) {
+        if (parts.length < 2) return;
+        String telephoneAppelant = parts[1];
+        try {
+            callManager.accepterAppel(telephoneConnecte, telephoneAppelant);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ── CALL_REFUSE|telephoneAppelant ────────────────────────────────────────
+    private void handleCallRefuse(String[] parts) {
+        if (parts.length < 2) return;
+        String telephoneAppelant = parts[1];
+        try {
+            callManager.refuserAppel(telephoneConnecte, telephoneAppelant);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ── CALL_END|telephoneDest ────────────────────────────────────────────────
+    private void handleCallEnd(String[] parts) {
+        if (parts.length < 2) return;
+        String telephoneDest = parts[1];
+        try {
+            callManager.terminerAppel(telephoneConnecte, telephoneDest);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ── CALL_CANCEL|telephoneDest ─────────────────────────────────────────────
+    private void handleCallCancel(String[] parts) {
+        if (parts.length < 2) return;
+        String telephoneDest = parts[1];
+        try {
+            callManager.annulerAppel(telephoneConnecte, telephoneDest);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 }

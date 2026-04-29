@@ -77,13 +77,7 @@ public class Ajouter_contacte {
             HBox item = Discussion.makeConvItem(name, phone, "maintenant", "0", color);
             convList.getItems().add(item);
             //
-            /*if (client != null && client.isConnecte()) {
-                client.envoyer(new network.Packet(
-                        network.Commande.ADD_CONTACT,
-                        name + "|" + phone
-                ));
-            }*/
-            //
+
             message.setTextFill(Color.web("#25D366"));
             message.setText("✓ Contact \"" + name + "\" ajouté !");
             nameField.clear();

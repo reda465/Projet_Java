@@ -25,6 +25,5 @@ public class ServeurMT extends Thread{
         catch(IOException e){
             e.printStackTrace();
         }
-
     }
 }

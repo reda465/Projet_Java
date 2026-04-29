@@ -12,7 +12,11 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
 import client.EcouteurClient;
+import model.Contact;
+import model.Conversation;
 import model.Utilisateur;
+import java.util.List;
+
 public class login extends Application implements EcouteurClient {
     private Label message;
     private Stage stage;
@@ -22,7 +26,8 @@ public class login extends Application implements EcouteurClient {
         stage.setScene(creerScene(stage));
         stage.setTitle("WhatsApp - Login");
         stage.show();
-        ClientHandlerAuth.getInstance().connecterAuServeur("10.100.106.60", 8080, this);
+        ClientHandlerAuth.getInstance()
+                .connecterAuServeur("192.168.56.1", 5000, this);
     }
     public Scene creerScene(Stage stage) {
         String fs = fieldStyle();
@@ -53,7 +58,7 @@ public class login extends Application implements EcouteurClient {
 
         // USERNAME
         TextField numero = new TextField();
-        numero.setPromptText("numero ");
+        numero.setPromptText("Nom d'utilisateur");
         numero.setStyle(fs);
         focusStyle(numero, fs);
 
@@ -81,12 +86,13 @@ public class login extends Application implements EcouteurClient {
         message.setFont(Font.font("Arial", 13));
         message.setWrapText(true);
         message.setAlignment(Pos.CENTER);
+
         // LOGIN
         loginBtn.setOnAction(e -> {
-        //je prnt le numero et le password
+
             String u = numero.getText().trim();
             String p = password.getText();
-        //si les champs sont vide on demande de remplir
+
             if (u.isEmpty() || p.isEmpty()) {
                 message.setTextFill(Color.RED);
                 message.setText("Veuillez remplir tous les champs");
@@ -96,7 +102,7 @@ public class login extends Application implements EcouteurClient {
             loginBtn.setDisable(true);
             message.setTextFill(Color.web("#128C7E"));
             message.setText("Connexion en cours...");
-            //je recupere le resultt qui va etre transforme par client
+
             new Thread(() -> {
 
                 String resultat =
@@ -108,7 +114,6 @@ public class login extends Application implements EcouteurClient {
                         message.setText(resultat);
                         loginBtn.setDisable(false);
                     }
-
                 });
 
             }).start();
@@ -130,8 +135,15 @@ public class login extends Application implements EcouteurClient {
         HBox signupBox = new HBox(5, noAccount, signupLink);
         signupBox.setAlignment(Pos.CENTER);
 
-        // box logo+titre
-        VBox card = new VBox(10, header, numero, password, loginBtn, message, signupBox
+        // CARD
+        VBox card = new VBox(
+                10,
+                header,
+                numero,
+                password,
+                loginBtn,
+                message,
+                signupBox
         );
         card.setPadding(new Insets(30));
         card.setPrefWidth(320);
@@ -145,9 +157,8 @@ public class login extends Application implements EcouteurClient {
         return new Scene(root, 420, 600);
     }
     // ===== CALLBACKS =====
-    //mon role c'est de mettre a jour interface
     @Override
-    public void connexionReussie(Utilisateur moi) {//appel automatiquement lorsque srveur dit ok
+    public void connexionReussie(Utilisateur moi) {
         Platform.runLater(() -> {
             message.setTextFill(Color.web("#25D366"));
             message.setText("Connexion réussie ! Bienvenue " + moi.getNomComplet());
@@ -210,6 +221,7 @@ public class login extends Application implements EcouteurClient {
             }
         });
     }
+
     public static void main(String[] args) {
         launch(args);
     }
