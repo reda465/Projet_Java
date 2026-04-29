@@ -1,6 +1,7 @@
 package javafx;
 import client.ClientHandlerAuth;
 import client.EcouteurClient;
+import model.Contact;
 import model.Conversation;
 import model.Utilisateur;
 import javafx.application.Platform;
@@ -281,8 +282,23 @@ public class Discussion implements EcouteurClient {
     }
 
     @Override
-    public void conversationRecues(List<Conversation> conversations) {
-        // Non utilisé ici
+    public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
+
+    }
+
+    @Override
+    public void appelAccepte(String numero) {
+
+    }
+
+    @Override
+    public void appelRefuse() {
+
+    }
+
+    @Override
+    public void appelTermine(String numero) {
+
     }
 
     @Override
@@ -303,6 +319,16 @@ public class Discussion implements EcouteurClient {
                 convList.getItems().add(item);
             }
         });
+    }
+
+    @Override
+    public void contactAjoute(Contact contact) {
+
+    }
+
+    @Override
+    public void listeContactsRecue(List<Contact> contacts) {
+
     }
 
     // ── Badge messages non lus ────────────────────────────────────────────────

@@ -205,12 +205,38 @@ public class login extends Application implements EcouteurClient {
     }
 
     @Override
-    public void conversationRecues(List<Conversation> conversations) {
+    public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
 
     }
 
     @Override
+    public void appelAccepte(String numero) {
+
+    }
+
+    @Override
+    public void appelRefuse() {
+
+    }
+
+    @Override
+    public void appelTermine(String numero) {
+
+    }
+
+
+    @Override
     public void conversationsRecues(List<Conversation> conversations) {
+
+    }
+
+    @Override
+    public void contactAjoute(Contact contact) {
+
+    }
+
+    @Override
+    public void listeContactsRecue(List<Contact> contacts) {
 
     }
 
