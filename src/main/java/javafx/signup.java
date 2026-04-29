@@ -11,7 +11,12 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
+import model.Contact;
+import model.Conversation;
 import model.Utilisateur;
+
+import java.util.List;
+
 import static javafx.application.Application.launch;
 public class signup implements EcouteurClient {
     private Label messageLabel;
@@ -149,7 +154,23 @@ public class signup implements EcouteurClient {
     @Override
     public void connexionReussie(Utilisateur moi) { /* pas utilisé ici */ }
     @Override
-    public void messageRecu(String contenu) { /* pas utilisé ici */ }
+    public void messageRecu(String num, String contenu) { /* pas utilisé ici */ }
+
+    @Override
+    public void conversationsRecues(List<Conversation> conversations) {
+
+    }
+
+    @Override
+    public void contactAjoute(Contact contact) {
+
+    }
+
+    @Override
+    public void listeContactsRecue(List<Contact> contacts) {
+
+    }
+
     @Override
     public void deconnexion() {
         Platform.runLater(() -> {
@@ -157,5 +178,25 @@ public class signup implements EcouteurClient {
             messageLabel.setText("Déconnecté du serveur");
             btn.setDisable(false);
         });
+    }
+
+    @Override
+    public void appelEntrant(String numero, String type) {
+
+    }
+
+    @Override
+    public void appelAccepte(String numero) {
+
+    }
+
+    @Override
+    public void appelRefuse(String numero) {
+
+    }
+
+    @Override
+    public void appelTermine(String numero) {
+
     }
 }

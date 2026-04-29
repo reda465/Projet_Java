@@ -3,33 +3,33 @@ package network;
 import Serveur.Protocol;
 import lombok.Getter;
 import lombok.Setter;
-import Serveur.Protocol;
 
 @Getter
 @Setter
 public class Packet {
 
-    private Protocol commande;
+    private Protocol protocol;
     private String data;
 
-    public Packet(Protocol commande, String data) {
-        this.commande = commande;
-        this.data = data;
+    public Packet(Protocol protocol, String contenu) {
+        this.protocol = protocol;
+        this.data = (contenu != null) ? contenu : "";
     }
-    // ===== Transformer en String pour le réseau/serveur =====
-    // Format : COMMANDE|expediteurId|données
+
     public String toString() {
-        return commande + "|" + data;
+        return protocol + "|" + data;
     }
 
-    // Reconstruire un Packet depuis un String reçu
     public static Packet fromString(String ligne) {
-        String[] parts = ligne.split("\\|",2);  // Coupe aux "|"
+        String[] parts = ligne.split("\\|", 2);
 
-        Protocol cmd = Protocol.valueOf(parts[0]);  // String → enum
-        String donnees = (parts.length > 1) ? parts[1] : "";
-        Packet p = new Packet(cmd, donnees);
+        Protocol prot = Protocol.valueOf(parts[0]);
+        String cont = parts[1];
 
-        return p;
+        return new Packet(prot, cont);
+    }
+
+    public String toDebugString() {
+        return "Packet[" + protocol + "', contenu='" + data + "']";
     }
 }
