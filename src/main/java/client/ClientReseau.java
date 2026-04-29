@@ -181,7 +181,7 @@ public class ClientReseau {
                         if (callService != null) callService.onTermine();
                     }
                     break;
-                case CONVERSATIONS_LIST:
+                case CONVERSATIONS_RECUES:
                     traiterConversationsRecues(data);
                     break;
                 default:
@@ -204,7 +204,7 @@ public class ClientReseau {
             String[] convs = data.split("\\|");
             for (String c : convs) {
                 if (c.isEmpty()) continue;
-                String[] parts = c.split(";", 6);
+                String[] parts = c.split(";", -1);
                 if (parts.length < 5) continue;
 
                 Conversation conv = new Conversation();
