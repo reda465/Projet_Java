@@ -12,7 +12,8 @@ public interface EcouteurClient {
 
     // Quand on reçoit un message
     void messageRecu(String contenu);
-
     // Quand on se déconnecte
     void deconnexion();
+    /*void surAppelAudioRecu(String appelant);  */// pour appel audio
+
 }

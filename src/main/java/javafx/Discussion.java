@@ -1,79 +1,92 @@
 package javafx;
+
+import client.ClientHandlerAuth;
+import client.ClientReseau;
+import client.EcouteurClient;
+import model.Utilisateur;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.geometry.*;
 import javafx.scene.*;
 import javafx.scene.control.*;
-import javafx.scene.layout.*;//VBOX
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
 import javafx.collections.*;
-import java.time.LocalTime;//pour recuperer heure actuelle
+import network.Packet;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-public class Discussion extends Application {
+public class Discussion extends Application implements EcouteurClient {
+    // ── État réseau ──────────────────────────────────────────────────────────
+    private static ClientReseau client;
+    private static Utilisateur  utilisateurConnecte;
+
+    // Numéro du contact actuellement ouvert (null = aucun contact sélectionné)
+    private String contactActif = null;
+
+    // ── Composants UI ────────────────────────────────────────────────────────
+    private VBox      messagesBox;
+    private ScrollPane scrollPane;
+    private Label     chatStatus;
+    private Label     chatName;
+    private StackPane chatAvatar;
+    private TextField msgField;
+    private Button    sendBtn;
+    private Stage     primaryStage;
+    ListView<HBox>    convList;   // package-visible pour Ajouter_contacte
+
+    // ── Démarrage ────────────────────────────────────────────────────────────
     @Override
     public void start(Stage stage) {
+        this.primaryStage = stage;
+
+        // Connexion réseau — "this" reçoit tous les événements serveur
+        client = new ClientReseau(this);
+        ClientHandlerAuth.getInstance().connecterAuServeur("10.100.106.60", 8080, this);
+
         stage.setScene(creerScene(stage));
-        stage.setTitle("WhatsApp - Discussions");//titre de la fenetre
-        stage.show();//pour afficher la fenetre
+        stage.setTitle("WhatsApp – Discussions");
+        stage.setOnCloseRequest(e -> { if (client != null) client.deconnecter(); });
+        stage.show();
     }
-    public static Scene creerScene(Stage stage) {
+
+    // ── Construction de la scène ─────────────────────────────────────────────
+    public Scene creerScene(Stage stage) {
+        this.primaryStage = stage;
+
+        /* ===================================================================
+         *  SIDEBAR
+         * =================================================================*/
         VBox sidebar = new VBox(0);
         sidebar.setPrefWidth(300);
-        sidebar.setStyle("-fx-background-color: white; -fx-border-color: #E9EDEF; -fx-border-width: 0 1 0 0;");
-        // Header sidebar
+        sidebar.setStyle(
+                "-fx-background-color: #ffffff;" +
+                        "-fx-border-color: #dadada;" +
+                        "-fx-border-width: 0 1 0 0;"
+        );
+
+        // -- En-tête sidebar --
         HBox sideHeader = new HBox(10);
         sideHeader.setAlignment(Pos.CENTER_LEFT);
-        sideHeader.setPadding(new Insets(14));
-        sideHeader.setStyle("-fx-background-color: #F0F2F5;");
+        sideHeader.setPadding(new Insets(10,16,10,16));
+        sideHeader.setStyle("-fx-background-color: #25D366;");
 
-        StackPane myAvatar = makeAvatar("M", "#128C7E");
+        Region spacerHeader = new Region();
+        HBox.setHgrow(spacerHeader, Priority.ALWAYS);
 
-        Label myName = new Label("Mon Compte");
-        myName.setFont(Font.font("Arial", FontWeight.BOLD, 15));
-        myName.setTextFill(Color.web("#111B21"));
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        //  BOUTON "Ajouter un contact" — icône personne+
         Button addContactBtn = new Button("👤+");
-        addContactBtn.setStyle(
-                "-fx-background-color: #25D366;" +
-                        "-fx-text-fill: white;" +
-                        "-fx-font-size: 13px;" +
-                        "-fx-font-weight: bold;" +
-                        "-fx-background-radius: 20px;" +
-                        "-fx-padding: 5px 10px;" +
-                        "-fx-cursor: hand;"
-        );
+        styleIconBtn(addContactBtn, "#25D366", "#128C7E");
         addContactBtn.setTooltip(new Tooltip("Ajouter un contact"));
-        addContactBtn.setOnMouseEntered(e -> addContactBtn.setStyle(
-                "-fx-background-color: #128C7E;" +
-                        "-fx-text-fill: white;" +
-                        "-fx-font-size: 13px;" +
-                        "-fx-font-weight: bold;" +
-                        "-fx-background-radius: 20px;" +
-                        "-fx-padding: 5px 10px;" +
-                        "-fx-cursor: hand;"
-        ));
-        addContactBtn.setOnMouseExited(e -> addContactBtn.setStyle(
-                "-fx-background-color: #25D366;" +
-                        "-fx-text-fill: white;" +
-                        "-fx-font-size: 13px;" +
-                        "-fx-font-weight: bold;" +
-                        "-fx-background-radius: 20px;" +
-                        "-fx-padding: 5px 10px;" +
-                        "-fx-cursor: hand;"
-        ));
 
-        sideHeader.getChildren().addAll(myAvatar, myName, spacer, addContactBtn);
+        sideHeader.getChildren().addAll(spacerHeader, addContactBtn);
 
-        // Barre de recherche
+        // -- Barre de recherche --
         TextField search = new TextField();
         search.setPromptText("🔍  Rechercher");
         search.setStyle(
-                "-fx-background-color: #F0F2F5;" +
+                "-fx-background-color: #f0f0f0;" +
                         "-fx-border-color: transparent;" +
                         "-fx-border-radius: 8px;" +
                         "-fx-background-radius: 8px;" +
@@ -83,49 +96,67 @@ public class Discussion extends Application {
         HBox searchBox = new HBox(search);
         HBox.setHgrow(search, Priority.ALWAYS);
         searchBox.setPadding(new Insets(8, 10, 8, 10));
-        searchBox.setStyle("-fx-background-color: #F0F2F5;");
+        searchBox.setStyle("-fx-background-color: #ffffff;");
 
-        // Liste des conversations
-        ListView<HBox> convList = new ListView<>();
-        convList.setStyle("-fx-background-insets: 0; -fx-padding: 0; -fx-border-color: transparent;");
+        // -- Liste conversations VIDE au départ --
+        convList = new ListView<>();
+        convList.setStyle(
+                "-fx-background-insets: 0;" +
+                        "-fx-padding: 0;" +
+                        "-fx-border-color: transparent;"
+        );
         VBox.setVgrow(convList, Priority.ALWAYS);
+        convList.setItems(FXCollections.observableArrayList()); // liste vide
 
-        // Données initiales
-        String[][] convData = {
-                {"Samira",  "occupe",              "Hier",      "1", "#075E54"},
-                {"Karim",   "À tout à l'heure !",  "09:30",     "0", "#128C7E"},
-                {"Yasmine", "Photo envoyée 📷",    "Lun",       "3", "#25D366"},
-        };
-        ObservableList<HBox> items = FXCollections.observableArrayList();
-        for (String[] c : convData) {
-            items.add(makeConvItem(c[0], c[1], c[2], c[3], c[4]));
-        }
-        convList.setItems(items);
+        Label placeholder = new Label("Aucun contact.\nAppuyez sur 👤+ pour en ajouter.");
+        placeholder.setTextAlignment(TextAlignment.CENTER);
+        placeholder.setTextFill(Color.web("#8696a0"));
+        placeholder.setFont(Font.font("Segoe UI", 13));
+        convList.setPlaceholder(placeholder);
 
-        //  Lier le bouton à la popup ajouter_contacte
-        addContactBtn.setOnAction(e -> Ajouter_contacte.show(stage, convList));
+        // Bouton → popup Ajouter_contacte
+        addContactBtn.setOnAction(e ->
+                Ajouter_contacte.show(stage, convList, client)
+        );
+
+        // Clic sur un contact → ouvre la conversation
+        convList.setOnMouseClicked(e -> {
+            HBox selected = convList.getSelectionModel().getSelectedItem();
+            if (selected == null) return;
+            Object ud = selected.getUserData();
+            if (ud == null) return;
+            String[] parts = ((String) ud).split(";", 2);
+            String numero = parts[0];
+            String nom    = parts.length > 1 ? parts[1] : numero;
+            ouvrirConversation(numero, nom);
+        });
 
         sidebar.getChildren().addAll(sideHeader, searchBox, convList);
 
-        // ─── CHAT PANEL ─────────────────────────────────────────────────────
+        /* ===================================================================
+         *  PANNEAU DE CHAT
+         * =================================================================*/
         VBox chatPanel = new VBox(0);
         VBox.setVgrow(chatPanel, Priority.ALWAYS);
-        chatPanel.setStyle("-fx-background-color: #EFEAE2;");
+        chatPanel.setStyle("-fx-background-color: #e5ddd5;");
 
-        // Header chat
+        // -- En-tête chat --
         HBox chatHeader = new HBox(10);
         chatHeader.setAlignment(Pos.CENTER_LEFT);
         chatHeader.setPadding(new Insets(10, 16, 10, 16));
-        chatHeader.setStyle("-fx-background-color: #F0F2F5;");
+        chatHeader.setStyle("-fx-background-color: #25D366;");
 
-        StackPane chatAvatar = makeAvatar("S", "#25D366");
+        chatAvatar = makeAvatar("?", "#dfe5e7");
+
         VBox chatInfo = new VBox(2);
-        Label chatName = new Label("Samira");
-        chatName.setFont(Font.font("Arial", FontWeight.BOLD, 15));
-        chatName.setTextFill(Color.web("#111B21"));
-        Label chatStatus = new Label("en ligne");
-        chatStatus.setFont(Font.font("Arial", 12));
-        chatStatus.setTextFill(Color.web("#25D366"));
+        chatName = new Label("Sélectionnez un contact");
+        chatName.setFont(Font.font("Segoe UI", FontWeight.BOLD, 15));
+        chatName.setTextFill(Color.web("#ffffff"));
+
+        chatStatus = new Label("");
+        chatStatus.setFont(Font.font("Segoe UI", 12));
+        chatStatus.setTextFill(Color.web("#ffffff"));
+
         chatInfo.getChildren().addAll(chatName, chatStatus);
 
         Region chatSpacer = new Region();
@@ -133,36 +164,29 @@ public class Discussion extends Application {
 
         chatHeader.getChildren().addAll(chatAvatar, chatInfo, chatSpacer);
 
-        // Zone messages
-        VBox messagesBox = new VBox(8);
+        // -- Zone des messages --
+        messagesBox = new VBox(8);
         messagesBox.setPadding(new Insets(15));
+        messagesBox.setFillWidth(true);
 
-        ScrollPane scrollPane = new ScrollPane(messagesBox);
+        // Message d'accueil initial
+        afficherAccueil();
+
+        scrollPane = new ScrollPane(messagesBox);
         scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+        scrollPane.setStyle(
+                "-fx-background-color: transparent;" +
+                        "-fx-background: transparent;"
+        );
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
-        //  Utilisation de la classe message pour les bulles
-        String[][] msgs = {
-                {"recv", "Salut !",          "09:42"},
-                {"send", "Oui je suis là",   "09:43"},
-                {"recv", "Projet ?",         "09:44"},
-        };
-        for (String[] m : msgs) {
-            if (m[0].equals("send")) {
-                messagesBox.getChildren().add(Message.Messageenvoyer(m[1], m[2]));
-            } else {
-                messagesBox.getChildren().add(Message.Messageereçu(m[1], m[2]));
-            }
-        }
-
-        // Barre de saisie
+        // -- Barre de saisie --
         HBox inputBar = new HBox(8);
         inputBar.setAlignment(Pos.CENTER);
         inputBar.setPadding(new Insets(10, 12, 10, 12));
-        inputBar.setStyle("-fx-background-color: #F0F2F5;");
+        inputBar.setStyle("-fx-background-color: #f0f0f0;");
 
-        TextField msgField = new TextField();
+        msgField = new TextField();
         msgField.setPromptText("Tapez un message");
         msgField.setStyle(
                 "-fx-background-color: white;" +
@@ -172,80 +196,182 @@ public class Discussion extends Application {
                         "-fx-padding: 10px 14px;" +
                         "-fx-font-size: 14px;"
         );
+        msgField.setDisable(true); // désactivé jusqu'à la sélection d'un contact
         HBox.setHgrow(msgField, Priority.ALWAYS);
 
-        Button sendBtn = new Button("➤");
-        sendBtn.setStyle(
-                "-fx-background-color: #25D366;" +
-                        "-fx-text-fill: white;" +
-                        "-fx-font-size: 15px;" +
-                        "-fx-background-radius: 50%;" +
-                        "-fx-min-width: 40px;" +
-                        "-fx-min-height: 40px;" +
-                        "-fx-cursor: hand;"
-        );
-        sendBtn.setOnMouseEntered(e -> sendBtn.setStyle(
-                "-fx-background-color: #128C7E;" +
-                        "-fx-text-fill: white;" +
-                        "-fx-font-size: 15px;" +
-                        "-fx-background-radius: 50%;" +
-                        "-fx-min-width: 40px;" +
-                        "-fx-min-height: 40px;" +
-                        "-fx-cursor: hand;"
-        ));
-        sendBtn.setOnMouseExited(e -> sendBtn.setStyle(
-                "-fx-background-color: #25D366;" +
-                        "-fx-text-fill: white;" +
-                        "-fx-font-size: 15px;" +
-                        "-fx-background-radius: 50%;" +
-                        "-fx-min-width: 40px;" +
-                        "-fx-min-height: 40px;" +
-                        "-fx-cursor: hand;"
-        ));
+        sendBtn = new Button("➤");
+        styleIconBtn(sendBtn, "#25D366", "#128C7E");
+        sendBtn.setDisable(true);
 
-        //  Envoi du message avec la classe message
+        // ── Action d'envoi ────────────────────────────────────────────────────
         Runnable sendAction = () -> {
             String text = msgField.getText().trim();
-            if (!text.isEmpty()) {
-                String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-                messagesBox.getChildren().add(Message.Messageenvoyer(text, time));
-                msgField.clear();
-                scrollPane.setVvalue(1.0);
-            }
+            if (text.isEmpty() || contactActif == null) return;
+
+            String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+
+            // 1. Affichage local immédiat de la bulle envoyée
+            messagesBox.getChildren().add(Message.Messageenvoyer(text, time));
+            scrollToBottom();
+            msgField.clear();
+
+            // 2. Envoi réseau vers le serveur
+            //envoyerMessage(contactActif, text);
         };
+
         sendBtn.setOnAction(e -> sendAction.run());
         msgField.setOnAction(e -> sendAction.run());
 
         inputBar.getChildren().addAll(msgField, sendBtn);
         chatPanel.getChildren().addAll(chatHeader, scrollPane, inputBar);
 
-        // ─── ROOT ────────────────────────────────────────────────────────────
+        // ─── ROOT ─────────────────────────────────────────────────────────────
         HBox root = new HBox(0, sidebar, chatPanel);
         HBox.setHgrow(chatPanel, Priority.ALWAYS);
 
         return new Scene(root, 900, 620);
     }
 
-    // ─── HELPERS ─────────────────────────────────────────────────────────────
+    // ── Ouvrir une conversation ───────────────────────────────────────────────
 
-    static StackPane makeAvatar(String letter, String color) {
-        Circle c = new Circle(20);
-        c.setFill(Color.web(color));
-        Text t = new Text(letter);
-        t.setFill(Color.WHITE);
-        t.setFont(Font.font("Arial", FontWeight.BOLD, 16));
-        return new StackPane(c, t);
+    private void ouvrirConversation(String numero, String nom) {
+        contactActif = numero;
+        chatName.setText(nom);
+        chatStatus.setText("en ligne");
+        chatStatus.setTextFill(Color.web("#ffffff"));
+
+        // Mettre à jour l'avatar avec la première lettre du nom
+        mettreAJourAvatar(chatAvatar, String.valueOf(nom.charAt(0)).toUpperCase(), "#25D366");
+
+        // Vider la zone de messages
+        messagesBox.getChildren().clear();
+
+        // Activer la saisie
+        msgField.setDisable(false);
+        sendBtn.setDisable(false);
+        msgField.requestFocus();
     }
 
-    static HBox makeConvItem(String name, String last, String time, String unread, String color) {
-        StackPane avatar = makeAvatar(String.valueOf(name.charAt(0)), color);
+    // ── Action d'envoi ────────────────────────────────────────────────────
+    /*Runnable sendAction = () -> {
+        String text = msgField.getText().trim();
+        if (text.isEmpty() || contactActif == null) return;
+
+        String time = LocalTime.now()
+                .format(DateTimeFormatter.ofPattern("HH:mm"));
+
+        // 1. Affichage local immédiat de la bulle envoyée
+        messagesBox.getChildren().add(Message.Messageenvoyer(text, time));
+        msgField.clear();
+        scrollPane.setVvalue(1.0);
+
+        // 2. Envoi réseau vers le serveur
+        if (client != null && client.isConnecte()) {
+            client.envoyerMessage(chatName.getText(), text);
+        }
+    };*/
+
+    // ── EcouteurClient ───────────────────────────────────────────────────────
+
+    @Override
+    public void connexionReussie(Utilisateur moi) {
+        utilisateurConnecte = moi;
+        Platform.runLater(() ->
+                System.out.println("[Discussion] Connecté : " + moi.getNomComplet())
+        );
+    }
+
+    @Override
+    public void inscriptionReussie(String msg) {
+        Platform.runLater(() ->
+                showAlert(Alert.AlertType.INFORMATION, "Inscription", msg)
+        );
+    }
+
+    @Override
+    public void erreur(String message) {
+        Platform.runLater(() ->
+                showAlert(Alert.AlertType.ERROR, "Erreur", message)
+        );
+    }
+    @Override
+    public void messageRecu(String contenu) {
+        Platform.runLater(() -> {
+            String time = LocalTime.now()
+                    .format(DateTimeFormatter.ofPattern("HH:mm"));
+            messagesBox.getChildren()
+                    .add(Message.Messagerecu(contenu, time));
+            scrollPane.setVvalue(1.0);
+        });
+    }
+    @Override
+    public void deconnexion() {
+        Platform.runLater(() -> {
+            chatStatus.setText("hors ligne");
+            chatStatus.setTextFill(Color.web("#EA2424"));
+            showAlert(Alert.AlertType.INFORMATION, "Déconnexion",
+                    "Vous avez été déconnecté du serveur.");
+        });
+    }
+
+    // ── Badge messages non lus ────────────────────────────────────────────────
+
+    private void mettreAJourBadgeNonLu(String expediteur) {
+        for (HBox item : convList.getItems()) {
+            Object ud = item.getUserData();
+            if (ud == null) continue;
+            String numero = ((String) ud).split(";", 2)[0];
+            if (!numero.equals(expediteur)) continue;
+
+            item.getChildren().stream()
+                    .filter(n -> n instanceof VBox)
+                    .map(n -> (VBox) n)
+                    .findFirst()
+                    .ifPresent(vbox -> {
+                        if (vbox.getChildren().size() >= 2) {
+                            Label lbl = (Label) vbox.getChildren().get(1);
+                            lbl.setText("• Nouveau message");
+                            lbl.setTextFill(Color.web("#25D366"));
+                        }
+                    });
+            break;
+        }
+    }
+
+    // ── Helpers visuels ──────────────────────────────────────────────────────
+
+    private void afficherAccueil() {
+        Label msg = new Label("💬  Sélectionnez un contact pour commencer");
+        msg.setFont(Font.font("Segoe UI", 13));
+        msg.setTextFill(Color.web("#8696a0"));
+        msg.setPadding(new Insets(20));
+        VBox wrapper = new VBox(msg);
+        wrapper.setAlignment(Pos.CENTER);
+        VBox.setVgrow(wrapper, Priority.ALWAYS);
+        messagesBox.getChildren().add(wrapper);
+    }
+
+    private void scrollToBottom() {
+        scrollPane.setVvalue(1.0);
+    }
+
+    /**
+     * Crée un item de conversation.
+     * userData = "numero;nom" → lu par setOnMouseClicked pour définir contactActif.
+     */
+    public static HBox makeConvItem(
+            String name, String numero, String last, String color) {
+
+        StackPane avatar = makeAvatar(
+                String.valueOf(name.charAt(0)).toUpperCase(), color
+        );
 
         Label nameLabel = new Label(name);
-        nameLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
-        nameLabel.setTextFill(Color.web("#111B21"));
+        nameLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
+        nameLabel.setTextFill(Color.web("#111b21"));
 
         Label lastLabel = new Label(last);
-        lastLabel.setFont(Font.font("Arial", 12));
+        lastLabel.setFont(Font.font("Segoe UI", 12));
         lastLabel.setTextFill(Color.web("#667781"));
 
         VBox info = new VBox(3, nameLabel, lastLabel);
@@ -255,29 +381,81 @@ public class Discussion extends Application {
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(10, 14, 10, 14));
         row.setStyle("-fx-cursor: hand;");
-        row.setOnMouseEntered(e -> row.setStyle("-fx-background-color: #F0F2F5; -fx-cursor: hand;"));
-        row.setOnMouseExited(e -> row.setStyle("-fx-cursor: hand;"));
+        row.setUserData(numero + ";" + name);
 
-        if (!unread.equals("0")) {
-            Label badge = new Label(unread);
-            badge.setFont(Font.font("Arial", FontWeight.BOLD, 11));
-            badge.setTextFill(Color.WHITE);
-            badge.setStyle("-fx-background-color: #25D366; -fx-background-radius: 50%; -fx-padding: 2px 6px;");
-            Region sp = new Region();
-            HBox.setHgrow(sp, Priority.ALWAYS);
-            // Remplace info spacer par un layout avec badge
-            VBox infoWithBadge = new VBox(3, nameLabel, lastLabel);
-            HBox rowFull = new HBox(10, avatar, infoWithBadge, sp, badge);
-            rowFull.setAlignment(Pos.CENTER_LEFT);
-            rowFull.setPadding(new Insets(10, 14, 10, 14));
-            rowFull.setStyle("-fx-cursor: hand;");
-            rowFull.setOnMouseEntered(e -> rowFull.setStyle("-fx-background-color: #F0F2F5; -fx-cursor: hand;"));
-            rowFull.setOnMouseExited(e -> rowFull.setStyle("-fx-cursor: hand;"));
-            return rowFull;
-        }
+        // Hover
+        row.setOnMouseEntered(e -> {
+            if (!row.getStyle().contains("#E8F5E9")) {
+                row.setStyle("-fx-background-color: #F1F8E9; -fx-cursor: hand;");
+            }
+        });
+
+        row.setOnMouseExited(e -> {
+            if (!row.getStyle().contains("#E8F5E9")) {
+                row.setStyle("-fx-cursor: hand;");
+            }
+        });
+
+        // Sélection contact
+        row.setOnMouseClicked(e -> {
+
+            ListView<HBox> list =
+                    (ListView<HBox>) row.getParent().getParent().getParent();
+
+            for (HBox item : list.getItems()) {
+                item.setStyle("-fx-cursor: hand;");
+            }
+
+            row.setStyle(
+                    "-fx-background-color: #E8F5E9;" +
+                            "-fx-cursor: hand;"
+            );
+        });
+
         return row;
     }
-    public static void main(String[] args) {
-        launch(args);
+
+    // Signature 5 params conservée pour compatibilité avec l'ancien code
+    public static HBox makeConvItem(
+            String name, String last, String time, String unread, String color) {
+        return makeConvItem(name, name, last, color);
     }
+
+    static StackPane makeAvatar(String letter, String color) {
+        Circle c = new Circle(20);
+        c.setFill(Color.web(color));
+        Text t = new Text(letter);
+        t.setFill(Color.WHITE);
+        t.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
+        return new StackPane(c, t);
+    }
+
+    private static void mettreAJourAvatar(StackPane avatar, String letter, String color) {
+        avatar.getChildren().forEach(n -> {
+            if (n instanceof Circle) ((Circle) n).setFill(Color.web(color));
+            if (n instanceof Text)   ((Text)   n).setText(letter);
+        });
+    }
+
+    private static void styleIconBtn(Button btn, String base, String hover) {
+        String s1 = "-fx-background-color:" + base  + ";-fx-text-fill:white;" +
+                "-fx-font-size:15px;-fx-background-radius:50%;" +
+                "-fx-min-width:38px;-fx-min-height:38px;-fx-cursor:hand;";
+        String s2 = "-fx-background-color:" + hover + ";-fx-text-fill:white;" +
+                "-fx-font-size:15px;-fx-background-radius:50%;" +
+                "-fx-min-width:38px;-fx-min-height:38px;-fx-cursor:hand;";
+        btn.setStyle(s1);
+        btn.setOnMouseEntered(e -> btn.setStyle(s2));
+        btn.setOnMouseExited(e  -> btn.setStyle(s1));
+    }
+
+    private void showAlert(Alert.AlertType type, String titre, String msg) {
+        Alert alert = new Alert(type);
+        alert.setTitle(titre);
+        alert.setHeaderText(null);
+        alert.setContentText(msg);
+        alert.showAndWait();
+    }
+
+    public static void main(String[] args) { launch(args); }
 }
