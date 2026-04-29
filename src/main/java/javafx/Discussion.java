@@ -106,6 +106,9 @@ public class Discussion implements EcouteurClient {
                 Ajouter_contacte.show(stage, convList, ClientHandlerAuth.getInstance())
         );
 
+        //A VERIFIER
+
+
         // Clic sur un contact
         convList.setOnMouseClicked(e -> {
             HBox selected = convList.getSelectionModel().getSelectedItem();
@@ -217,7 +220,7 @@ public class Discussion implements EcouteurClient {
     }
 
     // ── Ouvrir une conversation ───────────────────────────────────────────────
-    private void ouvrirConversation(String numero, String nom) {
+    /*private void ouvrirConversation(String numero, String nom) {
         contactActif = numero;
         chatName.setText(nom);//en change le nom
         chatStatus.setText("en ligne");//le status
@@ -228,7 +231,7 @@ public class Discussion implements EcouteurClient {
         msgField.setDisable(false);//activer la zone d'eciture
         sendBtn.setDisable(false);
         msgField.requestFocus();
-    }
+    }*/
 
     // ── EcouteurClient ───────────────────────────────────────────────────────
 
