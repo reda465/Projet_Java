@@ -96,7 +96,6 @@ public class signup implements EcouteurClient {
 
             // 3. Envoyer au serveur
             String resultat = ClientHandlerAuth.getInstance().sInscrire(nomComplet, numero, pw);
-
             // 4. Erreur locale
             if (!resultat.equals("OK")) {
                 messageLabel.setTextFill(Color.RED);
@@ -104,7 +103,6 @@ public class signup implements EcouteurClient {
                 btn.setDisable(false);
             }
         });
-
         // Lien vers login
         Hyperlink loginLink = new Hyperlink("Se connecter");
         loginLink.setTextFill(Color.web("#25D366"));
@@ -140,7 +138,6 @@ public class signup implements EcouteurClient {
             }).start();
         });
     }
-
     @Override
     public void erreur(String message) {
         Platform.runLater(() -> {
