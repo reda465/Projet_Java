@@ -1,11 +1,15 @@
 package Serveur;
 
+import lombok.Getter;
+import lombok.Setter;
 import model.Utilisateur;
 
 import java.io.*;
 import java.net.Socket;
 import java.sql.SQLException;
 import Dao.*;
+@Getter
+@Setter
 
 public class ClientHandler extends Thread {
 

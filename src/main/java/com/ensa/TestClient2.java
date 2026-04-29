@@ -82,7 +82,13 @@ public class TestClient2 implements EcouteurClient {
 
 
     @Override public void deconnexion() { System.out.println("🔌 Déconnecté"); }
-    @Override public void appelEntrant(String n, String t) {}
+
+    @Override
+    public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
+        System.out.println("📞 Appel entrant de " + numero + " (" + type + ")");
+        System.out.println("   Tape '3' pour accepter, '4' pour refuser");
+    }
+
 
     @Override
     public void appelAccepte(String numero) {
@@ -90,9 +96,10 @@ public class TestClient2 implements EcouteurClient {
     }
 
     @Override
-    public void appelRefuse(String numero) {
+    public void appelRefuse() {
 
     }
+
 
     @Override
     public void appelTermine(String numero) {
