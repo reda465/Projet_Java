@@ -55,11 +55,11 @@ public class CallAudio {
         this.etat = Etat.REFUSE;
     }
 
-    @Override
+    /*@Override
     public String toString() {
         return "Appel audio : " + caller.getNom() + " -> " + receiver.getNom()
                 + " | Etat : " + etat;
-    }
+    }*/
 }
 
 

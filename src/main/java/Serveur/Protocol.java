@@ -16,11 +16,22 @@ public enum Protocol {
     // Messagerie
     MSG_SEND ,
     MSG_RECEIVE ,
-
     // Appels
     CALL_REQUEST,
     CALL_ACCEPT ,
     CALL_REFUSE ,
     CALL_CANCEL , // ← pour distinguer annulation et fin d'appel
-    CALL_END
-}
+    CALL_END ,
+
+    LISTE_CONVERSATIONS,
+    CONVERSATIONS_RECUES,
+    MESSAGES_NON_LUS,
+
+
+    AJOUTER_CONTACT,
+    SUPPRIMER_CONTACT,
+    LISTE_CONTACTS,
+    REPONSE_LISTE_CONTACTS,
+    CONTACT_AJOUTE,
+    CONTACT_INEXISTANT,
+    }
