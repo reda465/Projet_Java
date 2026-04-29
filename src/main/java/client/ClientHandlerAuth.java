@@ -2,7 +2,7 @@ package client;
 
 import model.Utilisateur;
 import service.AuthService;
-
+import service.MessageService;
 
 public class ClientHandlerAuth {
 
@@ -10,6 +10,7 @@ public class ClientHandlerAuth {
 
     private ClientReseau clientReseau;
     private AuthService authService;
+    private MessageService messageService;
     private boolean connecteAuServeur = false;
 
     // Constructeur privé (personne ne peut créer directement)
@@ -32,6 +33,7 @@ public class ClientHandlerAuth {
 
         if (clientReseau.isConnecte()) {
             authService = new AuthService(clientReseau);
+            messageService = new MessageService(clientReseau);
             connecteAuServeur = true;
             return true;
         }
@@ -59,6 +61,21 @@ public class ClientHandlerAuth {
             authService.deconnecter();
         }
         connecteAuServeur = false;
+    }
+    public void envoyerMessage(String numeroDestinataire, String contenu) {
+        if (!verifierConnexion()) {
+            System.out.println("Erreur : Pas connecté au serveur !");
+            return;
+        }
+        if (messageService == null) {
+            System.out.println("Erreur : Service de messagerie non initialisé !");
+            return;
+        }
+        if (clientReseau.getMoi() == null) {
+            System.out.println("Erreur : Pas authentifié !");
+            return;
+        }
+        messageService.envoyerMessage(numeroDestinataire, contenu);
     }
 
     public Utilisateur getUtilisateurConnecte() {

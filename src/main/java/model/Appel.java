@@ -2,11 +2,11 @@ package model;
 import model.enums.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
 public class Appel {
-    // SUPPRIMER les enums locaux ! Utiliser ceux de model.enums
 
     private int idAppel;
     private int idAppelant;
