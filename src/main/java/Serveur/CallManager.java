@@ -45,6 +45,7 @@ public class CallManager {
         ClientHandler destHandler = userManager.getHandler(telephoneDest);
         if (destHandler == null) {
             // Destinataire hors ligne → notifier l'appelant
+            System.out.println("hna dest mam3rofch");
             ClientHandler appelantHandler = userManager.getHandler(telephoneAppelant);
             if (appelantHandler != null)
                 appelantHandler.sendMessage(
