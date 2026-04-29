@@ -15,11 +15,9 @@ public interface EcouteurClient {
 
     // Quand on se déconnecte
     void deconnexion();
-
-    void audioCallStart(String info);
-    void audioCallStop(String info);
-    void audioRecu(byte[] audio);
-    void videoRecu(byte[] frameData);
-
-
+    void appelEntrant(String numeroAppelant, String typeAppel, String ipAppelant);
+    void appelAccepte(String ipAccepteur);
+    void appelRefuse();
+    void appelTermine(String info);
 }
+
