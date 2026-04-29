@@ -8,7 +8,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 //je dois voir etat de message mn ba3d
-public class Message {
+public class Messagefx {
     public static HBox Messageenvoyer(String text, String time) {
         Label msg = new Label(text);
         msg.setWrapText(true);

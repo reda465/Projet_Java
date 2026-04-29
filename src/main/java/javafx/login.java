@@ -14,6 +14,7 @@ import javafx.stage.Stage;
 import client.EcouteurClient;
 import model.Contact;
 import model.Conversation;
+import model.Message;
 import model.Utilisateur;
 import java.util.List;
 public class login extends Application implements EcouteurClient {
@@ -232,6 +233,11 @@ public class login extends Application implements EcouteurClient {
 
     @Override
     public void conversationsRecues(List<Conversation> conversations) {
+
+    }
+
+    @Override
+    public void messagesRecus(List<Message> messages) {
 
     }
 

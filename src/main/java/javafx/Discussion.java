@@ -17,11 +17,12 @@ import javafx.collections.*;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import  model.Message;
 public class Discussion implements EcouteurClient {
     // utilisateur actuellement connecter
     private Utilisateur utilisateurConnecte;
     private String contactActif = null;//status
-
+    private Integer idConversationActive = null;
     // composantes de l'interface
     private VBox      messagesBox;
     private ScrollPane scrollPane;
@@ -31,7 +32,7 @@ public class Discussion implements EcouteurClient {
     private TextField msgField;
     private Button    sendBtn;
     private Stage     primaryStage;
-    ListView<HBox>    convList;//liste des contace
+    ListView<HBox>    convList;//liste des contacte
 
     public Discussion(Utilisateur utilisateur) {
         this.utilisateurConnecte = utilisateur;
@@ -105,30 +106,28 @@ public class Discussion implements EcouteurClient {
         addContactBtn.setOnAction(e ->
                 Ajouter_contacte.show(stage, convList, ClientHandlerAuth.getInstance())
         );
-
-        //A VERIFIER
-
-
         // Clic sur un contact
         convList.setOnMouseClicked(e -> {
             HBox selected = convList.getSelectionModel().getSelectedItem();
             if (selected == null) return;
             Object ud = selected.getUserData();
             if (ud == null) return;
-            String[] parts = ((String) ud).split(";", 2);
-            String numero = parts[0];
-            String nom    = parts.length > 1 ? parts[1] : numero;
-            ouvrirConversation(numero, nom);
+            String[] parts = ((String) ud).split(";", 3);
+            try {
+                int idConv = Integer.parseInt(parts[0]);
+                String numero = parts[1];
+                String nom = parts[2];
+                ouvrirConversation(idConv, numero, nom);
+            } catch (NumberFormatException ex) {
+                System.out.println(" ID conversation invalide");
+            }
         });
-
         sidebar.getChildren().addAll(sideHeader, searchBox, convList);
-
-        // ── PANEL CHAT  S samira────────────────────────────────────────────────────────
+        //
         VBox chatPanel = new VBox(0);//hadik likathl f jnb
         VBox.setVgrow(chatPanel, Priority.ALWAYS);
         chatPanel.setStyle("-fx-background-color: #e5ddd5;");
 
-        // -
         HBox chatHeader = new HBox(10);
         chatHeader.setAlignment(Pos.CENTER_LEFT);
         chatHeader.setPadding(new Insets(10, 16, 10, 16));
@@ -152,7 +151,7 @@ public class Discussion implements EcouteurClient {
 
         chatHeader.getChildren().addAll(chatAvatar, chatInfo, chatSpacer);
 
-        // -- Zone des messages --
+        // -- Zone des messages
         messagesBox = new VBox(8);
         messagesBox.setPadding(new Insets(15));
         messagesBox.setFillWidth(true);
@@ -189,7 +188,6 @@ public class Discussion implements EcouteurClient {
         sendBtn = new Button("➤");//pour envoyer un message
         styleIconBtn(sendBtn, "#25D366", "#128C7E");
         sendBtn.setDisable(true);
-
         // ── Action d'envoi ────────────────────────────────────────────────────
         Runnable sendAction = () -> {
             String text = msgField.getText().trim();
@@ -198,7 +196,7 @@ public class Discussion implements EcouteurClient {
             String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
 
             // Affichage message localement
-            messagesBox.getChildren().add(Message.Messageenvoyer(text, time));
+            messagesBox.getChildren().add(Messagefx.Messageenvoyer(text, time));
             scrollToBottom();
             msgField.clear();
 
@@ -220,7 +218,8 @@ public class Discussion implements EcouteurClient {
     }
 
     // ── Ouvrir une conversation ───────────────────────────────────────────────
-    /*private void ouvrirConversation(String numero, String nom) {
+    private void ouvrirConversation(int idconversation,String numero, String nom) {
+        this.idConversationActive = idconversation;
         contactActif = numero;
         chatName.setText(nom);//en change le nom
         chatStatus.setText("en ligne");//le status
@@ -231,7 +230,8 @@ public class Discussion implements EcouteurClient {
         msgField.setDisable(false);//activer la zone d'eciture
         sendBtn.setDisable(false);
         msgField.requestFocus();
-    }*/
+        ClientHandlerAuth.getInstance().demanderMessages(idconversation);
+    }
 
     // ── EcouteurClient ───────────────────────────────────────────────────────
 
@@ -264,7 +264,7 @@ public class Discussion implements EcouteurClient {
             String time = LocalTime.now()
                     .format(DateTimeFormatter.ofPattern("HH:mm"));
             messagesBox.getChildren()
-                    .add(Message.Messagerecu(contenu, time));
+                    .add(Messagefx.Messagerecu(contenu, time));
             scrollPane.setVvalue(1.0);
 
             // Mettre à jour badge si conversation pas active
@@ -318,22 +318,51 @@ public class Discussion implements EcouteurClient {
                         ? conv.getDernierMessage() : "";
                 String color   = colors[(int)(Math.random() * colors.length)];
 
-                HBox item = makeConvItem(nom, numero, dernier, color);// avatar ,nom,dernier message
+                HBox item = makeConvItem(nom, numero, dernier, color,conv.getIdConversation(),conv.getMessagesNonLus());// avatar ,nom,dernier message
                 convList.getItems().add(item);
             }
         });
     }
 
     @Override
+    public void messagesRecus(List<Message> messages) {
+        Platform.runLater(() -> {
+            messagesBox.getChildren().clear();
+
+            if (messages == null || messages.isEmpty()) {
+                Label emptyLabel = new Label("Aucun message. Commencez la conversation !");
+                emptyLabel.setTextFill(Color.web("#8696a0"));
+                emptyLabel.setFont(Font.font("Segoe UI", 13));
+                messagesBox.getChildren().add(emptyLabel);
+                return;
+            }
+
+            for (Message msg : messages) {
+                String time = msg.getDateEnvoi() != null
+                        ? msg.getDateEnvoi().format(DateTimeFormatter.ofPattern("HH:mm"))
+                        : "";
+
+                HBox messageBubble;
+                if (msg.isEstMoi()) {
+                    // Message envoyé par moi → vert, à droite
+                    messageBubble = Messagefx.Messageenvoyer(msg.getContenuTexte(), time);
+                } else {
+                    // Message reçu → blanc, à gauche
+                    messageBubble = Messagefx.Messagerecu(msg.getContenuTexte(), time);
+                }
+                messagesBox.getChildren().add(messageBubble);
+            }
+            scrollToBottom();
+        });
+    }
+// LIGNE CORRIGÉE
+    @Override
     public void contactAjoute(Contact contact) {
 
     }
-
     @Override
     public void listeContactsRecue(List<Contact> contacts) {
-
     }
-
     // ── Badge messages non lus ────────────────────────────────────────────────
     private void mettreAJourBadgeNonLu(String expediteur) {
         for (HBox item : convList.getItems()) {
@@ -341,7 +370,6 @@ public class Discussion implements EcouteurClient {
             if (ud == null) continue;
             String numero = ((String) ud).split(";", 2)[0];
             if (!numero.equals(expediteur)) continue;
-
             item.getChildren().stream()
                     .filter(n -> n instanceof VBox)
                     .map(n -> (VBox) n)
@@ -372,7 +400,7 @@ public class Discussion implements EcouteurClient {
     private void scrollToBottom() {
         scrollPane.setVvalue(1.0);
     }
-    public static HBox makeConvItem(String name, String numero, String last, String color) {
+    public static HBox makeConvItem(String name, String numero, String last, String color,int idConve,int nbNonLus) {
         StackPane avatar = makeAvatar(
                 String.valueOf(name.charAt(0)).toUpperCase(), color
         );
@@ -391,8 +419,7 @@ public class Discussion implements EcouteurClient {
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(10, 14, 10, 14));
         row.setStyle("-fx-cursor: hand;");
-        row.setUserData(numero + ";" + name);
-
+        row.setUserData(idConve + ";" + numero + ";" + name);
         row.setOnMouseEntered(e -> {
             if (!row.getStyle().contains("#E8F5E9")) {
                 row.setStyle("-fx-background-color: #F1F8E9; -fx-cursor: hand;");
@@ -415,9 +442,8 @@ public class Discussion implements EcouteurClient {
 
         return row;
     }
-
-    public static HBox makeConvItem(String name, String last, String time, String unread, String color) {
-        return makeConvItem(name, name, last, color);
+    public static HBox makeConvItem(String name,String numero, String last, String color) {
+        return makeConvItem(name, numero, last, color);
     }
 
     static StackPane makeAvatar(String letter, String color) {

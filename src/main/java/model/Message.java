@@ -1,13 +1,17 @@
 package model;
 
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 @Data
 @NoArgsConstructor
-
+@Getter
+@Setter
 public class Message {
     private int idMessage;
     private int idConversation;
