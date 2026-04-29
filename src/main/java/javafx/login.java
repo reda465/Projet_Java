@@ -26,7 +26,7 @@ public class login extends Application implements EcouteurClient {
         stage.setTitle("WhatsApp - Login");
         stage.show();
         ClientHandlerAuth.getInstance()
-                .connecterAuServeur("192.168.56.1", 5000, this);
+                .connecterAuServeur("10.100.106.14", 5000, this);
     }
     public Scene creerScene(Stage stage) {
         String fs = fieldStyle();
