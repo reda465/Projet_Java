@@ -16,23 +16,17 @@ public enum Protocol {
     // Messagerie
     MSG_SEND ,
     MSG_RECEIVE ,
+
+    //conversation
+    GET_CONVERSATIONS,   // client demande sa liste de conversations
+    CONVERSATIONS_LIST,
+    CONVERSATIONS_RECUES,// serveur répond avec la liste
+    GET_MESSAGES,        // client demande les messages d'une conversation
+    MESSAGES_LIST,
+
     // Appels
     CALL_REQUEST,
     CALL_ACCEPT ,
     CALL_REFUSE ,
-    CALL_CANCEL , // ← pour distinguer annulation et fin d'appel
-    CALL_END ,
-
-    LISTE_CONVERSATIONS,
-    CONVERSATIONS_RECUES,
-    GET_CONVERSATIONS,
-    MESSAGES_NON_LUS,
-
-
-    AJOUTER_CONTACT,
-    SUPPRIMER_CONTACT,
-    LISTE_CONTACTS,
-    REPONSE_LISTE_CONTACTS,
-    CONTACT_AJOUTE,
-    CONTACT_INEXISTANT,
-    }
+    CALL_END
+}

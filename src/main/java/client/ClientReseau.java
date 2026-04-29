@@ -104,7 +104,7 @@ public class ClientReseau {
 
         private void traiterPacket(Packet p) {
             String data = p.getData();
-            String[] parts = data.split("\\|",-1);
+            String[] parts = data.split("\\|", -1); // -1 pour garder les champs vides
             switch (p.getProtocol()) {
                 case LOGIN_OK:
                     if (parts.length >= 2) {
@@ -154,7 +154,7 @@ public class ClientReseau {
                         String nomAppelant = parts[1];
                         String typeAppel = parts[2];
                         ecouteur.appelEntrant(numAppelant, nomAppelant, typeAppel, "");
-
+                        System.out.println("Appel entrant de " + nomAppelant + " (" + numAppelant + ") - Type : " + typeAppel);
                         if (callService != null) {
                             callService.recevoirAppel(numAppelant, nomAppelant, typeAppel, "");
                         }
@@ -181,6 +181,9 @@ public class ClientReseau {
                         if (callService != null) callService.onTermine();
                     }
                     break;
+                case CONVERSATIONS_LIST:
+                    traiterConversationsRecues(data);
+                    break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
                     break;
@@ -188,6 +191,7 @@ public class ClientReseau {
             }
         }
 
+        // ===== TRAITER CONVERSATIONS REÇUES =====
         private void traiterConversationsRecues(String data) {
             List<Conversation> conversations = new ArrayList<>();
 
@@ -213,7 +217,7 @@ public class ClientReseau {
                     conv.setDateDernierMessage(null);
                 }
                 conv.setMessagesNonLus(Integer.parseInt(parts[4]));
-                conv.setDernierMessage(parts.length >=6 ? parts[5] : "");
+                conv.setDernierMessage(parts.length >= 6 ? parts[5] : "");
                 conversations.add(conv);
             }
             System.out.println("Conversations reçues : " + conversations.size());

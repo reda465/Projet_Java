@@ -26,7 +26,7 @@ public class login extends Application implements EcouteurClient {
         stage.setTitle("WhatsApp - Login");
         stage.show();
         ClientHandlerAuth.getInstance()
-                .connecterAuServeur("10.136.57.18", 5000, this);
+                .connecterAuServeur("10.100.106.14", 5000, this);
     }
     public Scene creerScene(Stage stage) {
         String fs = fieldStyle();
@@ -169,13 +169,19 @@ public class login extends Application implements EcouteurClient {
                     stage.close();
                     // Créer et ouvrir Discussion avec l'utilisateur connecté
                     Discussion discussion = new Discussion(moi);
+                    if (ClientHandlerAuth.getInstance().getClientReseau() != null) {
+                        ClientHandlerAuth.getInstance().getClientReseau().setEcouteur(discussion);
+                    }
                     Stage discussionStage = new Stage();
+
                     discussionStage.setScene(discussion.creerScene(discussionStage));
                     discussionStage.setTitle("WhatsApp – Discussions");
                     discussionStage.setOnCloseRequest(e -> {
                         ClientHandlerAuth.getInstance().seDeconnecter();
+
                     });
                     discussionStage.show();
+                    ClientHandlerAuth.getInstance().demanderConversations();
                 });
             }).start();
         });
