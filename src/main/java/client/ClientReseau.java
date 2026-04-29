@@ -181,7 +181,7 @@ public class ClientReseau {
                         if (callService != null) callService.onTermine();
                     }
                     break;
-                case CONVERSATIONS_RECUES:
+                case CONVERSATIONS_LIST:
                     traiterConversationsRecues(data);
                     break;
                 default:
