@@ -55,11 +55,11 @@ public class CallVideo {
     public void refuser() {
         this.etat = Etat.REFUSE;
     }
-
+/*
     @Override
     public String toString() {
         return "Appel vidéo : " + caller.getNom() + " -> " + receiver.getNom()
                 + " | Etat : " + etat;
-    }
+    }*/
 }
 

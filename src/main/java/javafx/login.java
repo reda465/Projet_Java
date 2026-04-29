@@ -12,7 +12,12 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
 import client.EcouteurClient;
+import model.Contact;
+import model.Conversation;
 import model.Utilisateur;
+
+import java.util.List;
+
 public class login extends Application implements EcouteurClient {
     private Label message;
     private Stage stage;
@@ -173,9 +178,25 @@ public class login extends Application implements EcouteurClient {
         });
     }
     @Override
-    public void messageRecu(String contenu) {
+    public void messageRecu(String num, String contenu) {
         // non utilisé dans login
     }
+
+    @Override
+    public void conversationsRecues(List<Conversation> conversations) {
+
+    }
+
+    @Override
+    public void contactAjoute(Contact contact) {
+
+    }
+
+    @Override
+    public void listeContactsRecue(List<Contact> contacts) {
+
+    }
+
     @Override
     public void deconnexion() {
         Platform.runLater(() -> {
@@ -183,6 +204,27 @@ public class login extends Application implements EcouteurClient {
             message.setText("Déconnecté du serveur");
         });
     }
+
+    @Override
+    public void appelEntrant(String numero, String type) {
+
+    }
+
+    @Override
+    public void appelAccepte(String numero) {
+
+    }
+
+    @Override
+    public void appelRefuse(String numero) {
+
+    }
+
+    @Override
+    public void appelTermine(String numero) {
+
+    }
+
     // ===== STYLES =====
     static String fieldStyle() {
         return "-fx-background-color:#ECFFF5;" +

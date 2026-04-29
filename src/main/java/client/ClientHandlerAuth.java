@@ -1,6 +1,8 @@
 package client;
 
+import Serveur.Protocol;
 import model.Utilisateur;
+import network.Packet;
 import service.AuthService;
 import service.MessageService;
 
@@ -76,6 +78,20 @@ public class ClientHandlerAuth {
             return;
         }
         messageService.envoyerMessage(numeroDestinataire, contenu);
+    }
+
+    // ===== 7. LISTE UTILISATEURS (NOUVEAU) =====
+    public void demanderListeUtilisateurs() {
+        if (!verifierConnexion()) return;
+        Packet p = new Packet(Protocol.USERS_LIST, "");
+        clientReseau.envoyer(p);
+    }
+
+    public void demanderConversations() {
+        if (!verifierConnexion()) return;
+
+        Packet p = new Packet(Protocol.LISTE_CONVERSATIONS, "");
+        clientReseau.envoyer(p);
     }
 
     public Utilisateur getUtilisateurConnecte() {
