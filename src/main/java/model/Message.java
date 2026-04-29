@@ -20,6 +20,8 @@ public class Message {
     private String nomFichier;
     private Long tailleFichier;
     private LocalDateTime dateEnvoi;
+    private boolean estMoi;
+    private String nomExpediteur;
 
     public String getDateFormatee() {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");

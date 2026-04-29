@@ -118,12 +118,28 @@ public class ClientHandlerAuth {
         Packet p = new Packet(Protocol.USERS_LIST, "");
         clientReseau.envoyer(p);
     }
+    public void demanderMessages(int idConversation) {
+        if (!verifierConnexion()) {
+            System.out.println("❌ Pas connecté au serveur !");
+            return;
+        }
+        if (clientReseau == null) {
+            System.out.println("❌ Client réseau non initialisé !");
+            return;
+        }
+        clientReseau.demanderMessages(idConversation);
+    }
 
-    public static void demanderConversations() {
-        if (!verifierConnexion()) return;
-
-        Packet p = new Packet(Protocol.GET_CONVERSATIONS, "");
-        clientReseau.envoyer(p);
+    public void demanderConversations() {
+        if (!verifierConnexion()) {
+            System.out.println("❌ Pas connecté au serveur !");
+            return;
+        }
+        if (clientReseau == null) {
+            System.out.println("❌ Client réseau non initialisé !");
+            return;
+        }
+        clientReseau.demanderConversations();
     }
 
     public Utilisateur getUtilisateurConnecte() {

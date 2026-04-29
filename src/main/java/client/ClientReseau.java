@@ -11,6 +11,7 @@ import service.MessageService;
 
 import java.io.*;
 import java.net.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -62,7 +63,14 @@ public class ClientReseau {
         }
     }
 
-
+    public void demanderMessages(int idConversation) {
+        if (!connecte) {
+            System.out.println("❌ Pas connecté au serveur");
+            return;
+        }
+        Packet p = new Packet(Protocol.GET_MESSAGES, String.valueOf(idConversation));
+        envoyer(p);
+    }
     // ===== ENVOYER =====
     public void envoyer(Packet packet) {
         if (!connecte) {//erreur du connection
@@ -184,6 +192,9 @@ public class ClientReseau {
                 case CONVERSATIONS_LIST:
                     traiterConversationsRecues(data);
                     break;
+                case MESSAGES_LIST:
+                    traiterMessagesRecus(data);
+                    break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
                     break;
@@ -223,6 +234,53 @@ public class ClientReseau {
             System.out.println("Conversations reçues : " + conversations.size());
             if (ecouteur != null) {
                 ecouteur.conversationsRecues(conversations);
+            }
+        }
+        public void demanderConversations() {
+            if (!connecte || stylo == null) {
+                System.out.println("❌ Pas connecté au serveur");
+                return;
+            }
+            Packet p = new Packet(Protocol.GET_CONVERSATIONS, "");
+            envoyer(p);
+        }
+        private void traiterMessagesRecus(String data) {
+            List<Message> messages = new ArrayList<>();
+
+            if (data == null || data.isEmpty()) {
+                System.out.println("📭 Aucun message dans cette conversation");
+                if (ecouteur != null) ecouteur.messagesRecus(messages);
+                return;
+            }
+
+            // Format : idMessage;telExp;nomExp;contenu;date|idMessage;telExp;nomExp;contenu;date|...
+            String[] msgs = data.split("\\|");
+            for (String m : msgs) {
+                if (m == null || m.isEmpty()) continue;
+                String[] champs = m.split(";", -1);
+                if (champs.length < 5) continue;
+
+                try {
+                    Message msg = new Message();
+                    msg.setIdMessage(Integer.parseInt(champs[0].trim()));
+                    msg.setTelephoneExpediteur(champs[1]);
+                    msg.setNomExpediteur(champs[2]);
+                    msg.setContenuTexte(champs[3]);
+                    try {
+                        msg.setDateEnvoi(LocalDateTime.parse(champs[4]));
+                    } catch (Exception e) {
+                        msg.setDateEnvoi(null);
+                    }
+                    // Déterminer si c'est un message envoyé ou reçu
+                    msg.setEstMoi(moi != null && champs[1].equals(moi.getNumeroTelephone()));
+                    messages.add(msg);
+                } catch (NumberFormatException e) {
+                    System.out.println("❌ Erreur parsing message : " + e.getMessage());
+                }
+            }
+            System.out.println("💬 Messages reçus : " + messages.size());
+            if (ecouteur != null) {
+                ecouteur.messagesRecus(messages);
             }
         }
     }
