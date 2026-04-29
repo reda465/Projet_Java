@@ -3,9 +3,8 @@ package client;
 import model.Utilisateur;
 import model.Contact;
 import model.Conversation;
-import model.Utilisateur;
-import java.util.ArrayList;
 import java.util.List;
+
 public interface EcouteurClient {
     // Quand la connexion réussit
     void connexionReussie(Utilisateur moi);

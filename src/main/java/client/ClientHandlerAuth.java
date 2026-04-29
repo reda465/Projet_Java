@@ -122,7 +122,7 @@ public class ClientHandlerAuth {
     public void demanderConversations() {
         if (!verifierConnexion()) return;
 
-        Packet p = new Packet(Protocol.LISTE_CONVERSATIONS, "");
+        Packet p = new Packet(Protocol.CONVERSATIONS_LIST, "");
         clientReseau.envoyer(p);
     }
 

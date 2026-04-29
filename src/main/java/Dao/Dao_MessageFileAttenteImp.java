@@ -4,7 +4,9 @@ import model.Message;
 import model.MessageFileAttente;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Dao_MessageFileAttenteImp {
 
@@ -55,5 +57,41 @@ public class Dao_MessageFileAttenteImp {
             ps.executeUpdate();
         }
     }
+    public Map<Integer, Integer> compterNonLusParConversation(int idDestinataire) throws SQLException {
+        Map<Integer, Integer> result = new HashMap<>();
+        String sql = "SELECT m.id_conversation, COUNT(*) as nb_non_lus "
+                + "FROM messages_file_attente mfa "
+                + "JOIN messages m ON mfa.id_message = m.id_message "
+                + "WHERE mfa.id_destinataire = ? "
+                + "AND mfa.est_delivre = 0 "
+                + "GROUP BY m.id_conversation";
+
+        try (Connection c = DataBase.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idDestinataire);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                result.put(rs.getInt("id_conversation"), rs.getInt("nb_non_lus"));
+            }
+        }
+        return result;
+    }
+
+    /** Marque tous les messages d'une conversation comme lus (délivrés) pour un utilisateur */
+    public void marquerConversationCommeLue(int idConversation, int idDestinataire) throws SQLException {
+        String sql = "UPDATE messages_file_attente mfa "
+                + "JOIN messages m ON mfa.id_message = m.id_message "
+                + "SET mfa.est_delivre = 1 "
+                + "WHERE m.id_conversation = ? "
+                + "AND mfa.id_destinataire = ? "
+                + "AND mfa.est_delivre = 0";
+        try (Connection c = DataBase.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idConversation);
+            ps.setInt(2, idDestinataire);
+            ps.executeUpdate();
+        }
+    }
+
 
 }
