@@ -116,7 +116,7 @@ public class ClientReseau {
                     }
                     System.out.println("Connecté : " + moi.getNomComplet());
                     }
-                    demanderConversations();
+                    //ClientHandlerAuth.demanderConversations();
                     break;
 
                 case LOGIN_FAIL:
@@ -224,9 +224,6 @@ public class ClientReseau {
             if (ecouteur != null) {
                 ecouteur.conversationsRecues(conversations);
             }
-        }
-        public void demanderConversations() {
-            envoyer(new Packet(Protocol.GET_CONVERSATIONS, ""));
         }
     }
 }

@@ -119,10 +119,10 @@ public class ClientHandlerAuth {
         clientReseau.envoyer(p);
     }
 
-    public void demanderConversations() {
+    public static void demanderConversations() {
         if (!verifierConnexion()) return;
 
-        Packet p = new Packet(Protocol.CONVERSATIONS_LIST, "");
+        Packet p = new Packet(Protocol.GET_CONVERSATIONS, "");
         clientReseau.envoyer(p);
     }
 
