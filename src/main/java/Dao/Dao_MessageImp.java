@@ -3,7 +3,9 @@ package Dao;
 import model.Message;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Dao_MessageImp implements DAO_Message {
 
@@ -131,5 +133,25 @@ public class Dao_MessageImp implements DAO_Message {
             m.setDateEnvoi(dateEnvoi.toLocalDateTime());
 
         return m;
+    }
+    /** Récupère le dernier message de chaque conversation */
+    public Map<Integer, Message> getDernierMessageParConversation() throws SQLException {
+        Map<Integer, Message> result = new HashMap<>();
+        String sql = "SELECT m.* FROM messages m "
+                + "INNER JOIN ("
+                + "    SELECT id_conversation, MAX(date_envoi) as max_date "
+                + "    FROM messages "
+                + "    GROUP BY id_conversation"
+                + ") latest ON m.id_conversation = latest.id_conversation "
+                + "AND m.date_envoi = latest.max_date";
+
+        try (Connection c = DataBase.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                result.put(rs.getInt("id_conversation"), mapResultSet(rs));
+            }
+        }
+        return result;
     }
 }

@@ -1,15 +1,16 @@
 package Serveur;
 
-import lombok.Getter;
-import lombok.Setter;
+import model.Conversation;
+import model.Message;
 import model.Utilisateur;
 
 import java.io.*;
 import java.net.Socket;
 import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
+
 import Dao.*;
-@Getter
-@Setter
 
 public class ClientHandler extends Thread {
 
@@ -20,7 +21,10 @@ public class ClientHandler extends Thread {
     private final CallManager callManager = CallManager.getInstance();
     private final UserManager      userManager = UserManager.getInstance();
     private final  Dao_UtilisateurImp userDAO   = new Dao_UtilisateurImp();
-
+    // Dans les attributs de ClientHandler — ajouter ces deux
+    private final DaoConversationImp convDAO    = new DaoConversationImp();
+    private final Dao_MessageImp     messageDAO = new Dao_MessageImp();
+    private final Dao_MessageFileAttenteImp fileDAO = new Dao_MessageFileAttenteImp();
     public ClientHandler(Socket s) {
         this.socket = s;
     }
@@ -47,7 +51,7 @@ public class ClientHandler extends Thread {
                     case CALL_ACCEPT  -> handleCallAccept(parts);
                     case CALL_REFUSE  -> handleCallRefuse(parts);
                     case CALL_END     -> handleCallEnd(parts);
-                    case CALL_CANCEL  -> handleCallCancel(parts);
+                    //case CALL_CANCEL  -> handleCallCancel(parts);
 
                     default                -> pw.println("UNKNOWN_COMMAND");
                 }
@@ -78,7 +82,7 @@ public class ClientHandler extends Thread {
                 pw.println(Protocol.LOGIN_OK + "|" + u.getNomComplet() + "|" + u.getNumeroTelephone());
 
                 messageRouter.delivrerMessagesEnAttente(telephoneConnecte);
-
+                handleGetConversations();
             } else {
                 pw.println(Protocol.LOGIN_FAIL+"|ErreurLogin");
             }
@@ -199,4 +203,109 @@ public class ClientHandler extends Thread {
             e.printStackTrace();
         }
     }
+    // ── GET_CONVERSATIONS ─────────────────────────────────────────────────────
+// Client envoie : GET_CONVERSATIONS
+// Serveur répond : CONVERSATIONS_LIST|id;type;nom;dateDernierMsg|id;type;...
+    private void handleGetConversations() {
+        try {
+            Utilisateur u = userDAO.findByTelephone(telephoneConnecte);
+            if (u == null) return;
+
+            List<Conversation> convs = convDAO.getByUtilisateur(u.getIdUtilisateur());
+
+            // Pré-charger les données
+            Map<Integer, Integer> nonLusMap = fileDAO.compterNonLusParConversation(u.getIdUtilisateur());
+            Map<Integer, Message> dernierMsgMap = messageDAO.getDernierMessageParConversation();
+
+            if (convs.isEmpty()) {
+                pw.println(Protocol.CONVERSATIONS_LIST.name() + "|");
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder(Protocol.CONVERSATIONS_LIST.name() + "|");
+
+            for (Conversation c : convs) {
+                String nomAffichage;
+
+                // Pour conversation individuelle → nom de l'autre participant
+                if ("individuelle".equals(c.getTypeConversation())) {
+                    Utilisateur autre = convDAO.getAutreParticipant(
+                            c.getIdConversation(), u.getIdUtilisateur());
+                    nomAffichage = (autre != null) ? autre.getNomComplet() : "Inconnu";
+                } else {
+                    nomAffichage = c.getNomGroupe() != null ? c.getNomGroupe() : "Groupe";
+                }
+
+                int nbNonLus = nonLusMap.getOrDefault(c.getIdConversation(), 0);
+
+                String dernierMsgContenu = "";
+                Message dernierMsg = dernierMsgMap.get(c.getIdConversation());
+                if (dernierMsg != null) {
+                    dernierMsgContenu = dernierMsg.getContenuTexte() != null
+                            ? dernierMsg.getContenuTexte() : "";
+                }
+
+                sb.append(c.getIdConversation()).append(";")
+                        .append(c.getTypeConversation()).append(";")
+                        .append(nomAffichage).append(";")
+                        .append((c.getDateDernierMessage() != null)
+                                ? c.getDateDernierMessage().toString() : "").append(";")
+                        .append(nbNonLus).append(";")
+                        .append(dernierMsgContenu).append("|");
+            }
+
+            pw.println(sb.toString());
+            System.out.println("[CONV] Envoyé " + convs.size()
+                    + " conversations enrichies à " + telephoneConnecte);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            pw.println(Protocol.CONVERSATIONS_LIST.name() + "|ERROR");
+        }
+    }
+
+    // ── GET_MESSAGES|idConversation ───────────────────────────────────────────
+    // Après envoi des messages, marquer la conversation comme lue
+    private void handleGetMessages(String[] parts) {
+        if (parts.length < 2) return;
+
+        try {
+            int idConversation = Integer.parseInt(parts[1].trim());
+            Utilisateur u = userDAO.findByTelephone(telephoneConnecte);
+            if (u == null) return;
+
+            List<Message> messages = messageDAO.getByConversation(idConversation);
+
+            if (messages.isEmpty()) {
+                pw.println(Protocol.MESSAGES_LIST.name() + "|");
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder(Protocol.MESSAGES_LIST.name() + "|");
+            for (Message m : messages) {
+                Utilisateur exp = userDAO.getByID(m.getIdExpediteur());
+                String telExp = exp != null ? exp.getNumeroTelephone() : "?";
+                String nomExp = exp != null ? exp.getNomComplet() : "?";
+
+                sb.append(m.getIdMessage()).append(";")
+                        .append(telExp).append(";")
+                        .append(nomExp).append(";")
+                        .append(m.getContenuTexte() != null ? m.getContenuTexte() : "").append(";")
+                        .append(m.getDateEnvoi() != null ? m.getDateEnvoi().toString() : "").append("|");
+            }
+
+            pw.println(sb.toString());
+
+            // ← MARQUER COMME LUS : mettre est_delivre=1 dans messages_file_attente
+            fileDAO.marquerConversationCommeLue(idConversation, u.getIdUtilisateur());
+
+            System.out.println("[MSG] Envoyé " + messages.size()
+                    + " messages de conv " + idConversation
+                    + " à " + telephoneConnecte);
+
+        } catch (SQLException | NumberFormatException e) {
+            e.printStackTrace();
+        }
+    }
+
 }
