@@ -168,9 +168,7 @@ public class ClientReseau {
                 case CALL_ACCEPT:
                     if (ecouteur != null) ecouteur.appelAccepte(parts[0]);
                     break;
-                case CALL_CANCEL:
-                    if (ecouteur != null) ecouteur.appelTermine(parts[0]);
-                    break;
+
                 case CALL_END:
                     if (ecouteur != null) ecouteur.appelTermine(parts[0]);
                     break;
