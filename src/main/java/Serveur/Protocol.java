@@ -23,7 +23,7 @@ public enum Protocol {
     CALL_CANCEL , // ← pour distinguer annulation et fin d'appel
     CALL_END ,
 
-    LISTE_CONVERSATIONS,
+    CONVERSATIONS_LIST,
     CONVERSATIONS_RECUES,
     MESSAGES_NON_LUS,
 

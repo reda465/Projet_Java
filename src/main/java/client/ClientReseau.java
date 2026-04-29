@@ -153,7 +153,7 @@ public class ClientReseau {
                         String nomAppelant = parts[1];
                         String typeAppel = parts[2];
                         ecouteur.appelEntrant(numAppelant, nomAppelant, typeAppel, "");
-
+                        System.out.println("Appel entrant de " + nomAppelant + " (" + numAppelant + ") - Type : " + typeAppel);
                         if (callService != null) {
                             callService.recevoirAppel(numAppelant, nomAppelant, typeAppel, "");
                         }
@@ -178,6 +178,9 @@ public class ClientReseau {
                         ecouteur.appelTermine(telephone);
                         if (callService != null) callService.onTermine();
                     }
+                    break;
+                case CONVERSATIONS_LIST:
+                    traiterConversationsRecues(data);
                     break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
