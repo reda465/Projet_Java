@@ -143,7 +143,6 @@ public class Ajouter_contacte {
                 "-fx-background-radius:20px;" +
                 "-fx-border-color:#A5E6C3;";
     }
-
     static void focusStyle(TextField tf, String base) {
         tf.focusedProperty().addListener((obs, old, focused) -> {
             if (focused) tf.setStyle(base.replace("#A5E6C3", "#25D366"));
