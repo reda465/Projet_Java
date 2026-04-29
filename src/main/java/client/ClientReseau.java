@@ -104,7 +104,7 @@ public class ClientReseau {
 
         private void traiterPacket(Packet p) {
             String data = p.getData();
-            String[] parts = data.split("\\|");
+            String[] parts = data.split("\\|",-1);
             switch (p.getProtocol()) {
                 case LOGIN_OK:
                     if (parts.length >= 2) {
@@ -116,6 +116,7 @@ public class ClientReseau {
                     }
                     System.out.println("Connecté : " + moi.getNomComplet());
                     }
+                    demanderConversations();
                     break;
 
                 case LOGIN_FAIL:
@@ -158,6 +159,7 @@ public class ClientReseau {
                             callService.recevoirAppel(numAppelant, nomAppelant, typeAppel, "");
                         }
                     }
+                    break;
                 case CALL_ACCEPT:
                     // Format: numAccepteur|ipAccepteur
                     if (parts.length >= 2 && ecouteur != null) {
@@ -186,7 +188,6 @@ public class ClientReseau {
             }
         }
 
-        // ===== TRAITER CONVERSATIONS REÇUES =====
         private void traiterConversationsRecues(String data) {
             List<Conversation> conversations = new ArrayList<>();
 
@@ -195,28 +196,33 @@ public class ClientReseau {
                 return;
             }
 
-            // Format : id|nom|numero|dernierMsg|date|nonLus;id|nom|...
-            String[] convs = data.split(";");
+            // Format : id;type;nomExp;datedernierMsg;nonLus;contenuDerniermsg|id;nom;...
+            String[] convs = data.split("\\|");
             for (String c : convs) {
-                String[] parts = c.split("\\|", 6);
+                if (c.isEmpty()) continue;
+                String[] parts = c.split(";", 6);
                 if (parts.length < 5) continue;
 
                 Conversation conv = new Conversation();
                 conv.setIdConversation(Integer.parseInt(parts[0]));
-                conv.setNomContact(parts[1]);
-                conv.setNumeroContact(parts[2]);
-                conv.setDernierMessage(parts[3]);
-                conv.setDateDernierMessage(java.time.LocalDateTime.parse(parts[4]));
-
-                if (parts.length >= 6) {
-                    conv.setMessagesNonLus(Integer.parseInt(parts[5]));
+                conv.setTypeConversation(parts[1]);
+                conv.setNomContact(parts[2]);
+                try {
+                    conv.setDateDernierMessage(java.time.LocalDateTime.parse(parts[3]));
+                } catch (Exception e) {
+                    conv.setDateDernierMessage(null);
                 }
+                conv.setMessagesNonLus(Integer.parseInt(parts[4]));
+                conv.setDernierMessage(parts.length >=6 ? parts[5] : "");
                 conversations.add(conv);
             }
             System.out.println("Conversations reçues : " + conversations.size());
             if (ecouteur != null) {
                 ecouteur.conversationsRecues(conversations);
             }
+        }
+        public void demanderConversations() {
+            envoyer(new Packet(Protocol.GET_CONVERSATIONS, ""));
         }
     }
 }
