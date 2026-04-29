@@ -1,4 +1,4 @@
-package service;
+/*package service;
 
 import Serveur.Protocol;
 import client.ClientReseau;
@@ -45,4 +45,4 @@ public class ContactService {
 
         System.out.println(" Demande de liste des contacts envoyée");
     }
-}
+}*/
