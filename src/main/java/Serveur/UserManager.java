@@ -7,6 +7,7 @@ public class UserManager {
     private static UserManager instance;
     private final ConcurrentHashMap<String, ClientHandler> connectedUsers
             = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> ips = new ConcurrentHashMap<>();
 
     private UserManager() {}
 
@@ -17,16 +18,22 @@ public class UserManager {
 
     public void addUser(String telephone, ClientHandler handler) {
         connectedUsers.put(telephone, handler);
+        String ip = handler.getSocket().getInetAddress().getHostAddress();
+        ips.put(telephone, ip);
     }
 
     public void removeUser(String telephone) {
         connectedUsers.remove(telephone);
+        ips.remove(telephone);
     }
 
     public ClientHandler getHandler(String telephone) {
         return connectedUsers.get(telephone);
     }
 
+    public String getIP(String telephone) {
+        return ips.get(telephone);
+    }
     public boolean isOnline(String telephone) {
         return connectedUsers.containsKey(telephone);
     }

@@ -1,5 +1,7 @@
 package client;
 
+import model.Utilisateur;
+import model.Contact;
 import model.Conversation;
 import model.Utilisateur;
 import java.util.ArrayList;
@@ -8,13 +10,24 @@ public interface EcouteurClient {
     // Quand la connexion réussit
     void connexionReussie(Utilisateur moi);
     void inscriptionReussie(String msg);
+
     // Quand ça échoue ou autre erreur
     void erreur(String message);
+
     // Quand on reçoit un message
-    void messageRecu(String num ,String contenu);
-    // Quand on se déconnecte
-    void deconnexion();
-    void conversationRecues(List<Conversation>conversations);
+    void messageRecu(String numeroDest, String message);
 
     void conversationsRecues(List<Conversation> conversations);
+
+    //Contact
+    void contactAjoute(Contact contact);           // Quand un contact est ajouté
+    void listeContactsRecue(List<Contact> contacts);
+
+    // Quand on se déconnecte
+    void deconnexion();
+    void appelEntrant(String numero,String type, String ipAppelant, String ip);
+    void appelAccepte(String numero);
+     void appelRefuse();
+     void appelTermine(String numero);
+
 }
