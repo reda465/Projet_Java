@@ -8,6 +8,7 @@ import java.io.*;
 import java.net.Socket;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 
 import Dao.*;
 
@@ -23,7 +24,7 @@ public class ClientHandler extends Thread {
     // Dans les attributs de ClientHandler — ajouter ces deux
     private final DaoConversationImp convDAO    = new DaoConversationImp();
     private final Dao_MessageImp     messageDAO = new Dao_MessageImp();
-
+    private final Dao_MessageFileAttenteImp fileDAO = new Dao_MessageFileAttenteImp();
     public ClientHandler(Socket s) {
         this.socket = s;
     }
@@ -212,42 +213,66 @@ public class ClientHandler extends Thread {
 
             List<Conversation> convs = convDAO.getByUtilisateur(u.getIdUtilisateur());
 
+            // Pré-charger les données
+            Map<Integer, Integer> nonLusMap = fileDAO.compterNonLusParConversation(u.getIdUtilisateur());
+            Map<Integer, Message> dernierMsgMap = messageDAO.getDernierMessageParConversation();
+
             if (convs.isEmpty()) {
                 pw.println(Protocol.CONVERSATIONS_LIST.name() + "|");
                 return;
             }
 
-            // Sérialiser chaque conversation en une chaîne
             StringBuilder sb = new StringBuilder(Protocol.CONVERSATIONS_LIST.name() + "|");
+
             for (Conversation c : convs) {
-                sb.append(c.getIdConversation())
-                        .append(";")
-                        .append(c.getTypeConversation())
-                        .append(";")
-                        .append(c.getNomGroupe() != null ? c.getNomGroupe() : "")
-                        .append(";")
+                String nomAffichage;
+
+                // Pour conversation individuelle → nom de l'autre participant
+                if ("individuelle".equals(c.getTypeConversation())) {
+                    Utilisateur autre = convDAO.getAutreParticipant(
+                            c.getIdConversation(), u.getIdUtilisateur());
+                    nomAffichage = (autre != null) ? autre.getNomComplet() : "Inconnu";
+                } else {
+                    nomAffichage = c.getNomGroupe() != null ? c.getNomGroupe() : "Groupe";
+                }
+
+                int nbNonLus = nonLusMap.getOrDefault(c.getIdConversation(), 0);
+
+                String dernierMsgContenu = "";
+                Message dernierMsg = dernierMsgMap.get(c.getIdConversation());
+                if (dernierMsg != null) {
+                    dernierMsgContenu = dernierMsg.getContenuTexte() != null
+                            ? dernierMsg.getContenuTexte() : "";
+                }
+
+                sb.append(c.getIdConversation()).append(";")
+                        .append(c.getTypeConversation()).append(";")
+                        .append(nomAffichage).append(";")
                         .append((c.getDateDernierMessage() != null)
-                                ? c.getDateDernierMessage().toString() : "")
-                        .append("|");
+                                ? c.getDateDernierMessage().toString() : "").append(";")
+                        .append(nbNonLus).append(";")
+                        .append(dernierMsgContenu).append("|");
             }
 
             pw.println(sb.toString());
             System.out.println("[CONV] Envoyé " + convs.size()
-                    + " conversations à " + telephoneConnecte);
+                    + " conversations enrichies à " + telephoneConnecte);
 
         } catch (SQLException e) {
             e.printStackTrace();
+            pw.println(Protocol.CONVERSATIONS_LIST.name() + "|ERROR");
         }
     }
 
     // ── GET_MESSAGES|idConversation ───────────────────────────────────────────
-// Client envoie : GET_MESSAGES|7
-// Serveur répond : MESSAGES_LIST|id;idExp;telExp;contenu;date|id;...
+    // Après envoi des messages, marquer la conversation comme lue
     private void handleGetMessages(String[] parts) {
         if (parts.length < 2) return;
 
         try {
             int idConversation = Integer.parseInt(parts[1].trim());
+            Utilisateur u = userDAO.findByTelephone(telephoneConnecte);
+            if (u == null) return;
 
             List<Message> messages = messageDAO.getByConversation(idConversation);
 
@@ -262,19 +287,18 @@ public class ClientHandler extends Thread {
                 String telExp = exp != null ? exp.getNumeroTelephone() : "?";
                 String nomExp = exp != null ? exp.getNomComplet() : "?";
 
-                sb.append(m.getIdMessage())
-                        .append(";")
-                        .append(telExp)
-                        .append(";")
-                        .append(nomExp)
-                        .append(";")
-                        .append(m.getContenuTexte() != null ? m.getContenuTexte() : "")
-                        .append(";")
-                        .append(m.getDateEnvoi() != null ? m.getDateEnvoi().toString() : "")
-                        .append("|");
+                sb.append(m.getIdMessage()).append(";")
+                        .append(telExp).append(";")
+                        .append(nomExp).append(";")
+                        .append(m.getContenuTexte() != null ? m.getContenuTexte() : "").append(";")
+                        .append(m.getDateEnvoi() != null ? m.getDateEnvoi().toString() : "").append("|");
             }
 
             pw.println(sb.toString());
+
+            // ← MARQUER COMME LUS : mettre est_delivre=1 dans messages_file_attente
+            fileDAO.marquerConversationCommeLue(idConversation, u.getIdUtilisateur());
+
             System.out.println("[MSG] Envoyé " + messages.size()
                     + " messages de conv " + idConversation
                     + " à " + telephoneConnecte);
@@ -283,4 +307,5 @@ public class ClientHandler extends Thread {
             e.printStackTrace();
         }
     }
+
 }
