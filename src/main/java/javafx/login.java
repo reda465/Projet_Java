@@ -169,13 +169,19 @@ public class login extends Application implements EcouteurClient {
                     stage.close();
                     // Créer et ouvrir Discussion avec l'utilisateur connecté
                     Discussion discussion = new Discussion(moi);
+                    if (ClientHandlerAuth.getInstance().getClientReseau() != null) {
+                        ClientHandlerAuth.getInstance().getClientReseau().setEcouteur(discussion);
+                    }
                     Stage discussionStage = new Stage();
+
                     discussionStage.setScene(discussion.creerScene(discussionStage));
                     discussionStage.setTitle("WhatsApp – Discussions");
                     discussionStage.setOnCloseRequest(e -> {
                         ClientHandlerAuth.getInstance().seDeconnecter();
+
                     });
                     discussionStage.show();
+                    ClientHandlerAuth.getInstance().demanderConversations();
                 });
             }).start();
         });
