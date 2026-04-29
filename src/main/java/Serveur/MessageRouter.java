@@ -85,9 +85,7 @@ public class MessageRouter {
         // Format : MSG_RECEIVE|telephoneExp|nomExp|contenu|idMessage
         String ligne = Protocol.MSG_RECEIVE.name()        + "|"
                 + expediteur.getNumeroTelephone()    + "|"
-                + expediteur.getNomComplet()         + "|"
-                + contenu                            + "|"
-                + msg.getIdMessage();
+                + contenu                            ;
 
         // 6. Destinataire en ligne → direct | hors ligne → file d'attente
         ClientHandler destHandler = userManager.getHandler(telephoneDest);
@@ -132,9 +130,7 @@ public class MessageRouter {
 
             String ligne = Protocol.MSG_RECEIVE.name()        + "|"
                     + expediteur.getNumeroTelephone()    + "|"
-                    + expediteur.getNomComplet()         + "|"
-                    + msg.getContenuTexte()              + "|"
-                    + msg.getIdMessage();
+                    + msg.getContenuTexte()             ;
 
             handler.sendMessage(ligne);
         }
