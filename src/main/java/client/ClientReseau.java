@@ -136,47 +136,6 @@ public class ClientReseau {
                         ecouteur.erreur((String) p.getData());
                     }
                     break;
-                case MSG_RECEIVE:
-                    if (parts.length >= 2) {
-                        Message msg = new Message();
-                        msg.setTelephoneExpediteur(parts[0]);
-                        msg.setContenuTexte(parts[1]);
-                        System.out.println("Message " + msg.getContenuTexte());
-                        if (ecouteur != null) ecouteur.messageRecu(msg.getTelephoneExpediteur(), msg.getContenuTexte());
-                    }
-                    break;
-                case CALL_REQUEST:
-                    if (parts.length >= 2 && ecouteur != null) {
-                        ecouteur.appelEntrant(parts[0], parts[1]);
-                    }
-                    break;
-                case CALL_ACCEPT:
-                    if (ecouteur != null) ecouteur.appelAccepte(parts[0]);
-                    break;
-                ///////////
-                case CALL_REQUEST:
-                    // Format: numAppelant|numDest|type|idAppel|ipAppelant
-                    if (parts.length >= 5 && ecouteur != null) {
-                        String numAppelant = parts[0];
-                        String typeAppel = parts[2];
-                        String ipAppelant = parts[4];
-                        ecouteur.appelEntrant(numAppelant, typeAppel, ipAppelant);
-                    }
-                    break;
-                case CALL_ACCEPT:
-                    // Format: numAccepteur|ipAccepteur
-                    if (parts.length >= 2 && ecouteur != null) {
-                        String ipAccepteur = parts[1];
-                        ecouteur.appelAccepte(ipAccepteur);
-                    }
-                    break;
-                    ///////////////
-                case CALL_REFUSE:
-                    if (ecouteur != null) ecouteur.appelRefuse();
-                    break;
-                case CALL_END:
-                    if (ecouteur != null) ecouteur.appelTermine(parts[0]);
-                    break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
                     break;

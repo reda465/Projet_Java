@@ -14,8 +14,8 @@ public class pageouvert extends Application {
     public void start(Stage stage) {
         //  LOGO WhatsApp
         ImageView logo = new ImageView(
-                new Image("https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg")
-        );
+                new Image("https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg"));
+
         logo.setFitWidth(100);
         logo.setFitHeight(100);
         //  ICONES
@@ -55,7 +55,7 @@ public class pageouvert extends Application {
                 loginPage.start(newStage);
             } catch (Exception ex) {
                 ex.printStackTrace();}});
-        //  LAYOUT PRINCIPAL
+        //
         VBox root = new VBox(20, logo, icons, title, desc, startBtn
         );
         root.setAlignment(Pos.CENTER);

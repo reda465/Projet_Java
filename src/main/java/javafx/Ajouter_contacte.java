@@ -1,4 +1,5 @@
 package javafx;
+import client.ClientHandlerAuth;
 import client.ClientReseau;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -11,7 +12,7 @@ import javafx.scene.text.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 public class Ajouter_contacte {
-    public static void show(Stage parentStage, ListView<HBox> convList, ClientReseau client) {
+    public static void show(Stage parentStage, ListView<HBox> convList, ClientHandlerAuth client) {
         Stage window = new Stage();
         window.initModality(Modality.APPLICATION_MODAL);
         window.initOwner(parentStage);

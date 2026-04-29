@@ -16,7 +16,6 @@ import model.Contact;
 import model.Conversation;
 import model.Utilisateur;
 import java.util.List;
-
 public class login extends Application implements EcouteurClient {
     private Label message;
     private Stage stage;
@@ -32,7 +31,6 @@ public class login extends Application implements EcouteurClient {
     public Scene creerScene(Stage stage) {
         String fs = fieldStyle();
         String bs = btnStyle();
-
         // LOGO
         Circle circle = new Circle(32);
         circle.setFill(Color.web("#25D366"));
@@ -162,6 +160,24 @@ public class login extends Application implements EcouteurClient {
         Platform.runLater(() -> {
             message.setTextFill(Color.web("#25D366"));
             message.setText("Connexion réussie ! Bienvenue " + moi.getNomComplet());
+
+            // Attendre 1 seconde puis ouvrir Discussion
+            new Thread(() -> {
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+                Platform.runLater(() -> {
+                    // Fermer la fenêtre login
+                    stage.close();
+                    // Créer et ouvrir Discussion avec l'utilisateur connecté
+                    Discussion discussion = new Discussion(moi);
+                    Stage discussionStage = new Stage();
+                    discussionStage.setScene(discussion.creerScene(discussionStage));
+                    discussionStage.setTitle("WhatsApp – Discussions");
+                    discussionStage.setOnCloseRequest(e -> {
+                        ClientHandlerAuth.getInstance().seDeconnecter();
+                    });
+                    discussionStage.show();
+                });
+            }).start();
         });
     }
 
@@ -177,7 +193,7 @@ public class login extends Application implements EcouteurClient {
         });
     }
     @Override
-    public void messageRecu(String contenu) {
+    public void messageRecu(String num ,String contenu) {
         // non utilisé dans login
     }
     @Override
@@ -187,7 +203,18 @@ public class login extends Application implements EcouteurClient {
             message.setText("Déconnecté du serveur");
         });
     }
-    // ===== STYLES =====
+
+    @Override
+    public void conversationRecues(List<Conversation> conversations) {
+
+    }
+
+    @Override
+    public void conversationsRecues(List<Conversation> conversations) {
+
+    }
+
+    //
     static String fieldStyle() {
         return "-fx-background-color:#ECFFF5;" +
                 "-fx-border-color:#A5E6C3;" +

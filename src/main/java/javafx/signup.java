@@ -161,15 +161,8 @@ public class signup implements EcouteurClient {
 
     }
 
-    @Override
-    public void contactAjoute(Contact contact) {
 
-    }
 
-    @Override
-    public void listeContactsRecue(List<Contact> contacts) {
-
-    }
 
     @Override
     public void deconnexion() {
@@ -181,22 +174,8 @@ public class signup implements EcouteurClient {
     }
 
     @Override
-    public void appelEntrant(String numero, String type) {
+    public void conversationRecues(List<Conversation> conversations) {
 
     }
 
-    @Override
-    public void appelAccepte(String numero) {
-
-    }
-
-    @Override
-    public void appelRefuse(String numero) {
-
-    }
-
-    @Override
-    public void appelTermine(String numero) {
-
-    }
 }

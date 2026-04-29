@@ -1,4 +1,4 @@
-/package Dao;
+package Dao;
 
 import model.Appel;
 import model.enums.StatutAppel;
@@ -8,21 +8,7 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-<<<<<<< HEAD
-public class Dao_AppelImp implements DAO_Appel{
-    @Override
-    public int Add(Appel appel) throws SQLException {
-        Connection con= DataBase.getConnection();
-        String Sql="insert into appels Values(?,?,?,?,?,?,?)";
-        PreparedStatement st =con.prepareStatement(Sql);
-        st.setInt(1, appel.getIdAppel());
-        st.setInt(2, appel.getIdAppelant());
-        st.setInt(3, appel.getIdConversation());
-        //st.setString(4, (appel.getType_appel()).name());
-=======
 public class Dao_AppelImp implements DAO_Appel {
->>>>>>> 5cd903841af3b46e03b04993967464be3a5c09b8
-
     // ── ADD ──────────────────────────────────────────────────────────────────
     // Retourne l'id généré — nécessaire pour mettre à jour l'appel après
     @Override

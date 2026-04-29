@@ -11,8 +11,10 @@ public interface EcouteurClient {
     // Quand ça échoue ou autre erreur
     void erreur(String message);
     // Quand on reçoit un message
-    void messageRecu(String contenu);
+    void messageRecu(String num ,String contenu);
     // Quand on se déconnecte
     void deconnexion();
     void conversationRecues(List<Conversation>conversations);
+
+    void conversationsRecues(List<Conversation> conversations);
 }
