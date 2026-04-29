@@ -1,10 +1,14 @@
 package Serveur;
 
+import model.Conversation;
+import model.Message;
 import model.Utilisateur;
 
 import java.io.*;
 import java.net.Socket;
 import java.sql.SQLException;
+import java.util.List;
+
 import Dao.*;
 
 public class ClientHandler extends Thread {
@@ -16,6 +20,9 @@ public class ClientHandler extends Thread {
     private final CallManager callManager = CallManager.getInstance();
     private final UserManager      userManager = UserManager.getInstance();
     private final  Dao_UtilisateurImp userDAO   = new Dao_UtilisateurImp();
+    // Dans les attributs de ClientHandler — ajouter ces deux
+    private final DaoConversationImp convDAO    = new DaoConversationImp();
+    private final Dao_MessageImp     messageDAO = new Dao_MessageImp();
 
     public ClientHandler(Socket s) {
         this.socket = s;
@@ -43,7 +50,7 @@ public class ClientHandler extends Thread {
                     case CALL_ACCEPT  -> handleCallAccept(parts);
                     case CALL_REFUSE  -> handleCallRefuse(parts);
                     case CALL_END     -> handleCallEnd(parts);
-                    case CALL_CANCEL  -> handleCallCancel(parts);
+                    //case CALL_CANCEL  -> handleCallCancel(parts);
 
                     default                -> pw.println("UNKNOWN_COMMAND");
                 }
@@ -74,7 +81,7 @@ public class ClientHandler extends Thread {
                 pw.println(Protocol.LOGIN_OK + "|" + u.getNomComplet() + "|" + u.getNumeroTelephone());
 
                 messageRouter.delivrerMessagesEnAttente(telephoneConnecte);
-
+                handleGetConversations();
             } else {
                 pw.println(Protocol.LOGIN_FAIL+"|ErreurLogin");
             }
@@ -192,6 +199,87 @@ public class ClientHandler extends Thread {
         try {
             callManager.annulerAppel(telephoneConnecte, telephoneDest);
         } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+    // ── GET_CONVERSATIONS ─────────────────────────────────────────────────────
+// Client envoie : GET_CONVERSATIONS
+// Serveur répond : CONVERSATIONS_LIST|id;type;nom;dateDernierMsg|id;type;...
+    private void handleGetConversations() {
+        try {
+            Utilisateur u = userDAO.findByTelephone(telephoneConnecte);
+            if (u == null) return;
+
+            List<Conversation> convs = convDAO.getByUtilisateur(u.getIdUtilisateur());
+
+            if (convs.isEmpty()) {
+                pw.println(Protocol.CONVERSATIONS_LIST.name() + "|");
+                return;
+            }
+
+            // Sérialiser chaque conversation en une chaîne
+            StringBuilder sb = new StringBuilder(Protocol.CONVERSATIONS_LIST.name() + "|");
+            for (Conversation c : convs) {
+                sb.append(c.getIdConversation())
+                        .append(";")
+                        .append(c.getTypeConversation())
+                        .append(";")
+                        .append(c.getNomGroupe() != null ? c.getNomGroupe() : "")
+                        .append(";")
+                        .append((c.getDateDernierMessage() != null)
+                                ? c.getDateDernierMessage().toString() : "")
+                        .append("|");
+            }
+
+            pw.println(sb.toString());
+            System.out.println("[CONV] Envoyé " + convs.size()
+                    + " conversations à " + telephoneConnecte);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ── GET_MESSAGES|idConversation ───────────────────────────────────────────
+// Client envoie : GET_MESSAGES|7
+// Serveur répond : MESSAGES_LIST|id;idExp;telExp;contenu;date|id;...
+    private void handleGetMessages(String[] parts) {
+        if (parts.length < 2) return;
+
+        try {
+            int idConversation = Integer.parseInt(parts[1].trim());
+
+            List<Message> messages = messageDAO.getByConversation(idConversation);
+
+            if (messages.isEmpty()) {
+                pw.println(Protocol.MESSAGES_LIST.name() + "|");
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder(Protocol.MESSAGES_LIST.name() + "|");
+            for (Message m : messages) {
+                Utilisateur exp = userDAO.getByID(m.getIdExpediteur());
+                String telExp = exp != null ? exp.getNumeroTelephone() : "?";
+                String nomExp = exp != null ? exp.getNomComplet() : "?";
+
+                sb.append(m.getIdMessage())
+                        .append(";")
+                        .append(telExp)
+                        .append(";")
+                        .append(nomExp)
+                        .append(";")
+                        .append(m.getContenuTexte() != null ? m.getContenuTexte() : "")
+                        .append(";")
+                        .append(m.getDateEnvoi() != null ? m.getDateEnvoi().toString() : "")
+                        .append("|");
+            }
+
+            pw.println(sb.toString());
+            System.out.println("[MSG] Envoyé " + messages.size()
+                    + " messages de conv " + idConversation
+                    + " à " + telephoneConnecte);
+
+        } catch (SQLException | NumberFormatException e) {
             e.printStackTrace();
         }
     }

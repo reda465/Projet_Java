@@ -1,6 +1,7 @@
 package Dao;
 
 import model.Conversation;
+import model.Utilisateur;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -172,5 +173,23 @@ public class DaoConversationImp implements DAO_Conversation {
             conv.setIdCreateur(idCreateur);
 
         return conv;
+    }
+    public Utilisateur getAutreParticipant(int idConversation, int monId) throws SQLException {
+        String sql = "SELECT u.* FROM utilisateurs u " +
+                "JOIN participants_conversation pc ON u.id_utilisateur = pc.id_utilisateur " +
+                "WHERE pc.id_conversation = ? AND u.id_utilisateur != ?";
+
+        try (Connection c = DataBase.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setInt(1, idConversation);
+            ps.setInt(2, monId);
+
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                return new Dao_UtilisateurImp().getByID(rs.getInt("id_utilisateur"));
+            }
+        }
+        return null;
     }
 }
