@@ -47,6 +47,8 @@ public class ClientHandler extends Thread {
                     case Protocol.REGISTER -> handleRegister(parts);
                     case Protocol.LOGOUT   -> { handleLogout(); return; }
                     case Protocol.MSG_SEND -> handleMessage(parts);
+                    case Protocol.GET_CONVERSATIONS -> handleGetConversations();
+                    case Protocol.GET_MESSAGES -> handleGetMessages(parts);
                     case CALL_REQUEST -> handleCallRequest(parts);
                     case CALL_ACCEPT  -> handleCallAccept(parts);
                     case CALL_REFUSE  -> handleCallRefuse(parts);
@@ -82,7 +84,7 @@ public class ClientHandler extends Thread {
                 pw.println(Protocol.LOGIN_OK + "|" + u.getNomComplet() + "|" + u.getNumeroTelephone());
 
                 messageRouter.delivrerMessagesEnAttente(telephoneConnecte);
-                handleGetConversations();
+
             } else {
                 pw.println(Protocol.LOGIN_FAIL+"|ErreurLogin");
             }
