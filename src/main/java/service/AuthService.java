@@ -25,7 +25,6 @@ public class AuthService {
     // ===== CONNEXION =====
     public String connecter(String numero, String password) {
 
-
         String data = numero + "|" + password;
         Packet p = new Packet(Protocol.LOGIN, data);
         client.envoyer(p);

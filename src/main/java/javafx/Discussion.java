@@ -43,7 +43,7 @@ public class Discussion implements EcouteurClient {
         VBox sidebar = new VBox(0);
         sidebar.setPrefWidth(300);
         sidebar.setStyle(
-                "-fx-background-color: #ffffff;" +
+                "-fx-background-color: #000000;" +
                         "-fx-border-color: #dadada;" +
                         "-fx-border-width: 0 1 0 0;");
 
@@ -220,7 +220,7 @@ public class Discussion implements EcouteurClient {
     // ── Ouvrir une conversation ───────────────────────────────────────────────
     private void ouvrirConversation(int idconversation,String numero, String nom) {
         this.idConversationActive = idconversation;
-        contactActif = numero;
+        contactActif= numero;
         chatName.setText(nom);//en change le nom
         chatStatus.setText("en ligne");//le status
         chatStatus.setTextFill(Color.web("#ffffff"));
@@ -327,7 +327,7 @@ public class Discussion implements EcouteurClient {
     @Override
     public void messagesRecus(List<Message> messages) {
         Platform.runLater(() -> {
-            messagesBox.getChildren().clear();
+            //messagesBox.getChildren().clear();
 
             if (messages == null || messages.isEmpty()) {
                 Label emptyLabel = new Label("Aucun message. Commencez la conversation !");
@@ -368,7 +368,9 @@ public class Discussion implements EcouteurClient {
         for (HBox item : convList.getItems()) {
             Object ud = item.getUserData();
             if (ud == null) continue;
-            String numero = ((String) ud).split(";", 2)[0];
+            String[] parts = ((String) ud).split(";", 3);
+            if (parts.length < 3) continue;
+            String numero = parts[1];
             if (!numero.equals(expediteur)) continue;
             item.getChildren().stream()
                     .filter(n -> n instanceof VBox)
@@ -420,6 +422,17 @@ public class Discussion implements EcouteurClient {
         row.setPadding(new Insets(10, 14, 10, 14));
         row.setStyle("-fx-cursor: hand;");
         row.setUserData(idConve + ";" + numero + ";" + name);
+        row.getChildren().addAll(avatar,info);
+        //
+        if (nbNonLus > 0) {
+            Circle badge = new Circle(10);
+            badge.setFill(Color.web("#25D366"));
+            Label badgeLabel = new Label(String.valueOf(nbNonLus));
+            badgeLabel.setTextFill(Color.WHITE);
+            badgeLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
+            StackPane badgePane = new StackPane(badge, badgeLabel);
+            row.getChildren().add(badgePane);
+        }
         row.setOnMouseEntered(e -> {
             if (!row.getStyle().contains("#E8F5E9")) {
                 row.setStyle("-fx-background-color: #F1F8E9; -fx-cursor: hand;");
@@ -432,18 +445,18 @@ public class Discussion implements EcouteurClient {
             }
         });
 
-        row.setOnMouseClicked(e -> {
+        /*row.setOnMouseClicked(e -> {
             ListView<HBox> list = (ListView<HBox>) row.getParent().getParent();
             for (HBox item : list.getItems()) {
                 item.setStyle("-fx-cursor: hand;");
             }
             row.setStyle("-fx-background-color: #E8F5E9; -fx-cursor: hand;");
         });
-
+*/
         return row;
     }
     public static HBox makeConvItem(String name,String numero, String last, String color) {
-        return makeConvItem(name, numero, last, color);
+        return makeConvItem(name, numero, last, color,-1,0);
     }
 
     static StackPane makeAvatar(String letter, String color) {
