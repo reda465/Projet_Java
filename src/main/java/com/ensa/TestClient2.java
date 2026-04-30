@@ -66,6 +66,11 @@ public class TestClient2 implements EcouteurClient {
     }
 
     @Override
+    public void messagesRecus(List<Message> messages) {
+
+    }
+
+    @Override
     public void contactAjoute(Contact contact) {
 
     }

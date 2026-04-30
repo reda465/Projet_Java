@@ -141,6 +141,11 @@ public class ClientHandlerAuth {
         }
         clientReseau.demanderConversations();
     }
+    // Dans ClientHandlerAuth.java
+    public boolean connecterAuServeurTest(String ip, int port, EcouteurClient ecouteur) {
+        // Utiliser le même code mais pointer vers le mock server
+        return connecterAuServeur(ip, port, ecouteur);
+    }
 
     public Utilisateur getUtilisateurConnecte() {
         if (clientReseau != null) {

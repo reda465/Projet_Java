@@ -231,6 +231,11 @@ public class TestAppelConsole implements EcouteurClient {
     }
 
     @Override
+    public void messagesRecus(List<Message> messages) {
+
+    }
+
+    @Override
     public void contactAjoute(Contact contact) {
 
     }
