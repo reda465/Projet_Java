@@ -71,14 +71,6 @@ public class ClientReseau {
         Packet p = new Packet(Protocol.GET_MESSAGES, String.valueOf(idConversation));
         envoyer(p);
     }
-    public void demanderConversations() {
-        if (!connecte || stylo == null) {
-            System.out.println("❌ Pas connecté au serveur");
-            return;
-        }
-        Packet p = new Packet(Protocol.GET_CONVERSATIONS, "");
-        envoyer(p);
-    }
     // ===== ENVOYER =====
     public void envoyer(Packet packet) {
         if (!connecte) {//erreur du connection
