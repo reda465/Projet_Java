@@ -75,7 +75,7 @@ public class Ajouter_contacte {
             String color = colors[(int)(Math.random() * colors.length)];
 
             // ── 2. Créer l'item et l'ajouter dans convList de Discussion ──
-            HBox item = Discussion.makeConvItem(name, phone, "maintenant", color);
+            HBox item = Discussion.makeConvItem(name, phone, "maintenant", color,-1,0);
             convList.getItems().add(item);
             //
 
