@@ -220,24 +220,30 @@ public class ClientReseau {
                 return;
             }
 
-            // Format : id;type;nomExp;datedernierMsg;nonLus;contenuDerniermsg|id;nom;...
+            // Format serveur : id;type;nom;numeroTel;date;nonLus;dernierMsg|...
             String[] convs = data.split("\\|");
             for (String c : convs) {
                 if (c.isEmpty()) continue;
-                String[] parts = c.split(";", 6);
-                if (parts.length < 5) continue;
+                String[] parts = c.split(";", 7);
+                if (parts.length < 7) continue;
 
                 Conversation conv = new Conversation();
-                conv.setIdConversation(Integer.parseInt(parts[0]));
+                conv.setIdConversation(Integer.parseInt(parts[0].trim()));
                 conv.setTypeConversation(parts[1]);
                 conv.setNomContact(parts[2]);
+                conv.setNumeroContact(parts[3] != null ? parts[3].trim() : "");
                 try {
-                    conv.setDateDernierMessage(java.time.LocalDateTime.parse(parts[3]));
+                    conv.setDateDernierMessage(parts[4].isEmpty() ? null
+                            : java.time.LocalDateTime.parse(parts[4]));
                 } catch (Exception e) {
                     conv.setDateDernierMessage(null);
                 }
-                conv.setMessagesNonLus(Integer.parseInt(parts[4]));
-                conv.setDernierMessage(parts.length >= 6 ? parts[5] : "");
+                try {
+                    conv.setMessagesNonLus(Integer.parseInt(parts[5].trim()));
+                } catch (Exception e) {
+                    conv.setMessagesNonLus(0);
+                }
+                conv.setDernierMessage(parts[6] != null ? parts[6] : "");
                 conversations.add(conv);
             }
             System.out.println("Conversations reçues : " + conversations.size());
