@@ -18,6 +18,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import  model.Message;
+import  java.util.Objects;
 public class Discussion implements EcouteurClient {
     // utilisateur actuellement connecter
     private Utilisateur utilisateurConnecte;
@@ -191,7 +192,7 @@ public class Discussion implements EcouteurClient {
         // ── Action d'envoi ────────────────────────────────────────────────────
         Runnable sendAction = () -> {
             String text = msgField.getText().trim();
-            if (text.isEmpty() || contactActif == null) return;
+            if (text.isEmpty() || !numeroContactUtilisable(contactActif) ) return;
 
             String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
 
@@ -220,7 +221,8 @@ public class Discussion implements EcouteurClient {
     // ── Ouvrir une conversation ───────────────────────────────────────────────
     private void ouvrirConversation(int idconversation,String numero, String nom) {
         this.idConversationActive = idconversation;
-        contactActif= numero;
+        //contactActif= numero;
+        contactActif=normaliserNumeroContact(numero);
         chatName.setText(nom);//en change le nom
         chatStatus.setText("en ligne");//le status
         chatStatus.setTextFill(Color.web("#ffffff"));
@@ -228,9 +230,12 @@ public class Discussion implements EcouteurClient {
         mettreAJourAvatar(chatAvatar, String.valueOf(nom.charAt(0)).toUpperCase(), "#25D366");
         messagesBox.getChildren().clear();
         msgField.setDisable(false);//activer la zone d'eciture
-        sendBtn.setDisable(false);
+        //sendBtn.setDisable(false);
+        majEtatBoutonEnvoi();
         msgField.requestFocus();
-        ClientHandlerAuth.getInstance().demanderMessages(idconversation);
+        if (idconversation != -1) {
+            ClientHandlerAuth.getInstance().demanderMessages(idconversation);
+        }
     }
 
     // ── EcouteurClient ───────────────────────────────────────────────────────
@@ -334,6 +339,7 @@ public class Discussion implements EcouteurClient {
                 emptyLabel.setTextFill(Color.web("#8696a0"));
                 emptyLabel.setFont(Font.font("Segoe UI", 13));
                 messagesBox.getChildren().add(emptyLabel);
+                majEtatBoutonEnvoi();
                 return;
             }
 
@@ -352,6 +358,16 @@ public class Discussion implements EcouteurClient {
                 }
                 messagesBox.getChildren().add(messageBubble);
             }
+            // Si la liste des conversations n'a pas envoyé le téléphone (MockServer / ancien format),
+            // on déduit le numéro du correspondant depuis les messages déjà chargés.
+            if (!numeroContactUtilisable(contactActif)) {
+                String deduit = infererNumeroInterlocuteur(messages);
+                if (deduit != null) {
+                    contactActif = deduit;
+                    chatStatus.setText("en ligne");
+                }
+            }
+            majEtatBoutonEnvoi();
             scrollToBottom();
         });
     }
@@ -371,7 +387,7 @@ public class Discussion implements EcouteurClient {
             String[] parts = ((String) ud).split(";", 3);
             if (parts.length < 3) continue;
             String numero = parts[1];
-            if (!numero.equals(expediteur)) continue;
+            if (!numeroContactUtilisable(numero) || !numero.trim().equals(expediteur)) continue;
             item.getChildren().stream()
                     .filter(n -> n instanceof VBox)
                     .map(n -> (VBox) n)
@@ -399,6 +415,51 @@ public class Discussion implements EcouteurClient {
         messagesBox.getChildren().add(wrapper);
     }
 
+    //dernier changement
+    private static boolean numeroContactUtilisable(String tel) {
+        if (tel == null || tel.isBlank()) return false;
+        return !"null".equalsIgnoreCase(tel.trim());
+    }
+
+    private static String normaliserNumeroContact(String tel) {
+        return numeroContactUtilisable(tel) ? tel.trim() : null;
+    }
+
+    /** Pour userData ListView : jamais injecter la chaîne littérale "null". */
+    private static String numeroPourListe(String numero) {
+        String n = normaliserNumeroContact(numero);
+        return n != null ? n : "";
+    }
+
+    private void majEtatBoutonEnvoi() {
+        if (sendBtn == null) return;
+        sendBtn.setDisable(!numeroContactUtilisable(contactActif));
+    }
+
+    /** Premier expéditeur dans l'historique dont le téléphone n'est pas le mien = interlocuteur. */
+    private String infererNumeroInterlocuteur(List<Message> messages) {
+        if (messages == null || messages.isEmpty()) return null;
+
+        String moiTel = null;
+        if (utilisateurConnecte != null && utilisateurConnecte.getNumeroTelephone() != null) {
+            moiTel = utilisateurConnecte.getNumeroTelephone().trim();
+        }
+        if ((moiTel == null || moiTel.isEmpty())
+                && ClientHandlerAuth.getInstance().getUtilisateurConnecte() != null) {
+            Utilisateur u = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
+            moiTel = u.getNumeroTelephone() != null ? u.getNumeroTelephone().trim() : null;
+        }
+        if (moiTel == null || moiTel.isEmpty()) return null;
+
+        for (Message msg : messages) {
+            String tel = msg.getTelephoneExpediteur();
+            if (!numeroContactUtilisable(tel)) continue;
+            String t = tel.trim();
+            if (!t.equals(moiTel)) return t;
+        }
+        return null;
+    }
+
     private void scrollToBottom() {
         scrollPane.setVvalue(1.0);
     }
@@ -417,10 +478,11 @@ public class Discussion implements EcouteurClient {
         VBox info = new VBox(3, nameLabel, lastLabel);
         HBox.setHgrow(info, Priority.ALWAYS);
 
-        HBox row = new HBox(10, avatar, info);
+        HBox row = new HBox(10);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(10, 14, 10, 14));
         row.setStyle("-fx-cursor: hand;");
+        String tel=numero!=null? numero.trim(): "";
         row.setUserData(idConve + ";" + numero + ";" + name);
         row.getChildren().addAll(avatar,info);
         //
