@@ -21,8 +21,7 @@ public class CallService {
     private String ipCorrespondant;
     private String numeroCorrespondant;
 
-    private static final int PORT_LOCAL = 5001;
-    private static final int PORT_DISTANT = 5002;
+    // (Ports retirés d'ici pour être attribués dynamiquement selon le rôle appelant/appelé)
 
     public CallService(ClientReseau clientReseau, Utilisateur localUser) {
         this.clientReseau = clientReseau;
@@ -61,7 +60,6 @@ public class CallService {
         System.out.println("[APPEL] Entrant de " + numAppelant + " (" + ipAppelant + ")");
     }
 
-    // J'accepte l'appel entrant
     public void accepte(){
         if (appelEnCours == null) return;
 
@@ -69,20 +67,23 @@ public class CallService {
         communicationActive = true;
 
         envoyer(Protocol.CALL_ACCEPT, numeroCorrespondant); // celui qui a appelé
-        audioUDP.demarrer(ipCorrespondant, PORT_DISTANT, PORT_LOCAL);
+        
+        // L'appelé écoute sur le port 5002 et envoie vers le port 5001
+        audioUDP.demarrer(ipCorrespondant, 5001, 5002);
 
         System.out.println("[APPEL] Accepté, UDP démarré");
     }
 
-    // L'autre a accepté mon appel
-    public void onAccepte(String ipAccepteur) {//////////////////A VERIFIER
+    // L'autre a accepté mon appel (Je suis l'appelant)
+    public void onAccepte(String ipAccepteur) {
         if (appelEnCours == null) return;
 
         this.ipCorrespondant = ipAccepteur;
         appelEnCours.setStatut(StatutAppel.accepte);
         communicationActive = true;
 
-        audioUDP.demarrer(ipAccepteur, PORT_DISTANT, PORT_LOCAL);
+        // L'appelant écoute sur le port 5001 et envoie vers le port 5002
+        audioUDP.demarrer(ipAccepteur, 5002, 5001);
         System.out.println("[APPEL] UDP démarré vers " + ipAccepteur);
     }
 

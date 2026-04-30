@@ -666,7 +666,6 @@ public class Discussion implements EcouteurClient {
         );
         return btn;
     }
-
     private String trouverNomContact(String numero) {
         for (HBox item : convList.getItems()) {
             Object ud = item.getUserData();
