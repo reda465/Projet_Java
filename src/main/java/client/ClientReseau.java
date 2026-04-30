@@ -81,7 +81,14 @@ public class ClientReseau {
             System.out.println(" Envoyé : " + packet.getProtocol());
         }
     }
-
+    public void demanderConversations() {
+        if (!connecte || stylo == null) {
+            System.out.println("❌ Pas connecté au serveur");
+            return;
+        }
+        Packet p = new Packet(Protocol.GET_CONVERSATIONS, "");
+        envoyer(p);
+    }
     // ===== DÉCONNEXION =====
     public void deconnecter() {
         connecte = false;
@@ -109,6 +116,8 @@ public class ClientReseau {
                 }
             }
         }
+
+
 
         private void traiterPacket(Packet p) {
             String data = p.getData();
@@ -236,14 +245,7 @@ public class ClientReseau {
                 ecouteur.conversationsRecues(conversations);
             }
         }
-        public void demanderConversations() {
-            if (!connecte || stylo == null) {
-                System.out.println("❌ Pas connecté au serveur");
-                return;
-            }
-            Packet p = new Packet(Protocol.GET_CONVERSATIONS, "");
-            envoyer(p);
-        }
+
         private void traiterMessagesRecus(String data) {
             List<Message> messages = new ArrayList<>();
 

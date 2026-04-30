@@ -13,10 +13,10 @@ public class Messagefx {
         Label msg = new Label(text);
         msg.setWrapText(true);
         msg.setFont(Font.font("Arial", 14));
-        msg.setTextFill(Color.BLACK);
+        msg.setTextFill(Color.web("#111B21"));
         Label tm = new Label(time);
         tm.setFont(Font.font("Arial", 10));
-        tm.setTextFill(Color.web("#53BDEB"));
+        tm.setTextFill(Color.web("#111B21"));
 
         VBox bulle = new VBox(4, msg, tm);
         bulle.setPadding(new Insets(8));
@@ -36,7 +36,7 @@ public class Messagefx {
         Label msg = new Label(text);
         msg.setWrapText(true);
         msg.setFont(Font.font("Arial", 14));
-        msg.setTextFill(Color.BLACK);
+        msg.setTextFill(Color.web("#111B21"));
 
         Label tm = new Label(time);
         tm.setFont(Font.font("Arial", 10));
