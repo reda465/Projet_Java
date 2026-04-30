@@ -132,6 +132,7 @@ public class ClientReseau {
                     System.out.println("Connecté : " + moi.getNomComplet());
                     }
                     //ClientHandlerAuth.demanderConversations();
+                    ClientHandlerAuth.getInstance().onConnexionReussie(moi);
                     break;
 
                 case LOGIN_FAIL:
@@ -168,10 +169,11 @@ public class ClientReseau {
                         String numAppelant = parts[0];
                         String nomAppelant = parts[1];
                         String typeAppel = parts[2];
-                        ecouteur.appelEntrant(numAppelant, nomAppelant, typeAppel, "");
+                        String ipAppelant = parts.length >= 5 ? parts[4] : "";
+                        ecouteur.appelEntrant(numAppelant, typeAppel, ipAppelant, nomAppelant);
                         System.out.println("Appel entrant de " + nomAppelant + " (" + numAppelant + ") - Type : " + typeAppel);
                         if (callService != null) {
-                            callService.recevoirAppel(numAppelant, nomAppelant, typeAppel, "");
+                            callService.recevoirAppel(numAppelant, nomAppelant, typeAppel, ipAppelant);
                         }
                     }
                     break;
