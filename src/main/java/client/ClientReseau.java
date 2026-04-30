@@ -2,6 +2,7 @@
 package client;
 
 import Serveur.Protocol;
+import client.ClientHandlerAuth;
 import lombok.Getter;
 import lombok.Setter;
 import network.*;
@@ -133,6 +134,9 @@ public class ClientReseau {
                     }
                     System.out.println("Connecté : " + moi.getNomComplet());
                     }
+                    // Initialiser les services dépendants de l'utilisateur connecté (ex: appels)
+                    // Sinon ClientHandlerAuth.appeler() affiche "CallService non initialisé !"
+                    ClientHandlerAuth.getInstance().onConnexionReussie(moi);
                     //ClientHandlerAuth.demanderConversations();
                     break;
 
@@ -170,17 +174,20 @@ public class ClientReseau {
                         String numAppelant = parts[0];
                         String nomAppelant = parts[1];
                         String typeAppel = parts[2];
-                        ecouteur.appelEntrant(numAppelant, nomAppelant, typeAppel, "");
+                        // Signature UI: (numero, type, ipAppelant, ip)
+                        // On réutilise le dernier param pour passer le nom si besoin côté UI.
+                        String ipAppelant = parts.length >= 5 ? parts[4] : "";
+                        ecouteur.appelEntrant(numAppelant, typeAppel, ipAppelant, nomAppelant);
                         System.out.println("Appel entrant de " + nomAppelant + " (" + numAppelant + ") - Type : " + typeAppel);
                         if (callService != null) {
-                            callService.recevoirAppel(numAppelant, nomAppelant, typeAppel, "");
+                            callService.recevoirAppel(numAppelant, nomAppelant, typeAppel, ipAppelant);
                         }
                     }
                     break;
                 case CALL_ACCEPT:
                     // Format: numAccepteur|ipAccepteur
                     if (parts.length >= 2 && ecouteur != null) {
-                        String ipAccepteur = parts[1];
+                        String ipAccepteur = parts.length >= 2 ? parts[1] : "";
                         if (callService != null) {
                             callService.onAccepte(ipAccepteur);
                         }
@@ -220,24 +227,30 @@ public class ClientReseau {
                 return;
             }
 
-            // Format : id;type;nomExp;datedernierMsg;nonLus;contenuDerniermsg|id;nom;...
+            // Format serveur : id;type;nom;numeroTel;date;nonLus;dernierMsg|...
             String[] convs = data.split("\\|");
             for (String c : convs) {
                 if (c.isEmpty()) continue;
-                String[] parts = c.split(";", 6);
-                if (parts.length < 5) continue;
+                String[] parts = c.split(";", 7);
+                if (parts.length < 7) continue;
 
                 Conversation conv = new Conversation();
-                conv.setIdConversation(Integer.parseInt(parts[0]));
+                conv.setIdConversation(Integer.parseInt(parts[0].trim()));
                 conv.setTypeConversation(parts[1]);
                 conv.setNomContact(parts[2]);
+                conv.setNumeroContact(parts[3] != null ? parts[3].trim() : "");
                 try {
-                    conv.setDateDernierMessage(java.time.LocalDateTime.parse(parts[3]));
+                    conv.setDateDernierMessage(parts[4].isEmpty() ? null
+                            : java.time.LocalDateTime.parse(parts[4]));
                 } catch (Exception e) {
                     conv.setDateDernierMessage(null);
                 }
-                conv.setMessagesNonLus(Integer.parseInt(parts[4]));
-                conv.setDernierMessage(parts.length >= 6 ? parts[5] : "");
+                try {
+                    conv.setMessagesNonLus(Integer.parseInt(parts[5].trim()));
+                } catch (Exception e) {
+                    conv.setMessagesNonLus(0);
+                }
+                conv.setDernierMessage(parts[6] != null ? parts[6] : "");
                 conversations.add(conv);
             }
             System.out.println("Conversations reçues : " + conversations.size());
