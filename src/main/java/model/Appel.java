@@ -6,8 +6,8 @@ import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
-public class Appel {
 
+public class Appel {
     private int idAppel;
     private int idAppelant;
     private int idConversation;

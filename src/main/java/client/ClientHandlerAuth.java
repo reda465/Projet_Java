@@ -1,8 +1,15 @@
 package client;
 
+import Serveur.Protocol;
+import lombok.Getter;
+import lombok.Setter;
 import model.Utilisateur;
+import network.Packet;
 import service.AuthService;
 import service.MessageService;
+import service.CallService;
+@Getter
+@Setter
 
 public class ClientHandlerAuth {
 
@@ -12,6 +19,7 @@ public class ClientHandlerAuth {
     private AuthService authService;
     private MessageService messageService;
     private boolean connecteAuServeur = false;
+    private CallService callService;
 
     // Constructeur privé (personne ne peut créer directement)
     private ClientHandlerAuth() {}
@@ -48,6 +56,11 @@ public class ClientHandlerAuth {
         }
         return authService.connecter(numero, password);
     }
+    public void onConnexionReussie(Utilisateur moi) {
+        // Initialiser CallService après connexion
+        this.callService = new CallService(clientReseau, moi);
+        clientReseau.setCallService(callService);
+    }
     // ===== 3. INSCRIPTION =====
     public String sInscrire(String nomComplet, String numero, String password) {
         if (!verifierConnexion()) {
@@ -76,6 +89,62 @@ public class ClientHandlerAuth {
             return;
         }
         messageService.envoyerMessage(numeroDestinataire, contenu);
+    }
+    public void appeler(String numeroDest, int idConv, String type) {
+        if (callService == null) {
+            System.out.println("Erreur : CallService non initialisé !");
+            return;
+        }
+        callService.appeler(numeroDest, idConv, model.enums.TypeAppel.valueOf(type));
+    }
+    public void accepterAppel() {
+        if (callService != null) callService.accepte();
+    }
+
+    public void refuserAppel() {
+        if (callService != null) callService.refuser();
+    }
+
+    public void raccrocher() {
+        if (callService != null) callService.raccrocher();
+    }
+    public boolean isEnAppel() {
+        return callService != null && callService.isEnAppel();
+    }
+
+    // ===== 7. LISTE UTILISATEURS (NOUVEAU) =====
+    public void demanderListeUtilisateurs() {
+        if (!verifierConnexion()) return;
+        Packet p = new Packet(Protocol.USERS_LIST, "");
+        clientReseau.envoyer(p);
+    }
+    public void demanderMessages(int idConversation) {
+        if (!verifierConnexion()) {
+            System.out.println("❌ Pas connecté au serveur !");
+            return;
+        }
+        if (clientReseau == null) {
+            System.out.println("❌ Client réseau non initialisé !");
+            return;
+        }
+        clientReseau.demanderMessages(idConversation);
+    }
+
+    public void demanderConversations() {
+        if (!verifierConnexion()) {
+            System.out.println("❌ Pas connecté au serveur !");
+            return;
+        }
+        if (clientReseau == null) {
+            System.out.println("❌ Client réseau non initialisé !");
+            return;
+        }
+        clientReseau.demanderConversations();
+    }
+    // Dans ClientHandlerAuth.java
+    public boolean connecterAuServeurTest(String ip, int port, EcouteurClient ecouteur) {
+        // Utiliser le même code mais pointer vers le mock server
+        return connecterAuServeur(ip, port, ecouteur);
     }
 
     public Utilisateur getUtilisateurConnecte() {
