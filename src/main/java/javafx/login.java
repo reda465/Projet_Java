@@ -216,8 +216,9 @@ public class login extends Application implements EcouteurClient {
     }
 
     @Override
-    public void appelAccepte(String numero) {
 
+    public void appelAccepte(String numero, String ip) {
+        System.out.println("📞 Appel accepté par " + numero + " ip=" + ip);
     }
 
     @Override

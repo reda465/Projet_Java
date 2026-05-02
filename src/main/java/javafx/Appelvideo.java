@@ -1,11 +1,12 @@
-
 package javafx;
+
 import client.ClientHandlerAuth;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -14,9 +15,9 @@ import javafx.scene.text.FontWeight;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 
-public class Appelaudio {
+public class Appelvideo {
 
-    // ── Appel audio sortant ───────────────────────────────────────────────────
+    // ── Appel vidéo sortant ───────────────────────────────────────────────────
     public static void demarrer(Stage parent, String contactNom,
                                 String numeroContact, int idConversation) {
 
@@ -28,18 +29,29 @@ public class Appelaudio {
         Stage stage = new Stage();
         stage.initModality(Modality.WINDOW_MODAL);
         stage.initOwner(parent);
-        stage.setTitle("Appel audio — " + contactNom);
+        stage.setTitle("Appel vidéo — " + contactNom);
 
-        Label icone = new Label("📞");
+        Label icone = new Label("📹");
         icone.setFont(Font.font("Segoe UI", 48));
 
         Label nom = new Label(contactNom);
-        nom.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
+        nom.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
         nom.setTextFill(Color.web("#111B21"));
 
-        Label statut = new Label("Appel en cours...");
-        statut.setFont(Font.font("Segoe UI", 14));
+        Label statut = new Label("Appel vidéo en cours...");
+        statut.setFont(Font.font("Segoe UI", 13));
         statut.setTextFill(Color.web("#667781"));
+
+        ImageView videoView = new ImageView();
+        videoView.setFitWidth(420);
+        videoView.setFitHeight(300);
+        videoView.setPreserveRatio(true);
+        videoView.setStyle("-fx-background-color: black; -fx-border-radius: 10px;");
+
+        // Lier l'ImageView à CallService pour afficher la vidéo reçue
+        if (ClientHandlerAuth.getInstance().getCallService() != null) {
+            ClientHandlerAuth.getInstance().getCallService().setVideoView(videoView);
+        }
 
         Button btnRaccrocher = new Button("📵  Raccrocher");
         btnRaccrocher.setStyle(
@@ -55,33 +67,31 @@ public class Appelaudio {
             stage.close();
         });
 
-        VBox root = new VBox(18, icone, nom, statut, btnRaccrocher);
+        VBox root = new VBox(15, icone, nom, statut, videoView, btnRaccrocher);
         root.setAlignment(Pos.CENTER);
-        root.setPadding(new Insets(40));
+        root.setPadding(new Insets(20));
         root.setStyle("-fx-background-color: #F0F2F5;");
 
-        // Notifier le serveur du démarrage
-        ClientHandlerAuth.getInstance().appeler(
-                numeroContact, idConversation, "AUDIO"
-        );
-
-        stage.setScene(new Scene(root, 320, 300));
+        stage.setScene(new Scene(root, 520, 500));
         stage.show();
+
+        // Notifier le serveur du démarrage (VIDEO)
+        ClientHandlerAuth.getInstance().appeler(numeroContact, idConversation, "VIDEO");
     }
 
-    // ── Appel audio entrant ───────────────────────────────────────────────────
+    // ── Appel vidéo entrant ───────────────────────────────────────────────────
     public static void recevoirAppel(Stage parent, String appelantNom,
                                      String numeroAppelant) {
 
         Stage stage = new Stage();
         stage.initModality(Modality.WINDOW_MODAL);
         stage.initOwner(parent);
-        stage.setTitle("Appel entrant");
+        stage.setTitle("Appel vidéo entrant");
 
-        Label icone = new Label("📞");
+        Label icone = new Label("📹");
         icone.setFont(Font.font("Segoe UI", 48));
 
-        Label info = new Label(appelantNom + " vous appelle...");
+        Label info = new Label(appelantNom + " vous appelle en vidéo...");
         info.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
         info.setTextFill(Color.web("#111B21"));
 
@@ -97,8 +107,8 @@ public class Appelaudio {
         btnAccepter.setOnAction(e -> {
             ClientHandlerAuth.getInstance().accepterAppel();
             stage.close();
-            // IMPORTANT : ne pas relancer appeler() !
-            // On ouvre juste la fenêtre d'appel (communication)
+
+            // Ouvrir fenêtre communication (sans appeler à nouveau)
             ouvrirFenetreCommunication(parent, appelantNom, numeroAppelant);
         });
 
@@ -124,10 +134,11 @@ public class Appelaudio {
         root.setPadding(new Insets(40));
         root.setStyle("-fx-background-color: #F0F2F5;");
 
-        stage.setScene(new Scene(root, 340, 280));
+        stage.setScene(new Scene(root, 420, 260));
         stage.show();
     }
-    // ── Fenêtre communication (sans envoyer CALL_REQUEST) ─────────────────────
+
+    // ── Fenêtre communication vidéo (sans envoyer CALL_REQUEST) ───────────────
     private static void ouvrirFenetreCommunication(Stage parent,
                                                    String contactNom,
                                                    String numeroContact) {
@@ -135,18 +146,29 @@ public class Appelaudio {
         Stage stage = new Stage();
         stage.initModality(Modality.WINDOW_MODAL);
         stage.initOwner(parent);
-        stage.setTitle("Appel audio — " + contactNom);
+        stage.setTitle("Appel vidéo — " + contactNom);
 
-        Label icone = new Label("📞");
+        Label icone = new Label("📹");
         icone.setFont(Font.font("Segoe UI", 48));
 
         Label nom = new Label(contactNom);
-        nom.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
+        nom.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
         nom.setTextFill(Color.web("#111B21"));
 
-        Label statut = new Label("En communication...");
-        statut.setFont(Font.font("Segoe UI", 14));
+        Label statut = new Label("En communication vidéo...");
+        statut.setFont(Font.font("Segoe UI", 13));
         statut.setTextFill(Color.web("#667781"));
+
+        ImageView videoView = new ImageView();
+        videoView.setFitWidth(420);
+        videoView.setFitHeight(300);
+        videoView.setPreserveRatio(true);
+        videoView.setStyle("-fx-background-color: black; -fx-border-radius: 10px;");
+
+        // Lier l'ImageView à CallService pour afficher la vidéo reçue
+        if (ClientHandlerAuth.getInstance().getCallService() != null) {
+            ClientHandlerAuth.getInstance().getCallService().setVideoView(videoView);
+        }
 
         Button btnRaccrocher = new Button("📵  Raccrocher");
         btnRaccrocher.setStyle(
@@ -157,18 +179,17 @@ public class Appelaudio {
                         "-fx-padding: 10px 28px;" +
                         "-fx-cursor: hand;"
         );
-
         btnRaccrocher.setOnAction(e -> {
             ClientHandlerAuth.getInstance().raccrocher();
             stage.close();
         });
 
-        VBox root = new VBox(18, icone, nom, statut, btnRaccrocher);
+        VBox root = new VBox(15, icone, nom, statut, videoView, btnRaccrocher);
         root.setAlignment(Pos.CENTER);
-        root.setPadding(new Insets(40));
+        root.setPadding(new Insets(20));
         root.setStyle("-fx-background-color: #F0F2F5;");
 
-        stage.setScene(new Scene(root, 320, 300));
+        stage.setScene(new Scene(root, 520, 500));
         stage.show();
     }
 }

@@ -299,19 +299,14 @@ public class Discussion implements EcouteurClient {
         });
     }
 
+
+
+
+
+
     @Override
-    public void appelAccepte(String numero) {
-        Platform.runLater(() -> {
-            if (statutAppelLabel != null) {
-                statutAppelLabel.setText("Connecté ✓");
-                statutAppelLabel.setTextFill(Color.web("#25D366"));
-            }
-            if (audioUDP == null) {
-                audioUDP = new AudioUDP();
-                // numero = ipAccepteur envoyé par le serveur dans CALL_ACCEPT
-                audioUDP.demarrer(numero, 6001, 6000);
-            }
-        });
+    public void appelAccepte(String numero, String ip) {
+        System.out.println("📞 Appel accepté par " + numero + " ip=" + ip);
     }
 
     @Override
