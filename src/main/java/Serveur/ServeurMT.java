@@ -13,7 +13,6 @@ public class ServeurMT extends Thread{
     public void run() {
         try (
             ServerSocket ss = new ServerSocket(5000);
-
         )
         {
            while(true){
@@ -25,6 +24,5 @@ public class ServeurMT extends Thread{
         catch(IOException e){
             e.printStackTrace();
         }
-
     }
 }

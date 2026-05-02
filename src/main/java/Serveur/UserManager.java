@@ -3,8 +3,10 @@ package Serveur;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class UserManager {
+
     private static UserManager instance;
-    private final ConcurrentHashMap<String, ClientHandler> handlers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ClientHandler> connectedUsers
+            = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> ips = new ConcurrentHashMap<>();
 
     private UserManager() {}
@@ -15,29 +17,32 @@ public class UserManager {
     }
 
     public void addUser(String telephone, ClientHandler handler) {
-        handlers.put(telephone, handler);
+        connectedUsers.put(telephone, handler);
         String ip = handler.getSocket().getInetAddress().getHostAddress();
         ips.put(telephone, ip);
     }
 
     public void removeUser(String telephone) {
-        handlers.remove(telephone);
+        connectedUsers.remove(telephone);
         ips.remove(telephone);
     }
 
     public ClientHandler getHandler(String telephone) {
-        return handlers.get(telephone);
+        return connectedUsers.get(telephone);
     }
 
     public String getIP(String telephone) {
         return ips.get(telephone);
     }
-
-    public void broadcast(String message) {
-        for (ClientHandler h : handlers.values()) h.sendMessage(message);
+    public boolean isOnline(String telephone) {
+        return connectedUsers.containsKey(telephone);
     }
 
     public String getOnlineUsersList() {
-        return String.join(",", handlers.keySet());
+        return String.join(",", connectedUsers.keySet());
+    }
+
+    public void broadcast(String message) {
+        connectedUsers.values().forEach(h -> h.sendMessage(message));
     }
 }

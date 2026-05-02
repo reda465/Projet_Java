@@ -4,9 +4,11 @@ import model.Message;
 import model.MessageFileAttente;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-public class Dao_MessageFileAttenteImp implements DAO_Message {
+public class Dao_MessageFileAttenteImp {
 
     /** Ajoute un message en file d'attente pour un destinataire hors ligne */
     public int ajouterEnAttente(int idMessage, int idDestinataire) throws SQLException {
@@ -55,29 +57,41 @@ public class Dao_MessageFileAttenteImp implements DAO_Message {
             ps.executeUpdate();
         }
     }
+    public Map<Integer, Integer> compterNonLusParConversation(int idDestinataire) throws SQLException {
+        Map<Integer, Integer> result = new HashMap<>();
+        String sql = "SELECT m.id_conversation, COUNT(*) as nb_non_lus "
+                + "FROM messages_file_attente mfa "
+                + "JOIN messages m ON mfa.id_message = m.id_message "
+                + "WHERE mfa.id_destinataire = ? "
+                + "AND mfa.est_delivre = 0 "
+                + "GROUP BY m.id_conversation";
 
-    @Override
-    public int Add(Message message) throws SQLException {
-        return 0;
+        try (Connection c = DataBase.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idDestinataire);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                result.put(rs.getInt("id_conversation"), rs.getInt("nb_non_lus"));
+            }
+        }
+        return result;
     }
 
-    @Override
-    public int Modify(Message message) throws SQLException {
-        return 0;
+    /** Marque tous les messages d'une conversation comme lus (délivrés) pour un utilisateur */
+    public void marquerConversationCommeLue(int idConversation, int idDestinataire) throws SQLException {
+        String sql = "UPDATE messages_file_attente mfa "
+                + "JOIN messages m ON mfa.id_message = m.id_message "
+                + "SET mfa.est_delivre = 1 "
+                + "WHERE m.id_conversation = ? "
+                + "AND mfa.id_destinataire = ? "
+                + "AND mfa.est_delivre = 0";
+        try (Connection c = DataBase.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idConversation);
+            ps.setInt(2, idDestinataire);
+            ps.executeUpdate();
+        }
     }
 
-    @Override
-    public int Delete(Message message) throws SQLException {
-        return 0;
-    }
 
-    @Override
-    public Message getByID(Integer integer) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public List<Message> getAll() throws SQLException {
-        return List.of();
-    }
 }
