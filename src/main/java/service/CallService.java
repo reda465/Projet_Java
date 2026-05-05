@@ -29,8 +29,10 @@ public class CallService {
     // JavaFX ImageView pour afficher la vidéo reçue
     private ImageView videoView;
 
-    private static final int PORT_Audio = 5001;
-    private static final int PORT_VIDEO = 6001;
+    private static final int PORT_AUDIO_A  = 5001;
+    private static final int PORT_AUDIO_B  = 5002;
+    private static final int PORT_VIDEO_A  = 6001;
+    private static final int PORT_VIDEO_B  = 6002;
 
     public CallService(ClientReseau clientReseau, Utilisateur localUser) {
         this.clientReseau = clientReseau;
@@ -82,14 +84,14 @@ public class CallService {
         communicationActive = true;
 
         envoyer(Protocol.CALL_ACCEPT, numeroCorrespondant); // celui qui a appelé
-        audioUDP.demarrer(ipCorrespondant,PORT_Audio, PORT_Audio);
+        audioUDP.demarrer(ipCorrespondant,PORT_AUDIO_A, PORT_AUDIO_B);
 
         // Video seulement si VIDEO
-        if (appelEnCours.getTypeAppel() == TypeAppel.video) {
+        if (appelEnCours.getTypeAppel() == TypeAppel.VIDEO) {
             if (videoView == null) {
                 System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
             }
-            videoUDP.demarrer(ipCorrespondant, PORT_VIDEO, PORT_VIDEO, videoView);
+            videoUDP.demarrer(ipCorrespondant, PORT_VIDEO_A, PORT_VIDEO_B, videoView);
         }
 
         System.out.println("[APPEL] Accepté, UDP démarré");
@@ -103,14 +105,14 @@ public class CallService {
         appelEnCours.setStatut(StatutAppel.accepte);
         communicationActive = true;
 
-        audioUDP.demarrer(ipAccepteur, PORT_Audio, PORT_Audio);
+        audioUDP.demarrer(ipAccepteur, PORT_AUDIO_B, PORT_AUDIO_A);
 
         // Video seulement si VIDEO
-        if (appelEnCours.getTypeAppel() == TypeAppel.video) {
+        if (appelEnCours.getTypeAppel() == TypeAppel.VIDEO) {
             if (videoView == null) {
                 System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
             }
-            videoUDP.demarrer(ipAccepteur, PORT_VIDEO, PORT_VIDEO, videoView);
+            videoUDP.demarrer(ipAccepteur, PORT_VIDEO_B, PORT_VIDEO_A, videoView);
         }
 
 

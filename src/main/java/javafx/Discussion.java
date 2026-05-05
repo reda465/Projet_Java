@@ -2,6 +2,7 @@ package javafx;
 import client.AudioUDP;
 import client.ClientHandlerAuth;
 import client.EcouteurClient;
+import client.VideoUDP;
 import model.Contact;
 import model.Conversation;
 import model.Utilisateur;
@@ -24,11 +25,10 @@ public class Discussion implements EcouteurClient {
     private Utilisateur utilisateurConnecte;
     private String contactActif = null;
     private Integer idConversationActive = null;
-
     private Stage stageAppel = null;
     private AudioUDP audioUDP = null;
+    private VideoUDP videoUDP = null;
     private Label statutAppelLabel = null;
-
     private VBox messagesBox;
     private ScrollPane scrollPane;
     private Label chatStatus;
@@ -38,11 +38,10 @@ public class Discussion implements EcouteurClient {
     private Button sendBtn;
     private Stage primaryStage;
     ListView<HBox> convList;
-
+    private String typeAppelEnCours = null;
     public Discussion(Utilisateur utilisateur) {
         this.utilisateurConnecte = utilisateur;
     }
-
     public Scene creerScene(Stage stage) {
         this.primaryStage = stage;
         VBox sidebar = new VBox(0);
@@ -156,6 +155,18 @@ public class Discussion implements EcouteurClient {
         btnAppelAudio.setOnAction(e -> {
             if (numeroContactUtilisable(contactActif)) {
                 demarrerAppelAudio(contactActif, chatName.getText());
+            } else {
+                showAlert(Alert.AlertType.WARNING,
+                        "Aucun contact", "Sélectionnez un contact d'abord.");
+            }
+        });
+        //BOUTON DE L'appel video
+        Button btnAppelVideo = new Button("📹");
+        styleIconBtn(btnAppelVideo, "#25D366", "#128C7E");
+        btnAppelVideo.setTooltip(new Tooltip("Appel vidéo"));
+        btnAppelVideo.setOnAction(e -> {
+            if (numeroContactUtilisable(contactActif)) {
+                demarrerAppelVideo(contactActif, chatName.getText());
             } else {
                 showAlert(Alert.AlertType.WARNING,
                         "Aucun contact", "Sélectionnez un contact d'abord.");
@@ -570,7 +581,64 @@ public class Discussion implements EcouteurClient {
         );
         afficherFenetreAppel(nomContact, true, numeroContact, null);
     }
+     //pour appel video
+     private void demarrerAppelVideo(String numeroContact, String nomContact) {
+         typeAppelEnCours = "VIDEO";
+         ClientHandlerAuth.getInstance().appeler(
+                 numeroContact,
+                 idConversationActive != null ? idConversationActive : -1,
+                 "VIDEO"
+         );
+         afficherFenetreAttenteVideo(nomContact);
+     }
+     //
+     private void afficherFenetreAttenteVideo(String nomContact) {
+         if (stageAppel != null && stageAppel.isShowing()) return;
 
+         stageAppel = new Stage();
+         stageAppel.initModality(javafx.stage.Modality.WINDOW_MODAL);
+         stageAppel.initOwner(primaryStage);
+         stageAppel.setTitle("Appel vidéo — " + nomContact);
+         stageAppel.setResizable(false);
+
+         Circle cercle = new Circle(45);
+         cercle.setFill(Color.web("#25D366"));
+         Text initiale = new Text(String.valueOf(nomContact.charAt(0)).toUpperCase());
+         initiale.setFill(Color.WHITE);
+         initiale.setFont(Font.font("Segoe UI", FontWeight.BOLD, 36));
+         StackPane avatarGrand = new StackPane(cercle, initiale);
+
+         Label nomLabel = new Label(nomContact);
+         nomLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
+         nomLabel.setTextFill(Color.web("#111B21"));
+
+         statutAppelLabel = new Label("Appel vidéo en cours...");
+         statutAppelLabel.setFont(Font.font("Segoe UI", 14));
+         statutAppelLabel.setTextFill(Color.web("#667781"));
+
+         VBox infoBox = new VBox(16, avatarGrand, nomLabel, statutAppelLabel);
+         infoBox.setAlignment(Pos.CENTER);
+         infoBox.setPadding(new Insets(20, 0, 10, 0));
+
+         Button btnRaccrocher = makeBtnAppel("📵", "#EA2424");
+         btnRaccrocher.setOnAction(e -> {
+             ClientHandlerAuth.getInstance().raccrocher();
+             typeAppelEnCours = null;
+             if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
+         });
+
+         HBox boutonsBox = new HBox(btnRaccrocher);
+         boutonsBox.setAlignment(Pos.CENTER);
+         boutonsBox.setPadding(new Insets(20));
+
+         VBox root = new VBox(infoBox, boutonsBox);
+         root.setAlignment(Pos.CENTER);
+         root.setPadding(new Insets(20));
+         root.setStyle("-fx-background-color: #F0F2F5;");
+
+         stageAppel.setScene(new javafx.scene.Scene(root, 320, 320));
+         stageAppel.show();
+     }
     private void afficherFenetreAppel(String nomContact, boolean estSortant,
                                       String numeroContact, String ipDistant) {
         if (stageAppel != null && stageAppel.isShowing()) return;
@@ -657,7 +725,6 @@ public class Discussion implements EcouteurClient {
         stageAppel.setScene(new javafx.scene.Scene(root, 320, 320));
         stageAppel.show();
     }
-
     private void terminerAppel(String numeroContact) {
         // raccrocher() = méthode correcte dans ClientHandlerAuth
         ClientHandlerAuth.getInstance().raccrocher();
