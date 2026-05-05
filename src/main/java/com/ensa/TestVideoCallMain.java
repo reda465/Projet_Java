@@ -131,7 +131,7 @@ public class TestVideoCallMain extends Application {
             try {
                 Thread.sleep(3000);
                 System.out.println("\n🎥 [TEST] Client1 appelle Client2 en VIDEO...\n");
-                callService1.appeler("2222", 1, TypeAppel.video);
+                callService1.appeler("2222", 1, TypeAppel.VIDEO);
             } catch (Exception ignored) {}
         }).start();
 

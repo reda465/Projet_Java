@@ -46,6 +46,7 @@ public class ClientHandlerAuth {
         if (clientReseau.isConnecte()) {
             authService = new AuthService(clientReseau);
             messageService = new MessageService(clientReseau);
+
             contactService = new ContactService(clientReseau);
             connecteAuServeur = true;
             return true;
