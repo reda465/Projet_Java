@@ -31,8 +31,8 @@ public class CallService {
 
     private static final int PORT_AUDIO_A  = 5001;
     private static final int PORT_AUDIO_B  = 5002;
-    private static final int PORT_VIDEO_A  = 6001;
-    private static final int PORT_VIDEO_B  = 6002;
+    private static final int PORT_VIDEO_A  = 5003;
+    private static final int PORT_VIDEO_B  = 5004;
 
     public CallService(ClientReseau clientReseau, Utilisateur localUser) {
         this.clientReseau = clientReseau;
