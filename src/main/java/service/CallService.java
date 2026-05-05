@@ -30,6 +30,11 @@ public class CallService {
 
     // JavaFX ImageView pour afficher la vidéo reçue
     private ImageView videoView;
+    // Si la UI n'est pas encore prête, on garde une demande de démarrage en attente
+    private boolean videoStartPending = false;
+    private String pendingIp = null;
+    private int pendingRemotePort = -1;
+    private int pendingLocalPort = -1;
 
     private static final int PORT_AUDIO_A  = 5001;
     private static final int PORT_AUDIO_B  = 5002;
@@ -45,6 +50,30 @@ public class CallService {
 
     public void setVideoView(ImageView view) {
         this.videoView = view;
+        // Si une négociation/acceptation a déjà eu lieu, démarrer dès que la vue existe
+        if (videoView != null && videoStartPending && pendingIp != null) {
+            videoStartPending = false;
+            demarrerVideoSiPossible(pendingIp, pendingRemotePort, pendingLocalPort);
+            pendingIp = null;
+            pendingRemotePort = -1;
+            pendingLocalPort = -1;
+        }
+    }
+
+    private void demarrerVideoSiPossible(String ip, int portDistant, int monPort) {
+        if (appelEnCours == null || appelEnCours.getTypeAppel() != TypeAppel.VIDEO) return;
+        if (ip == null || ip.isBlank()) return;
+        // Eviter double bind si déjà actif
+        if (videoUDP != null && videoUDP.isActif()) return;
+        if (videoView == null) {
+            System.out.println("⚠️ VideoView null : vidéo en attente d'affichage...");
+            videoStartPending = true;
+            pendingIp = ip;
+            pendingRemotePort = portDistant;
+            pendingLocalPort = monPort;
+            return;
+        }
+        videoUDP.demarrer(ip, portDistant, monPort, videoView);
     }
 
     // J'appelle quelqu'un
@@ -90,10 +119,8 @@ public class CallService {
 
         // Video seulement si VIDEO
         if (appelEnCours.getTypeAppel() == TypeAppel.VIDEO) {
-            if (videoView == null) {
-                System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
-            }
-            videoUDP.demarrer(ipCorrespondant, PORT_VIDEO_A, PORT_VIDEO_B, videoView);
+            // Côté appelé (rôle B): j'écoute sur B et j'envoie vers A
+            demarrerVideoSiPossible(ipCorrespondant, PORT_VIDEO_A, PORT_VIDEO_B);
         }
 
         System.out.println("[APPEL] Accepté, UDP démarré");
@@ -110,10 +137,8 @@ public class CallService {
         audioUDP.demarrer(ipAccepteur, PORT_AUDIO_B, PORT_AUDIO_A);
         // Video seulement si VIDEO
         if (appelEnCours.getTypeAppel() == TypeAppel.VIDEO) {
-            if (videoView == null) {
-                System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
-            }
-            videoUDP.demarrer(ipAccepteur, PORT_VIDEO_B, PORT_VIDEO_A, videoView);
+            // Côté appelant (rôle A): j'écoute sur A et j'envoie vers B
+            demarrerVideoSiPossible(ipAccepteur, PORT_VIDEO_B, PORT_VIDEO_A);
         }
 
 
@@ -150,6 +175,10 @@ public class CallService {
         ipCorrespondant = null;
         numeroCorrespondant = null;
         videoView = null;
+        videoStartPending = false;
+        pendingIp = null;
+        pendingRemotePort = -1;
+        pendingLocalPort = -1;
     }
 
     public boolean isEnAppel() { return appelEnCours != null; }
