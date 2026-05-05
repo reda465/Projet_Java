@@ -12,9 +12,7 @@ import model.Utilisateur;
 import model.enums.StatutAppel;
 import model.enums.TypeAppel;
 import network.Packet;
-
 import java.time.LocalDateTime;
-
 public class CallService {
     private final ClientReseau clientReseau;
     private final Utilisateur localUser;
@@ -31,8 +29,8 @@ public class CallService {
 
     private static final int PORT_AUDIO_A  = 5001;
     private static final int PORT_AUDIO_B  = 5002;
-    private static final int PORT_VIDEO_A  = 6001;
-    private static final int PORT_VIDEO_B  = 6002;
+    private static final int PORT_VIDEO_A  = 5003;
+    private static final int PORT_VIDEO_B  = 5004;
 
     public CallService(ClientReseau clientReseau, Utilisateur localUser) {
         this.clientReseau = clientReseau;
@@ -84,15 +82,8 @@ public class CallService {
         communicationActive = true;
 
         envoyer(Protocol.CALL_ACCEPT, numeroCorrespondant); // celui qui a appelé
-        audioUDP.demarrer(ipCorrespondant,PORT_AUDIO_A, PORT_AUDIO_B);
-
-        // Video seulement si VIDEO
-        if (appelEnCours.getTypeAppel() == TypeAppel.VIDEO) {
-            if (videoView == null) {
-                System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
-            }
-            videoUDP.demarrer(ipCorrespondant, PORT_VIDEO_A, PORT_VIDEO_B, videoView);
-        }
+        // Media UDP is handled by Discussion and Appelvideo classes
+        System.out.println("[APPEL] Accepté, prêt pour média");
 
         System.out.println("[APPEL] Accepté, UDP démarré");
     }
@@ -105,15 +96,8 @@ public class CallService {
         appelEnCours.setStatut(StatutAppel.accepte);
         communicationActive = true;
 
-        audioUDP.demarrer(ipAccepteur, PORT_AUDIO_B, PORT_AUDIO_A);
-
-        // Video seulement si VIDEO
-        if (appelEnCours.getTypeAppel() == TypeAppel.VIDEO) {
-            if (videoView == null) {
-                System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
-            }
-            videoUDP.demarrer(ipAccepteur, PORT_VIDEO_B, PORT_VIDEO_A, videoView);
-        }
+        // Media UDP is handled by Discussion and Appelvideo classes
+        System.out.println("[APPEL] UDP prêt vers " + ipAccepteur);
 
 
         System.out.println("[APPEL] UDP démarré vers " + ipAccepteur);

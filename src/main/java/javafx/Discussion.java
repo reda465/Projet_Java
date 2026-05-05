@@ -315,9 +315,11 @@ public class Discussion implements EcouteurClient {
             String nom = trouverNomContact(numero);
 
             if ("VIDEO".equalsIgnoreCase(type)) {
+                typeAppelEnCours = "VIDEO";
                 // ← AJOUT : Appel vidéo entrant → déléguer à Appelvideo
                 Appelvideo.recevoirAppel(primaryStage, nom, numero, ipAppelant);
             } else {
+                typeAppelEnCours = "AUDIO";
                 // Appel audio entrant (existant)
                 afficherFenetreAppel(nom, false, numero, ipAppelant);
             }
@@ -353,15 +355,16 @@ public class Discussion implements EcouteurClient {
 
             if (ip != null && !ip.isBlank()) {
                 if ("VIDEO".equalsIgnoreCase(typeAppelEnCours)) {
+                    if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
                     // ← AJOUT : Démarrer la vidéo via Appelvideo
                     Appelvideo.demarrer(primaryStage, chatName.getText(), contactActif,
                             idConversationActive != null ? idConversationActive : -1, ip);
 
                     // Fermer la fenêtre d'appel audio si elle est ouverte
-                    if (stageAppel != null) {
+                    /*if (stageAppel != null) {
                         stageAppel.close();
                         stageAppel = null;
-                    }
+                    }*/
                 } else {
                     // Audio existant
                     audioUDP = new AudioUDP();
