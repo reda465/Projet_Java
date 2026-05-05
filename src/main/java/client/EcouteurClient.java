@@ -22,7 +22,8 @@ public interface EcouteurClient {
 
     // Quand on se déconnecte
     void deconnexion();
-    void appelEntrant(String numero,String type, String ipAppelant, String ip);
+    void appelEntrant(String numero,String type, String ipAppelant, String name);
+
     void appelAccepte(String numero, String ip);
      void appelRefuse();
      void appelTermine(String numero);
