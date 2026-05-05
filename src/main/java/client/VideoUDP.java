@@ -149,8 +149,8 @@ public class VideoUDP {
 
         System.out.println("[UDP] Vidéo arrêtée");
     }
-
     public boolean isActif() {
         return actif;
     }
 }
+

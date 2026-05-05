@@ -1,4 +1,4 @@
-/*package com.ensa;
+package com.ensa;
 
 import client.ClientReseau;
 import client.EcouteurClient;
@@ -16,7 +16,7 @@ import model.enums.TypeAppel;
 import network.Packet;
 import service.CallService;
 
-import java.util.List;
+/*import java.util.List;
 
 public class TestVideoCallMain extends Application {
 
@@ -131,7 +131,7 @@ public class TestVideoCallMain extends Application {
             try {
                 Thread.sleep(3000);
                 System.out.println("\n🎥 [TEST] Client1 appelle Client2 en VIDEO...\n");
-                callService1.appeler("2222", 1, TypeAppel.video);
+                callService1.appeler("2222", 1, TypeAppel.VIDEO);
             } catch (Exception ignored) {}
         }).start();
 
@@ -146,4 +146,5 @@ public class TestVideoCallMain extends Application {
     public static void main(String[] args) {
         launch(args);
     }
-}*/
+}
+*/

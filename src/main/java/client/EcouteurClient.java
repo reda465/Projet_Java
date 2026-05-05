@@ -10,7 +10,6 @@ public interface EcouteurClient {
     // Quand la connexion réussit
     void connexionReussie(Utilisateur moi);
     void inscriptionReussie(String msg);
-
     // Quand ça échoue ou autre erreur
     void erreur(String message);
 
@@ -30,6 +29,6 @@ public interface EcouteurClient {
      void appelRefuse();
      void appelTermine(String numero);
 
-   // void fichierRecu(String telephoneExp, String fileName, String base64);
+    void fichierRecu(String telephoneExp, String fileName, String base64);
     // void fichierRecu(String telephoneExp, String fileName, String base64);
 }
