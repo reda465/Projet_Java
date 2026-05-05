@@ -289,7 +289,7 @@ public class Discussion implements EcouteurClient {
         });
     }
 
-    // ──  CHANGEMENTS : les 4 méthodes d'appel
+    // ── SEULS CHANGEMENTS : les 4 méthodes d'appel ───────────────────────────
 
     @Override
     public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
@@ -298,19 +298,15 @@ public class Discussion implements EcouteurClient {
             afficherFenetreAppel(nom, false, numero, ipAppelant);
         });
     }
+
+
+
+
+
+
     @Override
-    public void appelAccepte(String numero) {
-        Platform.runLater(() -> {
-            if (statutAppelLabel != null) {
-                statutAppelLabel.setText("Connecté ✓");
-                statutAppelLabel.setTextFill(Color.web("#25D366"));
-            }
-            if (audioUDP == null) {
-                audioUDP = new AudioUDP();
-                // numero = ipAccepteur envoyé par le serveur dans CALL_ACCEPT
-                audioUDP.demarrer(numero, 6001, 6000);
-            }
-        });
+    public void appelAccepte(String numero, String ip) {
+        System.out.println("📞 Appel accepté par " + numero + " ip=" + ip);
     }
 
     @Override
@@ -331,6 +327,7 @@ public class Discussion implements EcouteurClient {
                     "Appel terminé", "L'appel est terminé.");
         });
     }
+
     // ─────────────────────────────────────────────────────────────────────────
 
     @Override
@@ -571,6 +568,7 @@ public class Discussion implements EcouteurClient {
     private void afficherFenetreAppel(String nomContact, boolean estSortant,
                                       String numeroContact, String ipDistant) {
         if (stageAppel != null && stageAppel.isShowing()) return;
+
         stageAppel = new Stage();
         stageAppel.initModality(javafx.stage.Modality.WINDOW_MODAL);
         stageAppel.initOwner(primaryStage);
@@ -663,6 +661,7 @@ public class Discussion implements EcouteurClient {
         );
         return btn;
     }
+
     private String trouverNomContact(String numero) {
         for (HBox item : convList.getItems()) {
             Object ud = item.getUserData();

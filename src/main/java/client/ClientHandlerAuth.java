@@ -102,7 +102,7 @@ public class ClientHandlerAuth {
     }
 
     public void refuserAppel() {
-        if (callService != null) callService.raccrocher();
+        if (callService != null) callService.refuser();
     }
 
     public void raccrocher() {
