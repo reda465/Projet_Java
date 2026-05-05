@@ -20,7 +20,7 @@ public class TestClient2 implements EcouteurClient {
         System.out.println("👤 CLIENT 2 - Ali");
         System.out.println("=======================");
 
-        boolean connected = facade.connecterAuServeur("10.100.106.228", (5000), this);
+        boolean connected = facade.connecterAuServeur("localhost", (5000), this);
         if (!connected) {
             System.out.println("❌ Connexion échouée");
             return;
