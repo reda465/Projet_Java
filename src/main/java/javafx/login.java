@@ -12,8 +12,10 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
 import client.EcouteurClient;
-import model.*;
-
+import model.Contact;
+import model.Conversation;
+import model.Message;
+import model.Utilisateur;
 import java.util.List;
 public class login extends Application implements EcouteurClient {
     private Label message;
