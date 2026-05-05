@@ -1,5 +1,7 @@
 package Serveur;
 
+import lombok.Getter;
+import lombok.Setter;
 import model.Conversation;
 import model.Message;
 import model.Utilisateur;
@@ -9,8 +11,11 @@ import java.net.Socket;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
-
 import Dao.*;
+@Getter
+@Setter
+
+
 
 public class ClientHandler extends Thread {
 

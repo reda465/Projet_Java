@@ -1,5 +1,6 @@
 package javafx;
-
+import client.ClientHandlerAuth;
+import client.ClientReseau;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -10,17 +11,12 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-
-
 public class Ajouter_contacte {
-
-    // Signature mise à jour : reçoit le convList pour y ajouter le contact
-    public static void show(Stage parentStage, ListView<HBox> convList) {
+    public static void show(Stage parentStage, ListView<HBox> convList, ClientHandlerAuth client) {
         Stage window = new Stage();
         window.initModality(Modality.APPLICATION_MODAL);
         window.initOwner(parentStage);
         window.setTitle("Ajouter un contact");
-        // ─── Logo / Titre ─────────────────────────────────────────────────
         Circle circle = new Circle(24);
         circle.setFill(Color.web("#25D366"));
         Text w = new Text("👤");
@@ -35,7 +31,7 @@ public class Ajouter_contacte {
         header.setAlignment(Pos.CENTER);
         header.setPadding(new Insets(0, 0, 10, 0));
 
-        // ─── Champs ───────────────────────────────────────────────────────
+        // ─── Champs ────────────────────────────────────────────────────────
         TextField nameField = new TextField();
         nameField.setPromptText("Nom du contact");
         nameField.setStyle(fieldStyle());
@@ -46,12 +42,12 @@ public class Ajouter_contacte {
         phoneField.setStyle(fieldStyle());
         focusStyle(phoneField, fieldStyle());
 
-        // ─── Message feedback ─────────────────────────────────────────────
+        // ─── Message feedback ──────────────────────────────────────────────
         Label message = new Label();
         message.setWrapText(true);
         message.setFont(Font.font("Arial", 12));
 
-        // ─── Bouton Ajouter ───────────────────────────────────────────────
+        // ─── Bouton Ajouter ────────────────────────────────────────────────
         Button addBtn = new Button("Ajouter le contact");
         addBtn.setMaxWidth(Double.MAX_VALUE);
         addBtn.setStyle(btnStyle());
@@ -74,21 +70,22 @@ public class Ajouter_contacte {
                 return;
             }
 
-            //  Ajout dans la liste des conversations
+            // ── 1. Choisir une couleur aléatoire pour l'avatar ──
             String[] colors = {"#25D366", "#128C7E", "#075E54", "#34B7F1"};
             String color = colors[(int)(Math.random() * colors.length)];
-            //convList.getItems().add(
-                  //  discussion.makeConvItem(name, "Nouveau contact", "maintenant", "0", color)
-            //  );
+
+            // ── 2. Créer l'item et l'ajouter dans convList de Discussion ──
+            HBox item = Discussion.makeConvItem(name, phone, "maintenant", "0", color);
+            convList.getItems().add(item);
+            //
 
             message.setTextFill(Color.web("#25D366"));
             message.setText("✓ Contact \"" + name + "\" ajouté !");
-
             nameField.clear();
             phoneField.clear();
         });
 
-        // ─── Bouton Annuler ───────────────────────────────────────────────
+        // ─── Bouton Annuler ────────────────────────────────────────────────
         Button cancelBtn = new Button("Annuler");
         cancelBtn.setMaxWidth(Double.MAX_VALUE);
         cancelBtn.setStyle(
@@ -101,8 +98,7 @@ public class Ajouter_contacte {
                         "-fx-cursor: hand;"
         );
         cancelBtn.setOnAction(e -> window.close());
-
-        // ─── Layout ───────────────────────────────────────────────────────
+        //box
         VBox layout = new VBox(10,
                 header,
                 new Label("Nom"),
@@ -124,8 +120,7 @@ public class Ajouter_contacte {
         window.setScene(new Scene(root, 320, 400));
         window.show();
     }
-
-    // ─── Styles (cohérents avec login) ────────────────────────────────────
+    // ─── Styles ────────────────────────────────────────────────────────────
     static String fieldStyle() {
         return "-fx-background-color:#ECFFF5;" +
                 "-fx-border-color:#A5E6C3;" +
@@ -133,7 +128,6 @@ public class Ajouter_contacte {
                 "-fx-background-radius:11px;" +
                 "-fx-padding:10px;";
     }
-
     static String btnStyle() {
         return "-fx-background-color:#25D366;" +
                 "-fx-text-fill:white;" +

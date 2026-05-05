@@ -1,6 +1,9 @@
 package client;
 
 import model.Utilisateur;
+import model.Contact;
+import model.Conversation;
+import java.util.List;
 
 public interface EcouteurClient {
     // Quand la connexion réussit
@@ -11,13 +14,19 @@ public interface EcouteurClient {
     void erreur(String message);
 
     // Quand on reçoit un message
-    void messageRecu(String contenu);
+    void messageRecu(String numeroDest, String message);
+
+    void conversationsRecues(List<Conversation> conversations);
+
+    //Contact
+    void contactAjoute(Contact contact);           // Quand un contact est ajouté
+    void listeContactsRecue(List<Contact> contacts);
 
     // Quand on se déconnecte
     void deconnexion();
-    void appelEntrant(String numero,String type);
+    void appelEntrant(String numero,String type, String ipAppelant, String ip);
     void appelAccepte(String numero);
-     void appelRefuse(String numero);
+     void appelRefuse();
      void appelTermine(String numero);
 
 }

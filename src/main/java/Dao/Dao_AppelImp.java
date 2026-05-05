@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Dao_AppelImp implements DAO_Appel {
-
     // ── ADD ──────────────────────────────────────────────────────────────────
     // Retourne l'id généré — nécessaire pour mettre à jour l'appel après
     @Override
