@@ -1,4 +1,3 @@
-
 package javafx;
 import client.ClientHandlerAuth;
 import javafx.geometry.Insets;
@@ -13,9 +12,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-
 public class Appelaudio {
-
     // ── Appel audio sortant ───────────────────────────────────────────────────
     public static void demarrer(Stage parent, String contactNom,
                                 String numeroContact, int idConversation) {
@@ -37,9 +34,13 @@ public class Appelaudio {
         nom.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
         nom.setTextFill(Color.web("#111B21"));
 
-        Label statut = new Label("Appel en cours...");
+        Label statut = new Label("En attente de réponse...");
         statut.setFont(Font.font("Segoe UI", 14));
         statut.setTextFill(Color.web("#667781"));
+
+        /*Label statut = new Label("Appel en cours...");
+        statut.setFont(Font.font("Segoe UI", 14));
+        statut.setTextFill(Color.web("#667781"));*/
 
         Button btnRaccrocher = new Button("📵  Raccrocher");
         btnRaccrocher.setStyle(
@@ -50,6 +51,7 @@ public class Appelaudio {
                         "-fx-padding: 10px 28px;" +
                         "-fx-cursor: hand;"
         );
+        //man3rf
         btnRaccrocher.setOnAction(e -> {
             ClientHandlerAuth.getInstance().raccrocher();
             stage.close();
@@ -70,7 +72,7 @@ public class Appelaudio {
     }
 
     // ── Appel audio entrant ───────────────────────────────────────────────────
-    public static void recevoirAppel(Stage parent, String appelantNom,
+    /*public static void recevoirAppel(Stage parent, String appelantNom,
                                      String numeroAppelant) {
 
         Stage stage = new Stage();
@@ -128,7 +130,7 @@ public class Appelaudio {
         stage.show();
     }
     // ── Fenêtre communication (sans envoyer CALL_REQUEST) ─────────────────────
-    private static void ouvrirFenetreCommunication(Stage parent,
+   /* private static void ouvrirFenetreCommunication(Stage parent,
                                                    String contactNom,
                                                    String numeroContact) {
 
@@ -170,5 +172,5 @@ public class Appelaudio {
 
         stage.setScene(new Scene(root, 320, 300));
         stage.show();
-    }
+    }*/
 }
