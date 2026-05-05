@@ -1,4 +1,3 @@
-
 package javafx;
 import client.ClientHandlerAuth;
 import javafx.geometry.Insets;
