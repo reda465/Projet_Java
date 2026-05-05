@@ -127,7 +127,7 @@ public class TestCallMain {
         Thread.sleep(2000);
 
         System.out.println("\n📞 [TEST] Client1 appelle Client2...\n");
-        callService1.appeler("2222", 1, TypeAppel.audio);
+        callService1.appeler("2222", 1, TypeAppel.AUDIO);
 
         while (true) {
             Thread.sleep(1000);
