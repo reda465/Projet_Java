@@ -1,11 +1,9 @@
 package client;
-
 import model.Message;
 import model.Utilisateur;
 import model.Contact;
 import model.Conversation;
 import java.util.List;
-
 public interface EcouteurClient {
     // Quand la connexion réussit
     void connexionReussie(Utilisateur moi);
@@ -24,7 +22,7 @@ public interface EcouteurClient {
 
     // Quand on se déconnecte
     void deconnexion();
-    void appelEntrant(String numero,String type, String ipAppelant, String ip);
+    void appelEntrant(String numero,String type, String ipAppelant, String name);
     void appelAccepte(String numero, String ip);
      void appelRefuse();
      void appelTermine(String numero);

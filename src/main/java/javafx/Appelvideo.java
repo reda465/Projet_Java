@@ -54,7 +54,7 @@ public class Appelvideo {
         if (ipDistant != null && !ipDistant.isBlank()) {
             arreterVideo();
             videoUDP = new VideoUDP();
-            videoUDP.demarrer(ipDistant, 6002, 6003, videoView);
+            videoUDP.demarrer(ipDistant, 5003, 5004, videoView);
             System.out.println("[Video] Démarré côté appelant → " + ipDistant);
         } else {
             System.out.println("[Video] IP distante manquante, vidéo non démarrée.");
@@ -176,7 +176,7 @@ public class Appelvideo {
         if (ipDistant != null && !ipDistant.isBlank()) {
             arreterVideo();
             videoUDP = new VideoUDP();
-            videoUDP.demarrer(ipDistant, 6003, 6002, videoView);
+            videoUDP.demarrer(ipDistant, 5004, 5003, videoView);
             System.out.println("[Video] Démarré côté appelé → " + ipDistant);
         } else {
             System.out.println("[Video] IP distante manquante, vidéo non démarrée.");
