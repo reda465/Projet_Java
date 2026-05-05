@@ -2,7 +2,11 @@ package service;
 
 import Serveur.Protocol;
 import client.AudioUDP;
+import client.VideoUDP;
+import javafx.scene.image.ImageView;
 import client.ClientReseau;
+import lombok.Getter;
+import lombok.Setter;
 import model.Appel;
 import model.Utilisateur;
 import model.enums.StatutAppel;
@@ -15,18 +19,28 @@ public class CallService {
     private final ClientReseau clientReseau;
     private final Utilisateur localUser;
     private final AudioUDP audioUDP;
+    private final VideoUDP videoUDP;
 
     private Appel appelEnCours;
     private boolean communicationActive = false;
     private String ipCorrespondant;
     private String numeroCorrespondant;
 
-    // (Ports retirés d'ici pour être attribués dynamiquement selon le rôle appelant/appelé)
+    // JavaFX ImageView pour afficher la vidéo reçue
+    private ImageView videoView;
+
+    private static final int PORT_Audio = 5001;
+    private static final int PORT_VIDEO = 6001;
 
     public CallService(ClientReseau clientReseau, Utilisateur localUser) {
         this.clientReseau = clientReseau;
         this.localUser = localUser;
         this.audioUDP = new AudioUDP();
+        this.videoUDP = new VideoUDP();
+    }
+
+    public void setVideoView(ImageView view) {
+        this.videoView = view;
     }
 
     // J'appelle quelqu'un
@@ -60,6 +74,7 @@ public class CallService {
         System.out.println("[APPEL] Entrant de " + numAppelant + " (" + ipAppelant + ")");
     }
 
+    // J'accepte l'appel entrant
     public void accepte(){
         if (appelEnCours == null) return;
 
@@ -67,14 +82,20 @@ public class CallService {
         communicationActive = true;
 
         envoyer(Protocol.CALL_ACCEPT, numeroCorrespondant); // celui qui a appelé
-        
-        // L'appelé écoute sur le port 5002 et envoie vers le port 5001
-        audioUDP.demarrer(ipCorrespondant, 5001, 5002);
+        audioUDP.demarrer(ipCorrespondant,PORT_Audio, PORT_Audio);
+
+        // Video seulement si VIDEO
+        if (appelEnCours.getTypeAppel() == TypeAppel.video) {
+            if (videoView == null) {
+                System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
+            }
+            videoUDP.demarrer(ipCorrespondant, PORT_VIDEO, PORT_VIDEO, videoView);
+        }
 
         System.out.println("[APPEL] Accepté, UDP démarré");
     }
 
-    // L'autre a accepté mon appel (Je suis l'appelant)
+    // L'autre a accepté mon appel
     public void onAccepte(String ipAccepteur) {
         if (appelEnCours == null) return;
 
@@ -82,18 +103,27 @@ public class CallService {
         appelEnCours.setStatut(StatutAppel.accepte);
         communicationActive = true;
 
-        // L'appelant écoute sur le port 5001 et envoie vers le port 5002
-        audioUDP.demarrer(ipAccepteur, 5002, 5001);
+        audioUDP.demarrer(ipAccepteur, PORT_Audio, PORT_Audio);
+
+        // Video seulement si VIDEO
+        if (appelEnCours.getTypeAppel() == TypeAppel.video) {
+            if (videoView == null) {
+                System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
+            }
+            videoUDP.demarrer(ipAccepteur, PORT_VIDEO, PORT_VIDEO, videoView);
+        }
+
+
         System.out.println("[APPEL] UDP démarré vers " + ipAccepteur);
     }
 
-    // Refuser / Raccrocher / Terminer
+    // Refuser
     public void refuser() {
         if (appelEnCours == null) return;
         envoyer(Protocol.CALL_REFUSE, numeroCorrespondant);
         arreter();
     }
-
+ //  Je Raccrocher
     public void raccrocher() {
         if (appelEnCours == null) return;
         envoyer(Protocol.CALL_END, numeroCorrespondant);
@@ -108,13 +138,15 @@ public class CallService {
     private void envoyer(Protocol protocol, String data) {
         clientReseau.envoyer(new Packet(protocol, data));
     }
-
+  //arreter l'audio et vidau
     private void arreter() {
         audioUDP.arreter();
+        videoUDP.arreter();
         appelEnCours = null;
         communicationActive = false;
         ipCorrespondant = null;
         numeroCorrespondant = null;
+        videoView = null;
     }
 
     public boolean isEnAppel() { return appelEnCours != null; }
