@@ -35,11 +35,12 @@ public class VideoUDP {
     public VideoUDP() {}
 
     private VideoCapture ouvrirCamera() {
-        int[] backends = new int[] {
-                Videoio.CAP_ANY,
-                Videoio.CAP_DSHOW,
-                Videoio.CAP_MSMF
-        };
+        // MSMF pose souvent problème sur Windows (warnings cap_msmf.cpp "can't grab frame")
+        // On privilégie DirectShow (CAP_DSHOW) en premier sur Windows.
+        boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        int[] backends = isWindows
+                ? new int[] { Videoio.CAP_DSHOW, Videoio.CAP_MSMF, Videoio.CAP_ANY }
+                : new int[] { Videoio.CAP_ANY };
 
         for (int backend : backends) {
             for (int index = 0; index <= 2; index++) {
@@ -93,15 +94,32 @@ public class VideoUDP {
                     MatOfInt params = new MatOfInt(
                             Imgcodecs.IMWRITE_JPEG_QUALITY, QUALITE_JPEG
                     );
-
+                    int consecutiveGrabFailures = 0;
                     while (actif) {
                         //camera.read(frame);
                         boolean lectureOk = camera.read(frame);
                         if (!lectureOk || frame.empty()) {
+                            consecutiveGrabFailures++;
+                            // Si la caméra est "ouverte" mais ne renvoie jamais d'images (MSMF),
+                            // on tente une ré-ouverture une seule fois.
+                            if (consecutiveGrabFailures == 40) { // ~2s à 50ms
+                                System.out.println("[VideoUDP] ⚠️ Camera ouverte mais aucune frame capturée. Tentative de re-ouverture...");
+                                try { camera.release(); } catch (Exception ignored) {}
+                                camera = ouvrirCamera();
+                                if (camera != null && camera.isOpened()) {
+                                    camera.set(Videoio.CAP_PROP_FRAME_WIDTH,  LARGEUR_FRAME);
+                                    camera.set(Videoio.CAP_PROP_FRAME_HEIGHT, HAUTEUR_FRAME);
+                                    camera.set(Videoio.CAP_PROP_FPS, 15);
+                                    consecutiveGrabFailures = 0;
+                                } else {
+                                    System.out.println("[VideoUDP] ❌ Re-ouverture caméra échouée.");
+                                    return;
+                                }
+                            }
                             Thread.sleep(50);
                             continue;
                         }
-
+                        consecutiveGrabFailures = 0;
                         Imgproc.resize(frame, frameReduit,
                                 new Size(LARGEUR_FRAME, HAUTEUR_FRAME));
 
