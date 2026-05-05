@@ -208,6 +208,21 @@ public class ClientReseau {
                 case MESSAGES_LIST:
                     traiterMessagesRecus(data);
                     break;
+                case ADD_CONTACT_OK:
+                    if (parts.length >= 3 && ecouteur != null) {
+                        Contact contactAjoute = new Contact();
+                        contactAjoute.setNomComplet(parts[0]);
+                        contactAjoute.setNumeroTelephone(parts[1]);
+                        contactAjoute.setPhotoProfil(parts.length >= 3 ? parts[2] : null);
+                        System.out.println("✅ Contact ajouté: " + contactAjoute.getNomComplet());
+                        ecouteur.contactAjoute(contactAjoute);
+                    }
+                    break;
+                case ADD_CONTACT_FAIL:
+                    if (ecouteur != null) {
+                        ecouteur.erreur("Échec ajout contact: " + p.getData());
+                    }
+                    break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
                     break;

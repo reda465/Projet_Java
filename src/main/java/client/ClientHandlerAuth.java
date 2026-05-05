@@ -8,6 +8,9 @@ import network.Packet;
 import service.AuthService;
 import service.MessageService;
 import service.CallService;
+import service.ContactService;
+import model.Contact;
+
 @Getter
 @Setter
 
@@ -19,6 +22,7 @@ public class ClientHandlerAuth {
     private AuthService authService;
     private MessageService messageService;
     private boolean connecteAuServeur = false;
+    private ContactService contactService;
     private CallService callService;
 
     // Constructeur privé (personne ne peut créer directement)
@@ -42,6 +46,7 @@ public class ClientHandlerAuth {
         if (clientReseau.isConnecte()) {
             authService = new AuthService(clientReseau);
             messageService = new MessageService(clientReseau);
+            contactService = new ContactService(clientReseau);
             connecteAuServeur = true;
             return true;
         }
@@ -67,6 +72,20 @@ public class ClientHandlerAuth {
             return "Erreur : Pas connecté au serveur !";
         }
         return authService.inscrire(nomComplet, numero, password);
+    }
+    public void ajouterContact(String numeroTelephone, String nomAffiche) {
+        if (!verifierConnexion()) {
+            System.out.println(" Pas connecté au serveur !");
+            return;
+        }
+        if (contactService == null) {
+            System.out.println(" Service contact non initialisé !");
+            return;
+        }
+        contactService.ajouterContact(numeroTelephone, nomAffiche);
+    }
+    public void ajouterContact(String numeroTelephone) {
+        ajouterContact(numeroTelephone, numeroTelephone);
     }
     // ===== 3. DÉCONNEXION =====
     public void seDeconnecter() {
