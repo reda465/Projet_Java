@@ -16,7 +16,17 @@ public enum Protocol {
     // Messagerie
     MSG_SEND ,
     MSG_RECEIVE ,
+    // Contacts
+    ADD_CONTACT,
+    ADD_CONTACT_OK,
+    ADD_CONTACT_FAIL,
+    BLOCK_CONTACT,
+    BLOCK_OK,
 
+    // Notification de premier message
+    CONTACT_REQUEST,    // ← notification envoyée au destinataire
+    CONTACT_ACCEPTED,   // ← le destinataire accepte
+    CONTACT_BLOCKED,    // ← le destinataire bloque
     //conversation
     GET_CONVERSATIONS,   // client demande sa liste de conversations
     CONVERSATIONS_LIST,
@@ -28,5 +38,36 @@ public enum Protocol {
     CALL_REQUEST,
     CALL_ACCEPT ,
     CALL_REFUSE ,
-    CALL_END
+    CALL_END,
+
+    CREATE_GROUP,           // Client demande création groupe
+    CREATE_GROUP_OK,        // Serveur confirme création
+    CREATE_GROUP_FAIL,      // Échec (nom existant, erreur, etc.)
+
+    ADD_MEMBER,             // Ajouter membre au groupe
+    ADD_MEMBER_OK,
+    ADD_MEMBER_FAIL,
+
+    REMOVE_MEMBER,          // Retirer membre (admin seulement)
+    REMOVE_MEMBER_OK,
+    REMOVE_MEMBER_FAIL,
+
+    LEAVE_GROUP,            // Quitter le groupe soi-même
+    LEAVE_GROUP_OK,
+
+    DELETE_GROUP,           // Supprimer groupe (créateur seulement)
+    DELETE_GROUP_OK,
+    DELETE_GROUP_FAIL,
+
+    GET_GROUPS,             // Demander liste des groupes du client
+    GROUPS_LIST,            // Serveur envoie la liste
+
+    GET_GROUP_MEMBERS,      // Demander membres d'un groupe
+    GROUP_MEMBERS_LIST,     // Serveur envoie les membres
+
+    GROUP_MSG_SEND,         // Envoyer message dans groupe
+    GROUP_MSG_RECEIVE,      // Recevoir message de groupe
+
+    UPDATE_GROUP_NAME,      // Modifier nom du groupe (admin)
+    UPDATE_GROUP_NAME_OK
 }

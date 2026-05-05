@@ -2,7 +2,11 @@ package service;
 
 import Serveur.Protocol;
 import client.AudioUDP;
+import client.VideoUDP;
+import javafx.scene.image.ImageView;
 import client.ClientReseau;
+import lombok.Getter;
+import lombok.Setter;
 import model.Appel;
 import model.Utilisateur;
 import model.enums.StatutAppel;
@@ -15,19 +19,30 @@ public class CallService {
     private final ClientReseau clientReseau;
     private final Utilisateur localUser;
     private final AudioUDP audioUDP;
+    private final VideoUDP videoUDP;
 
     private Appel appelEnCours;
     private boolean communicationActive = false;
     private String ipCorrespondant;
     private String numeroCorrespondant;
 
-    private static final int PORT_LOCAL = 5001;
-    private static final int PORT_DISTANT = 5002;
+    // JavaFX ImageView pour afficher la vidéo reçue
+    private ImageView videoView;
+
+    private static final int PORT_AUDIO_A  = 5001;
+    private static final int PORT_AUDIO_B  = 5002;
+    private static final int PORT_VIDEO_A  = 6001;
+    private static final int PORT_VIDEO_B  = 6002;
 
     public CallService(ClientReseau clientReseau, Utilisateur localUser) {
         this.clientReseau = clientReseau;
         this.localUser = localUser;
         this.audioUDP = new AudioUDP();
+        this.videoUDP = new VideoUDP();
+    }
+
+    public void setVideoView(ImageView view) {
+        this.videoView = view;
     }
 
     // J'appelle quelqu'un
@@ -69,30 +84,47 @@ public class CallService {
         communicationActive = true;
 
         envoyer(Protocol.CALL_ACCEPT, numeroCorrespondant); // celui qui a appelé
-        audioUDP.demarrer(ipCorrespondant, PORT_DISTANT, PORT_LOCAL);
+        audioUDP.demarrer(ipCorrespondant, PORT_AUDIO_A, PORT_AUDIO_B);
+
+        // Video seulement si VIDEO
+        if (appelEnCours.getTypeAppel() == TypeAppel.VIDEO) {
+            if (videoView == null) {
+                System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
+            }
+            videoUDP.demarrer(ipCorrespondant, PORT_VIDEO_A, PORT_VIDEO_B, videoView);
+        }
 
         System.out.println("[APPEL] Accepté, UDP démarré");
     }
 
     // L'autre a accepté mon appel
-    public void onAccepte(String ipAccepteur) {//////////////////A VERIFIER
+    public void onAccepte(String ipAccepteur) {
         if (appelEnCours == null) return;
 
         this.ipCorrespondant = ipAccepteur;
         appelEnCours.setStatut(StatutAppel.accepte);
         communicationActive = true;
 
-        audioUDP.demarrer(ipAccepteur, PORT_DISTANT, PORT_LOCAL);
+        audioUDP.demarrer(ipAccepteur, PORT_AUDIO_B, PORT_AUDIO_A);
+        // Video seulement si VIDEO
+        if (appelEnCours.getTypeAppel() == TypeAppel.VIDEO) {
+            if (videoView == null) {
+                System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
+            }
+            videoUDP.demarrer(ipAccepteur, PORT_VIDEO_B, PORT_VIDEO_A, videoView);
+        }
+
+
         System.out.println("[APPEL] UDP démarré vers " + ipAccepteur);
     }
 
-    // Refuser / Raccrocher / Terminer
+    // Refuser
     public void refuser() {
         if (appelEnCours == null) return;
         envoyer(Protocol.CALL_REFUSE, numeroCorrespondant);
         arreter();
     }
-
+ //  Je Raccrocher
     public void raccrocher() {
         if (appelEnCours == null) return;
         envoyer(Protocol.CALL_END, numeroCorrespondant);
@@ -107,13 +139,15 @@ public class CallService {
     private void envoyer(Protocol protocol, String data) {
         clientReseau.envoyer(new Packet(protocol, data));
     }
-
+  //arreter l'audio et vidau
     private void arreter() {
         audioUDP.arreter();
+        videoUDP.arreter();
         appelEnCours = null;
         communicationActive = false;
         ipCorrespondant = null;
         numeroCorrespondant = null;
+        videoView = null;
     }
 
     public boolean isEnAppel() { return appelEnCours != null; }

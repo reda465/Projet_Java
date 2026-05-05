@@ -1,4 +1,4 @@
-package com.ensa;
+/*package com.ensa;
 
 import client.ClientHandlerAuth;
 import client.EcouteurClient;
@@ -223,6 +223,11 @@ public class AppelTest implements EcouteurClient {
     }
 
     @Override
+    public void messageRecu(String contenu) {
+
+    }
+
+    @Override
     public void deconnexion() {
         System.out.println("\n🔌 Déconnecté");
     }
@@ -237,4 +242,4 @@ public class AppelTest implements EcouteurClient {
     private void attendre(int ms) {
         try { Thread.sleep(ms); } catch (Exception e) {}
     }
-}
+}*/

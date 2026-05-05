@@ -8,22 +8,23 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 //je dois voir etat de message mn ba3d
-public class Message {
+public class Messagefx {
     public static HBox Messageenvoyer(String text, String time) {
         Label msg = new Label(text);
         msg.setWrapText(true);
         msg.setFont(Font.font("Arial", 14));
         msg.setTextFill(Color.BLACK);
+        msg.setStyle("-fx-text-fill: black;");
         Label tm = new Label(time);
         tm.setFont(Font.font("Arial", 10));
-        tm.setTextFill(Color.web("#53BDEB"));
-
+        tm.setTextFill(Color.BLACK);
+        tm.setStyle("-fx-text-fill: black;");
         VBox bulle = new VBox(4, msg, tm);
         bulle.setPadding(new Insets(8));
         bulle.setMaxWidth(320);
         bulle.setStyle(
                 "-fx-background-color: #D9FDD3;" +
-                        "-fx-background-radius: 12 2 12 12;"//a changer car j'aime pas la couleur hadi pour le coin
+                        "-fx-background-radius: 12 2 12 12;"+"-fx-text-fill: black;"//a changer car j'aime pas la couleur hadi pour le coin
         );
 
         HBox ligne = new HBox(bulle);
@@ -37,17 +38,19 @@ public class Message {
         msg.setWrapText(true);
         msg.setFont(Font.font("Arial", 14));
         msg.setTextFill(Color.BLACK);
+        msg.setStyle("-fx-text-fill: black;");
 
         Label tm = new Label(time);
         tm.setFont(Font.font("Arial", 10));
-        tm.setTextFill(Color.GRAY);
+        tm.setTextFill(Color.web("#555555"));
+        tm.setStyle("-fx-text-fill: #555555;");
 
         VBox bulle = new VBox(4, msg, tm);
         bulle.setPadding(new Insets(8));
         bulle.setMaxWidth(320);
         bulle.setStyle(
                 "-fx-background-color: white;" +
-                        "-fx-background-radius: 2 12 12 12;"
+                        "-fx-background-radius: 2 12 12 12;"+"-fx-text-fill: black;"
         );
         HBox ligne = new HBox(bulle);
         ligne.setAlignment(Pos.CENTER_LEFT);//message recu a gauche

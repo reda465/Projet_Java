@@ -1,7 +1,7 @@
 package Dao;
 
 import model.Utilisateur;
-//import org.mindrot.jbcrypt.BCrypt;
+import org.mindrot.jbcrypt.BCrypt;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -18,6 +18,7 @@ public class Dao_UtilisateurImp implements Dao_Utilisateur {
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, u.getNomComplet());
             ps.setString(2, u.getNumeroTelephone());
+            ps.setString(3, u.getMotDePasse());
 
             return ps.executeUpdate();
         }
@@ -95,8 +96,9 @@ public class Dao_UtilisateurImp implements Dao_Utilisateur {
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 String hash = rs.getString("mot_de_passe");
-
-                return mapResultSet(rs);
+                if (BCrypt.checkpw(password, hash)) {
+                    return mapResultSet(rs);
+                }
             }
         }
         return null;
@@ -131,8 +133,6 @@ public class Dao_UtilisateurImp implements Dao_Utilisateur {
         u.setNumeroTelephone(rs.getString("numero_telephone"));
         u.setMotDePasse(rs.getString("mot_de_passe"));
         u.setPhotoProfil(rs.getString("photo_profil"));
-        //u.setDateInscription(rs.getTimestamp("date_inscription").toLocalDateTime());
-        //u.setDerniereConnexion(rs.getTimestamp("derniere_connexion").toLocalDateTime());
 
         Timestamp dateInscription = rs.getTimestamp("date_inscription");
         if (dateInscription != null)

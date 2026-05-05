@@ -8,6 +8,9 @@ import network.Packet;
 import service.AuthService;
 import service.MessageService;
 import service.CallService;
+import service.ContactService;
+import model.Contact;
+
 @Getter
 @Setter
 
@@ -19,6 +22,7 @@ public class ClientHandlerAuth {
     private AuthService authService;
     private MessageService messageService;
     private boolean connecteAuServeur = false;
+    private ContactService contactService;
     private CallService callService;
 
     // Constructeur privé (personne ne peut créer directement)
@@ -42,6 +46,8 @@ public class ClientHandlerAuth {
         if (clientReseau.isConnecte()) {
             authService = new AuthService(clientReseau);
             messageService = new MessageService(clientReseau);
+
+            contactService = new ContactService(clientReseau);
             connecteAuServeur = true;
             return true;
         }
@@ -67,6 +73,20 @@ public class ClientHandlerAuth {
             return "Erreur : Pas connecté au serveur !";
         }
         return authService.inscrire(nomComplet, numero, password);
+    }
+    public void ajouterContact(String numeroTelephone, String nomAffiche) {
+        if (!verifierConnexion()) {
+            System.out.println(" Pas connecté au serveur !");
+            return;
+        }
+        if (contactService == null) {
+            System.out.println(" Service contact non initialisé !");
+            return;
+        }
+        contactService.ajouterContact(numeroTelephone, nomAffiche);
+    }
+    public void ajouterContact(String numeroTelephone) {
+        ajouterContact(numeroTelephone, numeroTelephone);
     }
     // ===== 3. DÉCONNEXION =====
     public void seDeconnecter() {
@@ -102,7 +122,7 @@ public class ClientHandlerAuth {
     }
 
     public void refuserAppel() {
-        if (callService != null) callService.raccrocher();
+        if (callService != null) callService.refuser();
     }
 
     public void raccrocher() {
@@ -118,12 +138,33 @@ public class ClientHandlerAuth {
         Packet p = new Packet(Protocol.USERS_LIST, "");
         clientReseau.envoyer(p);
     }
+    public void demanderMessages(int idConversation) {
+        if (!verifierConnexion()) {
+            System.out.println("❌ Pas connecté au serveur !");
+            return;
+        }
+        if (clientReseau == null) {
+            System.out.println("❌ Client réseau non initialisé !");
+            return;
+        }
+        clientReseau.demanderMessages(idConversation);
+    }
 
     public void demanderConversations() {
-        if (!verifierConnexion()) return;
-
-        Packet p = new Packet(Protocol.CONVERSATIONS_LIST, "");
-        clientReseau.envoyer(p);
+        if (!verifierConnexion()) {
+            System.out.println("❌ Pas connecté au serveur !");
+            return;
+        }
+        if (clientReseau == null) {
+            System.out.println("❌ Client réseau non initialisé !");
+            return;
+        }
+        clientReseau.demanderConversations();
+    }
+    // Dans ClientHandlerAuth.java
+    public boolean connecterAuServeurTest(String ip, int port, EcouteurClient ecouteur) {
+        // Utiliser le même code mais pointer vers le mock server
+        return connecterAuServeur(ip, port, ecouteur);
     }
 
     public Utilisateur getUtilisateurConnecte() {

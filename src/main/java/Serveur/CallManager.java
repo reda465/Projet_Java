@@ -39,7 +39,8 @@ public class CallManager {
     // ── CALL_REQUEST|telephoneDest|typeAppel ──────────────────────────────────
     public void demanderAppel(String telephoneAppelant,
                               String telephoneDest,
-                              String typeAppel) throws SQLException {
+                              String typeAppel,
+                              String ipAppelant) throws SQLException {
 
         // 1. Vérifier que le destinataire est en ligne
         ClientHandler destHandler = userManager.getHandler(telephoneDest);
@@ -87,13 +88,14 @@ public class CallManager {
         idAppels.put(telephoneAppelant, appel.getIdAppel());
 
         // 6. Notifier le destinataire
-        // Format : CALL_REQUEST|telephoneAppelant|nomAppelant|typeAppel|idAppel
+        // Format : CALL_REQUEST|telephoneAppelant|nomAppelant|typeAppel|idAppel|ipAppelant
         destHandler.sendMessage(
                 Protocol.CALL_REQUEST.name() + "|"
                         + appelant.getNumeroTelephone() + "|"
                         + appelant.getNomComplet()      + "|"
                         + typeAppel                     + "|"
-                        + appel.getIdAppel()
+                        + appel.getIdAppel()            + "|"
+                        + (ipAppelant != null ? ipAppelant : "")
         );
 
         System.out.println("[APPEL] " + telephoneAppelant
@@ -102,7 +104,8 @@ public class CallManager {
 
     // ── CALL_ACCEPT|telephoneAppelant ─────────────────────────────────────────
     public void accepterAppel(String telephoneAccepteur,
-                              String telephoneAppelant) throws SQLException {
+                              String telephoneAppelant,
+                              String ipAccepteur) throws SQLException {
 
         // 1. Mettre à jour le statut en DB
         Integer idAppel = idAppels.get(telephoneAppelant);
@@ -113,7 +116,9 @@ public class CallManager {
         ClientHandler appelantHandler = userManager.getHandler(telephoneAppelant);
         if (appelantHandler != null)
             appelantHandler.sendMessage(
-                    Protocol.CALL_ACCEPT.name() + "|" + telephoneAccepteur);
+                    // Format : CALL_ACCEPT|telephoneAccepteur|ipAccepteur
+                    Protocol.CALL_ACCEPT.name() + "|" + telephoneAccepteur + "|"
+                            + (ipAccepteur != null ? ipAccepteur : ""));
 
         System.out.println("[APPEL] Accepté par " + telephoneAccepteur);
     }

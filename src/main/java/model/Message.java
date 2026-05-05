@@ -1,13 +1,17 @@
 package model;
 
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 @Data
 @NoArgsConstructor
-
+@Getter
+@Setter
 public class Message {
     private int idMessage;
     private int idConversation;
@@ -20,6 +24,8 @@ public class Message {
     private String nomFichier;
     private Long tailleFichier;
     private LocalDateTime dateEnvoi;
+    private boolean estMoi;
+    private String nomExpediteur;
 
     public String getDateFormatee() {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");

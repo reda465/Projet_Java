@@ -14,6 +14,7 @@ import javafx.stage.Stage;
 import client.EcouteurClient;
 import model.Contact;
 import model.Conversation;
+import model.Message;
 import model.Utilisateur;
 import java.util.List;
 public class login extends Application implements EcouteurClient {
@@ -26,7 +27,7 @@ public class login extends Application implements EcouteurClient {
         stage.setTitle("WhatsApp - Login");
         stage.show();
         ClientHandlerAuth.getInstance()
-                .connecterAuServeur("192.168.56.1", 5000, this);
+                .connecterAuServeur("10.226.120.60", 5000, this);
     }
     public Scene creerScene(Stage stage) {
         String fs = fieldStyle();
@@ -160,7 +161,7 @@ public class login extends Application implements EcouteurClient {
         Platform.runLater(() -> {
             message.setTextFill(Color.web("#25D366"));
             message.setText("Connexion réussie ! Bienvenue " + moi.getNomComplet());
-
+            ClientHandlerAuth.getInstance().onConnexionReussie(moi);
             // Attendre 1 seconde puis ouvrir Discussion
             new Thread(() -> {
                 try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
@@ -186,7 +187,6 @@ public class login extends Application implements EcouteurClient {
             }).start();
         });
     }
-
     @Override
     public void inscriptionReussie(String msg) {
         // non utilisé dans login
@@ -216,8 +216,9 @@ public class login extends Application implements EcouteurClient {
     }
 
     @Override
-    public void appelAccepte(String numero) {
 
+    public void appelAccepte(String numero, String ip) {
+        System.out.println("📞 Appel accepté par " + numero + " ip=" + ip);
     }
 
     @Override
@@ -233,6 +234,11 @@ public class login extends Application implements EcouteurClient {
 
     @Override
     public void conversationsRecues(List<Conversation> conversations) {
+
+    }
+
+    @Override
+    public void messagesRecus(List<Message> messages) {
 
     }
 

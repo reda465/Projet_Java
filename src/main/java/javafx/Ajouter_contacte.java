@@ -75,7 +75,7 @@ public class Ajouter_contacte {
             String color = colors[(int)(Math.random() * colors.length)];
 
             // ── 2. Créer l'item et l'ajouter dans convList de Discussion ──
-            HBox item = Discussion.makeConvItem(name, phone, "maintenant", "0", color);
+            HBox item = Discussion.makeConvItem(name, phone, "maintenant", color,-1,0);
             convList.getItems().add(item);
             //
 
@@ -143,7 +143,6 @@ public class Ajouter_contacte {
                 "-fx-background-radius:20px;" +
                 "-fx-border-color:#A5E6C3;";
     }
-
     static void focusStyle(TextField tf, String base) {
         tf.focusedProperty().addListener((obs, old, focused) -> {
             if (focused) tf.setStyle(base.replace("#A5E6C3", "#25D366"));

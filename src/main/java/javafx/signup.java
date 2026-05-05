@@ -13,6 +13,7 @@ import javafx.scene.text.*;
 import javafx.stage.Stage;
 import model.Contact;
 import model.Conversation;
+import model.Message;
 import model.Utilisateur;
 
 import java.util.List;
@@ -162,6 +163,11 @@ public class signup implements EcouteurClient {
     }
 
     @Override
+    public void messagesRecus(List<Message> messages) {
+
+    }
+
+    @Override
     public void contactAjoute(Contact contact) {
 
     }
@@ -187,8 +193,8 @@ public class signup implements EcouteurClient {
     }
 
     @Override
-    public void appelAccepte(String numero) {
-
+    public void appelAccepte(String numero, String ip) {
+        System.out.println("📞 Appel accepté par " + numero + " ip=" + ip);
     }
 
     @Override
