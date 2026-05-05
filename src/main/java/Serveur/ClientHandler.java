@@ -2,6 +2,7 @@ package Serveur;
 
 import lombok.Getter;
 import lombok.Setter;
+import model.Contact;
 import model.Conversation;
 import model.Message;
 import model.Utilisateur;
@@ -30,6 +31,7 @@ public class ClientHandler extends Thread {
     private final DaoConversationImp convDAO    = new DaoConversationImp();
     private final Dao_MessageImp     messageDAO = new Dao_MessageImp();
     private final Dao_MessageFileAttenteImp fileDAO = new Dao_MessageFileAttenteImp();
+    private final Dao_ContactImp contactDAO = new Dao_ContactImp();
     public ClientHandler(Socket s) {
         this.socket = s;
     }
@@ -58,6 +60,9 @@ public class ClientHandler extends Thread {
                     case CALL_ACCEPT  -> handleCallAccept(parts);
                     case CALL_REFUSE  -> handleCallRefuse(parts);
                     case CALL_END     -> handleCallEnd(parts);
+                    case ADD_CONTACT      -> handleAddContact(parts);
+                    case BLOCK_CONTACT    -> handleBlockContact(parts);
+                    case CONTACT_ACCEPTED -> handleContactAccepted(parts);
                     //case CALL_CANCEL  -> handleCallCancel(parts);
 
                     default                -> pw.println("UNKNOWN_COMMAND");
@@ -85,13 +90,17 @@ public class ClientHandler extends Thread {
                 userManager.addUser(telephoneConnecte, this);
                 userDAO.updateDerniereConnexion(u.getIdUtilisateur());
 
-                // LOGIN_OK|nom_complet|numero_telephone
-                pw.println(Protocol.LOGIN_OK + "|" + u.getNomComplet() + "|" + u.getNumeroTelephone());
+                pw.println(Protocol.LOGIN_OK + "|"
+                        + u.getNomComplet() + "|"
+                        + u.getNumeroTelephone());
 
                 messageRouter.delivrerMessagesEnAttente(telephoneConnecte);
 
+                // ← NOUVEAU : délivrer les demandes de contact en attente
+                delivrerDemandesContactEnAttente(u);
+
             } else {
-                pw.println(Protocol.LOGIN_FAIL+"|ErreurLogin");
+                pw.println(Protocol.LOGIN_FAIL + "|ErreurLogin");
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -99,6 +108,30 @@ public class ClientHandler extends Thread {
         }
     }
 
+    // ── Délivrer les CONTACT_REQUEST en attente ───────────────────────────────
+    private void delivrerDemandesContactEnAttente(Utilisateur u) {
+        try {
+            List<Contact> demandes = contactDAO.getDemandesEnAttente(
+                    u.getIdUtilisateur());
+
+            for (Contact demande : demandes) {
+                Utilisateur demandeur = userDAO.getByID(
+                        demande.getIdContactUtilisateur());
+                if (demandeur == null) continue;
+
+                pw.println(Protocol.CONTACT_REQUEST.name()
+                        + "|" + demandeur.getNumeroTelephone()
+                        + "|" + demandeur.getNomComplet());
+
+                System.out.println("[CONTACT] Demande en attente livrée à "
+                        + u.getNumeroTelephone()
+                        + u.getNumeroTelephone()
+                        + " de " + demandeur.getNumeroTelephone());
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
     // ── REGISTER|nom_complet|numero_telephone|mot_de_passe ───────────────────
     private void handleRegister(String[] parts) {
         if (parts.length < 4) { pw.println("REGISTER_FAIL|Erreur_Inscription"); return; }
@@ -317,6 +350,151 @@ public class ClientHandler extends Thread {
                     + " à " + telephoneConnecte);
 
         } catch (SQLException | NumberFormatException e) {
+            e.printStackTrace();
+        }
+
+    }
+    // ── ADD_CONTACT|telephoneContact ─────────────────────────────────────────
+// Flux :
+// 1. Alice ajoute Bob → serveur crée le contact côté Alice
+// 2. Si Bob est en ligne → notifie Bob avec CONTACT_REQUEST
+// 3. Bob répond CONTACT_ACCEPTED ou BLOCK_CONTACT
+    private void handleAddContact(String[] parts) {
+        if (parts.length < 2) {
+            pw.println(Protocol.ADD_CONTACT_FAIL.name()); return;
+        }
+
+        String telephoneContact = parts[1].trim();
+        String nomAffiche = parts.length >= 3 ? parts[2].trim() : "";
+
+        try {
+            // 1. Retrouver les deux utilisateurs
+            Utilisateur moi = userDAO.findByTelephone(telephoneConnecte);
+            if (moi == null) { pw.println(Protocol.ADD_CONTACT_FAIL.name()); return; }
+
+            Utilisateur contact = userDAO.findByTelephone(telephoneContact);
+            if (contact == null) {
+                pw.println(Protocol.ADD_CONTACT_FAIL.name() + "|NUMERO_INTROUVABLE");
+                return;
+            }
+
+            // 2. Pas s'ajouter soi-même
+            if (moi.getIdUtilisateur() == contact.getIdUtilisateur()) {
+                pw.println(Protocol.ADD_CONTACT_FAIL.name() + "|AJOUT_SOI_MEME");
+                return;
+            }
+
+            // 3. Vérifier si Bob nous a bloqués
+            if (contactDAO.estBloque(contact.getIdUtilisateur(),
+                    moi.getIdUtilisateur())) {
+                pw.println(Protocol.ADD_CONTACT_FAIL.name() + "|BLOQUE");
+                return;
+            }
+
+            // 4. Créer le contact côté Alice (si pas déjà existant)
+            if (!contactDAO.contactExiste(moi.getIdUtilisateur(),
+                    contact.getIdUtilisateur())) {
+                Contact c = new Contact();
+                c.setIdUtilisateur(moi.getIdUtilisateur());
+                c.setIdContactUtilisateur(contact.getIdUtilisateur());
+                c.setNomAffiche(nomAffiche.isEmpty()
+                        ? contact.getNomComplet() : nomAffiche);
+                c.setEstBloque(false);
+                contactDAO.Add(c);
+            }
+
+            // 5. Répondre à Alice : ADD_CONTACT_OK|telephone|nomComplet
+            pw.println(Protocol.ADD_CONTACT_OK.name()
+                    + "|" + contact.getNumeroTelephone()
+                    + "|" + contact.getNomComplet());
+
+            // 6. Notifier Bob si en ligne
+            // Format : CONTACT_REQUEST|telephoneAlice|nomAlice
+            // 6. Notifier Bob si en ligne
+            ClientHandler contactHandler = userManager.getHandler(telephoneContact);
+            if (contactHandler != null) {
+                // Bob en ligne → notification immédiate
+                contactHandler.sendMessage(
+                        Protocol.CONTACT_REQUEST.name()
+                                + "|" + moi.getNumeroTelephone()
+                                + "|" + moi.getNomComplet()
+                );
+            } else {
+                // Bob hors ligne → stocker la notification en file d'attente
+                // On réutilise messages_file_attente avec un type spécial
+                // OU on envoie le CONTACT_REQUEST à sa prochaine connexion
+                // → on le stocke dans une table dédiée ou on le livre au LOGIN
+                System.out.println("[CONTACT] " + telephoneContact
+                        + " hors ligne — CONTACT_REQUEST mis en attente");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            pw.println(Protocol.ADD_CONTACT_FAIL.name() + "|ERREUR_SERVEUR");
+        }
+    }
+
+    // ── CONTACT_ACCEPTED|telephoneAlice ──────────────────────────────────────
+// Bob accepte → on crée le contact côté Bob aussi
+    private void handleContactAccepted(String[] parts) {
+        if (parts.length < 2) return;
+        String telephoneAlice = parts[1].trim();
+
+        try {
+            Utilisateur moi   = userDAO.findByTelephone(telephoneConnecte); // Bob
+            Utilisateur alice = userDAO.findByTelephone(telephoneAlice);
+            if (moi == null || alice == null) return;
+
+            // Créer le contact côté Bob
+            if (!contactDAO.contactExiste(moi.getIdUtilisateur(),
+                    alice.getIdUtilisateur())) {
+                Contact c = new Contact();
+                c.setIdUtilisateur(moi.getIdUtilisateur());
+                c.setIdContactUtilisateur(alice.getIdUtilisateur());
+                c.setNomAffiche(alice.getNomComplet());
+                c.setEstBloque(false);
+                contactDAO.Add(c);
+            }
+
+            // Notifier Alice que Bob a accepté
+            ClientHandler aliceHandler = userManager.getHandler(telephoneAlice);
+            if (aliceHandler != null) {
+                aliceHandler.sendMessage(
+                        Protocol.CONTACT_ACCEPTED.name()
+                                + "|" + moi.getNumeroTelephone()
+                                + "|" + moi.getNomComplet()
+                );
+            }
+
+            pw.println(Protocol.CONTACT_ACCEPTED.name() + "|OK");
+            System.out.println("[CONTACT] " + telephoneConnecte
+                    + " a accepté " + telephoneAlice);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ── BLOCK_CONTACT|telephoneContact ───────────────────────────────────────
+// Bob bloque Alice → plus aucun message ne passera
+    private void handleBlockContact(String[] parts) {
+        if (parts.length < 2) return;
+        String telephoneABloquer = parts[1].trim();
+
+        try {
+            Utilisateur moi      = userDAO.findByTelephone(telephoneConnecte);
+            Utilisateur aBlocker = userDAO.findByTelephone(telephoneABloquer);
+            if (moi == null || aBlocker == null) return;
+
+            // Bloquer
+            contactDAO.bloquerContact(moi.getIdUtilisateur(),
+                    aBlocker.getIdUtilisateur());
+
+            pw.println(Protocol.BLOCK_OK.name() + "|" + telephoneABloquer);
+
+            System.out.println("[CONTACT] " + telephoneConnecte
+                    + " a bloqué " + telephoneABloquer);
+
+        } catch (SQLException e) {
             e.printStackTrace();
         }
     }

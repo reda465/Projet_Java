@@ -16,7 +16,17 @@ public enum Protocol {
     // Messagerie
     MSG_SEND ,
     MSG_RECEIVE ,
+    // Contacts
+    ADD_CONTACT,
+    ADD_CONTACT_OK,
+    ADD_CONTACT_FAIL,
+    BLOCK_CONTACT,
+    BLOCK_OK,
 
+    // Notification de premier message
+    CONTACT_REQUEST,    // ← notification envoyée au destinataire
+    CONTACT_ACCEPTED,   // ← le destinataire accepte
+    CONTACT_BLOCKED,    // ← le destinataire bloque
     //conversation
     GET_CONVERSATIONS,   // client demande sa liste de conversations
     CONVERSATIONS_LIST,
@@ -29,10 +39,6 @@ public enum Protocol {
     CALL_ACCEPT ,
     CALL_REFUSE ,
     CALL_END,
-
-    ADD_CONTACT,
-    ADD_CONTACT_OK,
-    ADD_CONTACT_FAIL,
 
     CREATE_GROUP,           // Client demande création groupe
     CREATE_GROUP_OK,        // Serveur confirme création
