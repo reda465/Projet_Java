@@ -3,7 +3,7 @@ package Serveur;
 import model.Conversation;
 import model.Message;
 import model.Utilisateur;
-
+import lombok.*;
 import java.io.*;
 import java.net.Socket;
 import java.sql.SQLException;
@@ -43,12 +43,12 @@ public class ClientHandler extends Thread {
                 String[] parts    = ligne.split("\\|", -1);
 
                 switch (Protocol.valueOf(parts[0])) {
-                    case Protocol.LOGIN    -> handleLogin(parts);
-                    case Protocol.REGISTER -> handleRegister(parts);
-                    case Protocol.LOGOUT   -> { handleLogout(); return; }
-                    case Protocol.MSG_SEND -> handleMessage(parts);
-                    case Protocol.GET_CONVERSATIONS -> handleGetConversations();
-                    case Protocol.GET_MESSAGES -> handleGetMessages(parts);
+                    case LOGIN    -> handleLogin(parts);
+                    case REGISTER -> handleRegister(parts);
+                    case LOGOUT   -> { handleLogout(); return; }
+                    case MSG_SEND -> handleMessage(parts);
+                    case GET_CONVERSATIONS -> handleGetConversations();
+                    case GET_MESSAGES -> handleGetMessages(parts);
                     case CALL_REQUEST -> handleCallRequest(parts);
                     case CALL_ACCEPT  -> handleCallAccept(parts);
                     case CALL_REFUSE  -> handleCallRefuse(parts);
