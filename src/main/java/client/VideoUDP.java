@@ -31,9 +31,28 @@ public class VideoUDP {
     static {
         OpenCV.loadLocally();
     }
-
     public VideoUDP() {}
 
+    private VideoCapture ouvrirCamera() {
+        int[] backends = new int[] {
+                Videoio.CAP_ANY,
+                Videoio.CAP_DSHOW,
+                Videoio.CAP_MSMF
+        };
+
+        for (int backend : backends) {
+            for (int index = 0; index <= 2; index++) {
+                VideoCapture tentative = new VideoCapture(index, backend);
+                if (tentative.isOpened()) {
+                    System.out.println("[VideoUDP] Camera ouverte (index=" + index
+                            + ", backend=" + backend + ")");
+                    return tentative;
+                }
+                tentative.release();
+            }
+        }
+        return null;
+    }
     // ===================== LANCER VIDEO =====================
     public void demarrer(String ipDistant, int portDistant, int monPort, ImageView view) {
         try {
@@ -49,10 +68,12 @@ public class VideoUDP {
             // ================= THREAD ENVOI =================
             threadEnvoi = new Thread(() -> {
                 try {
-                    camera = new VideoCapture(0);
+                    camera = ouvrirCamera();
 
-                    if (!camera.isOpened()) {
-                        System.out.println("❌ Impossible d'ouvrir la caméra !");
+                    if (camera == null || !camera.isOpened()) {
+                        System.out.println("[VideoUDP] Impossible d'ouvrir la camera. "
+                                + "Ferme les applis qui utilisent deja la webcam "
+                                + "(Zoom/Teams/navigateur) puis reessaie.");
                         return;
                     }
                     camera.set(Videoio.CAP_PROP_FRAME_WIDTH,  LARGEUR_FRAME);
