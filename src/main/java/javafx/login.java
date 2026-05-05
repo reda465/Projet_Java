@@ -12,10 +12,8 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
 import client.EcouteurClient;
-import model.Contact;
-import model.Conversation;
-import model.Message;
-import model.Utilisateur;
+import model.*;
+
 import java.util.List;
 public class login extends Application implements EcouteurClient {
     private Label message;
@@ -27,7 +25,7 @@ public class login extends Application implements EcouteurClient {
         stage.setTitle("WhatsApp - Login");
         stage.show();
         ClientHandlerAuth.getInstance()
-                .connecterAuServeur("10.226.120.18", 5000, this);
+                .connecterAuServeur("10.100.106.14", 5000, this);
     }
     public Scene creerScene(Stage stage) {
         String fs = fieldStyle();
@@ -228,6 +226,56 @@ public class login extends Application implements EcouteurClient {
 
     @Override
     public void appelTermine(String numero) {
+
+    }
+
+    @Override
+    public void groupeCree(Groupe groupe) {
+
+    }
+
+    @Override
+    public void creationGroupeEchouee(String raison) {
+
+    }
+
+    @Override
+    public void listeGroupesRecue(List<Groupe> groupes) {
+
+    }
+
+    @Override
+    public void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {
+
+    }
+
+    @Override
+    public void messageGroupeRecu(MessageGroupe message) {
+
+    }
+
+    @Override
+    public void membreAjoute(int idGroupe, String numero) {
+
+    }
+
+    @Override
+    public void membreRetire(int idGroupe, String numero) {
+
+    }
+
+    @Override
+    public void aQuitteGroupe(int idGroupe) {
+
+    }
+
+    @Override
+    public void groupeSupprime(int idGroupe) {
+
+    }
+
+    @Override
+    public void nomGroupeModifie(int idGroupe, String nouveauNom) {
 
     }
 

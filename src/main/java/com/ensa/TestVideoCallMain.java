@@ -8,10 +8,7 @@ import javafx.scene.Scene;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
-import model.Contact;
-import model.Conversation;
-import model.Message;
-import model.Utilisateur;
+import model.*;
 import model.enums.TypeAppel;
 import network.Packet;
 import service.CallService;
@@ -66,6 +63,56 @@ public class TestVideoCallMain extends Application {
 
             @Override public void appelRefuse() {}
             @Override public void appelTermine(String numero) {}
+
+            @Override
+            public void groupeCree(Groupe groupe) {
+
+            }
+
+            @Override
+            public void creationGroupeEchouee(String raison) {
+
+            }
+
+            @Override
+            public void listeGroupesRecue(List<Groupe> groupes) {
+
+            }
+
+            @Override
+            public void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {
+
+            }
+
+            @Override
+            public void messageGroupeRecu(MessageGroupe message) {
+
+            }
+
+            @Override
+            public void membreAjoute(int idGroupe, String numero) {
+
+            }
+
+            @Override
+            public void membreRetire(int idGroupe, String numero) {
+
+            }
+
+            @Override
+            public void aQuitteGroupe(int idGroupe) {
+
+            }
+
+            @Override
+            public void groupeSupprime(int idGroupe) {
+
+            }
+
+            @Override
+            public void nomGroupeModifie(int idGroupe, String nouveauNom) {
+
+            }
         });
 
         client1.connecterAuServeur("127.0.0.1", 9090);
@@ -112,6 +159,56 @@ public class TestVideoCallMain extends Application {
             @Override public void appelAccepte(String numero, String ip) {}
             @Override public void appelRefuse() {}
             @Override public void appelTermine(String numero) {}
+
+            @Override
+            public void groupeCree(Groupe groupe) {
+
+            }
+
+            @Override
+            public void creationGroupeEchouee(String raison) {
+
+            }
+
+            @Override
+            public void listeGroupesRecue(List<Groupe> groupes) {
+
+            }
+
+            @Override
+            public void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {
+
+            }
+
+            @Override
+            public void messageGroupeRecu(MessageGroupe message) {
+
+            }
+
+            @Override
+            public void membreAjoute(int idGroupe, String numero) {
+
+            }
+
+            @Override
+            public void membreRetire(int idGroupe, String numero) {
+
+            }
+
+            @Override
+            public void aQuitteGroupe(int idGroupe) {
+
+            }
+
+            @Override
+            public void groupeSupprime(int idGroupe) {
+
+            }
+
+            @Override
+            public void nomGroupeModifie(int idGroupe, String nouveauNom) {
+
+            }
         });
 
         client2.connecterAuServeur("127.0.0.1", 9090);

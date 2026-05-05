@@ -136,7 +136,12 @@ public class DbSeeder {
             if (contenu == null || contenu.trim().isEmpty()) continue;
 
             int idExpediteur = (i % 2 == 0) ? a.getIdUtilisateur() : b.getIdUtilisateur();
-            Message m = new Message();
+            Message m = new Message() {
+                @Override
+                public String toNetworkString() {
+                    return "";
+                }
+            };
             m.setIdConversation(conv.getIdConversation());
             m.setIdExpediteur(idExpediteur);
             m.setTypeMessage("texte");
