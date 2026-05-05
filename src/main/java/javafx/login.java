@@ -12,10 +12,8 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
 import client.EcouteurClient;
-import model.Contact;
-import model.Conversation;
-import model.Message;
-import model.Utilisateur;
+import model.*;
+
 import java.util.List;
 public class login extends Application implements EcouteurClient {
     private Label message;
@@ -27,7 +25,7 @@ public class login extends Application implements EcouteurClient {
         stage.setTitle("WhatsApp - Login");
         stage.show();
         ClientHandlerAuth.getInstance()
-                .connecterAuServeur("10.226.120.60", 5000, this);
+                .connecterAuServeur("10.226.120.18", 5000, this);
     }
     public Scene creerScene(Stage stage) {
         String fs = fieldStyle();
