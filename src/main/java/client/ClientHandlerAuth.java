@@ -7,6 +7,7 @@ import model.Utilisateur;
 import network.Packet;
 import service.*;
 import model.Contact;
+import javafx.scene.image.ImageView;
 
 @Getter
 @Setter
@@ -169,6 +170,10 @@ public class ClientHandlerAuth {
 
     public void raccrocher() {
         if (callService != null) callService.raccrocher();
+    }
+
+    public void setVideoView(ImageView view) {
+        if (callService != null) callService.setVideoView(view);
     }
     public boolean isEnAppel() {
         return callService != null && callService.isEnAppel();

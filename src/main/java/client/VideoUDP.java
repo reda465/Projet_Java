@@ -35,12 +35,7 @@ public class VideoUDP {
     public VideoUDP() {}
 
     private VideoCapture ouvrirCamera() {
-       /* int[] backends = new int[] {
-                Videoio.CAP_ANY,
-                Videoio.CAP_DSHOW,
-                Videoio.CAP_MSMF
-        };*/
-        //MSMF pose souvent problème sur Windows (warnings cap_msmf.cpp "can't grab frame")
+        // MSMF pose souvent problème sur Windows (warnings cap_msmf.cpp "can't grab frame")
         // On privilégie DirectShow (CAP_DSHOW) en premier sur Windows.
         boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
         int[] backends = isWindows
@@ -125,7 +120,7 @@ public class VideoUDP {
                             Thread.sleep(50);
                             continue;
                         }
-                        consecutiveGrabFailures=0;
+                        consecutiveGrabFailures = 0;
 
                         Imgproc.resize(frame, frameReduit,
                                 new Size(LARGEUR_FRAME, HAUTEUR_FRAME));
