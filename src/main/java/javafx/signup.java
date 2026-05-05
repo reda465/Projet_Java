@@ -11,7 +11,13 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
+import model.Contact;
+import model.Conversation;
+import model.Message;
 import model.Utilisateur;
+
+import java.util.List;
+
 import static javafx.application.Application.launch;
 public class signup implements EcouteurClient {
     private Label messageLabel;
@@ -96,7 +102,6 @@ public class signup implements EcouteurClient {
 
             // 3. Envoyer au serveur
             String resultat = ClientHandlerAuth.getInstance().sInscrire(nomComplet, numero, pw);
-
             // 4. Erreur locale
             if (!resultat.equals("OK")) {
                 messageLabel.setTextFill(Color.RED);
@@ -104,7 +109,6 @@ public class signup implements EcouteurClient {
                 btn.setDisable(false);
             }
         });
-
         // Lien vers login
         Hyperlink loginLink = new Hyperlink("Se connecter");
         loginLink.setTextFill(Color.web("#25D366"));
@@ -140,7 +144,6 @@ public class signup implements EcouteurClient {
             }).start();
         });
     }
-
     @Override
     public void erreur(String message) {
         Platform.runLater(() -> {
@@ -152,7 +155,29 @@ public class signup implements EcouteurClient {
     @Override
     public void connexionReussie(Utilisateur moi) { /* pas utilisé ici */ }
     @Override
-    public void messageRecu(String contenu) { /* pas utilisé ici */ }
+    public void messageRecu(String num, String contenu) { /* pas utilisé ici */ }
+
+    @Override
+    public void conversationsRecues(List<Conversation> conversations) {
+
+    }
+
+    @Override
+    public void messagesRecus(List<Message> messages) {
+
+    }
+
+    @Override
+    public void contactAjoute(Contact contact) {
+
+    }
+
+    @Override
+    public void listeContactsRecue(List<Contact> contacts) {
+
+    }
+
+
     @Override
     public void deconnexion() {
         Platform.runLater(() -> {
@@ -163,17 +188,17 @@ public class signup implements EcouteurClient {
     }
 
     @Override
-    public void appelEntrant(String numero, String type) {
+    public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
 
     }
 
     @Override
-    public void appelAccepte(String numero) {
-
+    public void appelAccepte(String numero, String ip) {
+        System.out.println("📞 Appel accepté par " + numero + " ip=" + ip);
     }
 
     @Override
-    public void appelRefuse(String numero) {
+    public void appelRefuse() {
 
     }
 
@@ -181,4 +206,6 @@ public class signup implements EcouteurClient {
     public void appelTermine(String numero) {
 
     }
+
+
 }

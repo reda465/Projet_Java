@@ -2,7 +2,11 @@ package service;
 
 import Serveur.Protocol;
 import client.ClientReseau;
+import lombok.Getter;
+import lombok.Setter;
 import network.*;
+@Getter
+@Setter
 
 public class MessageService {
 
@@ -19,14 +23,12 @@ public class MessageService {
             System.out.println("Message vide !");
             return;
         }
-
         String monNumero = "";
         if (client.getMoi() != null) {
             monNumero = client.getMoi().getNumeroTelephone();
         }
-
         // data = numeroExp|numeroDest|contenu
-        String data = monNumero + "|" + numeroDestinataire + "|" + contenu;
+        String data = numeroDestinataire + "|" + contenu;
         Packet p = new Packet(Protocol.MSG_SEND, data);
         client.envoyer(p);
     }

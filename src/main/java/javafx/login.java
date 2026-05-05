@@ -12,7 +12,11 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
 import client.EcouteurClient;
+import model.Contact;
+import model.Conversation;
+import model.Message;
 import model.Utilisateur;
+import java.util.List;
 public class login extends Application implements EcouteurClient {
     private Label message;
     private Stage stage;
@@ -23,12 +27,11 @@ public class login extends Application implements EcouteurClient {
         stage.setTitle("WhatsApp - Login");
         stage.show();
         ClientHandlerAuth.getInstance()
-                .connecterAuServeur("127.0.0.1", 8080, this);
+                .connecterAuServeur("10.136.57.60", 5000, this);
     }
     public Scene creerScene(Stage stage) {
         String fs = fieldStyle();
         String bs = btnStyle();
-
         // LOGO
         Circle circle = new Circle(32);
         circle.setFill(Color.web("#25D366"));
@@ -158,9 +161,32 @@ public class login extends Application implements EcouteurClient {
         Platform.runLater(() -> {
             message.setTextFill(Color.web("#25D366"));
             message.setText("Connexion réussie ! Bienvenue " + moi.getNomComplet());
+
+            // Attendre 1 seconde puis ouvrir Discussion
+            new Thread(() -> {
+                try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+                Platform.runLater(() -> {
+                    // Fermer la fenêtre login
+                    stage.close();
+                    // Créer et ouvrir Discussion avec l'utilisateur connecté
+                    Discussion discussion = new Discussion(moi);
+                    if (ClientHandlerAuth.getInstance().getClientReseau() != null) {
+                        ClientHandlerAuth.getInstance().getClientReseau().setEcouteur(discussion);
+                    }
+                    Stage discussionStage = new Stage();
+
+                    discussionStage.setScene(discussion.creerScene(discussionStage));
+                    discussionStage.setTitle("WhatsApp – Discussions");
+                    discussionStage.setOnCloseRequest(e -> {
+                        ClientHandlerAuth.getInstance().seDeconnecter();
+
+                    });
+                    discussionStage.show();
+                    ClientHandlerAuth.getInstance().demanderConversations();
+                });
+            }).start();
         });
     }
-
     @Override
     public void inscriptionReussie(String msg) {
         // non utilisé dans login
@@ -173,7 +199,7 @@ public class login extends Application implements EcouteurClient {
         });
     }
     @Override
-    public void messageRecu(String contenu) {
+    public void messageRecu(String num ,String contenu) {
         // non utilisé dans login
     }
     @Override
@@ -185,17 +211,18 @@ public class login extends Application implements EcouteurClient {
     }
 
     @Override
-    public void appelEntrant(String numero, String type) {
+    public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
 
     }
 
     @Override
-    public void appelAccepte(String numero) {
 
+    public void appelAccepte(String numero, String ip) {
+        System.out.println("📞 Appel accepté par " + numero + " ip=" + ip);
     }
 
     @Override
-    public void appelRefuse(String numero) {
+    public void appelRefuse() {
 
     }
 
@@ -204,7 +231,28 @@ public class login extends Application implements EcouteurClient {
 
     }
 
-    // ===== STYLES =====
+
+    @Override
+    public void conversationsRecues(List<Conversation> conversations) {
+
+    }
+
+    @Override
+    public void messagesRecus(List<Message> messages) {
+
+    }
+
+    @Override
+    public void contactAjoute(Contact contact) {
+
+    }
+
+    @Override
+    public void listeContactsRecue(List<Contact> contacts) {
+
+    }
+
+    //
     static String fieldStyle() {
         return "-fx-background-color:#ECFFF5;" +
                 "-fx-border-color:#A5E6C3;" +

@@ -1,14 +1,19 @@
 
 package client;
 
+import Serveur.Protocol;
 import lombok.Getter;
 import lombok.Setter;
 import network.*;
 import model.*;
+import service.CallService;
 import service.MessageService;
-
 import java.io.*;
 import java.net.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
 //import Serveur.*;
 @Setter
 @Getter
@@ -22,6 +27,7 @@ public class ClientReseau {
     private EcouteurClient ecouteur;
     private Utilisateur moi;
     private MessageService messageService;
+    private CallService callService;
 
 
     public ClientReseau(EcouteurClient ecouteur){//lier a l'interface graphique pour les signales
@@ -56,7 +62,14 @@ public class ClientReseau {
         }
     }
 
-
+    public void demanderMessages(int idConversation) {
+        if (!connecte) {
+            System.out.println("❌ Pas connecté au serveur");
+            return;
+        }
+        Packet p = new Packet(Protocol.GET_MESSAGES, String.valueOf(idConversation));
+        envoyer(p);
+    }
     // ===== ENVOYER =====
     public void envoyer(Packet packet) {
         if (!connecte) {//erreur du connection
@@ -67,7 +80,14 @@ public class ClientReseau {
             System.out.println(" Envoyé : " + packet.getProtocol());
         }
     }
-
+    public void demanderConversations() {
+        if (!connecte || stylo == null) {
+            System.out.println("❌ Pas connecté au serveur");
+            return;
+        }
+        Packet p = new Packet(Protocol.GET_CONVERSATIONS, "");
+        envoyer(p);
+    }
     // ===== DÉCONNEXION =====
     public void deconnecter() {
         connecte = false;
@@ -98,7 +118,7 @@ public class ClientReseau {
 
         private void traiterPacket(Packet p) {
             String data = p.getData();
-            String[] parts = data.split("\\|");
+            String[] parts = data.split("\\|", -1); // -1 pour garder les champs vides
             switch (p.getProtocol()) {
                 case LOGIN_OK:
                     if (parts.length >= 2) {
@@ -110,6 +130,7 @@ public class ClientReseau {
                     }
                     System.out.println("Connecté : " + moi.getNomComplet());
                     }
+                    //ClientHandlerAuth.demanderConversations();
                     break;
 
                 case LOGIN_FAIL:
@@ -133,49 +154,135 @@ public class ClientReseau {
                     }
                     break;
                 case MSG_RECEIVE:
-                    String monTel;
                     if (parts.length >= 2) {
                         Message msg = new Message();
                         msg.setTelephoneExpediteur(parts[0]);
-                        if( moi != null){ monTel = moi.getNumeroTelephone(); }
-                        else { monTel = "moi"; }
-                        msg.setTelephoneDestinataire(monTel);////////
                         msg.setContenuTexte(parts[1]);
-                        System.out.println("Message de " + msg.getTelephoneExpediteur() + " : " + msg.getContenuTexte());
-                        if (ecouteur != null) ecouteur.messageRecu(msg.getContenuTexte());
+                        System.out.println("Message " + msg.getContenuTexte());
+                        if (ecouteur != null) ecouteur.messageRecu(msg.getTelephoneExpediteur(), msg.getContenuTexte());
                     }
                     break;
-                case MSG_SEND: {
-                    String[] msgParts = data.split("\\|");
-                    if (msgParts.length < 3) {
-                        p.setData("MSG_FAIL|Format invalide");
-                        envoyer(p);
-                        return;
-                    }
-                    String numExp = msgParts[0];
-                    String numDest = msgParts[1];
-                    String contenu = msgParts[2];
-                    p.setData(numExp +  "|" + numDest + "|" + contenu);
-                    envoyer(p);
-                    System.out.println("  → Message relayé de " + numExp + " vers " + numDest);
-                    break;
-                }
                 case CALL_REQUEST:
-                    if (parts.length >= 2 && ecouteur != null) {
-                        ecouteur.appelEntrant(parts[0], parts[1]);
+                    if (parts.length >= 5 && ecouteur != null) {
+                        String numAppelant = parts[0];
+                        String nomAppelant = parts[1];
+                        String typeAppel = parts[2];
+                        String ipAppelant  = parts[4];
+                        ecouteur.appelEntrant(numAppelant, nomAppelant, typeAppel, "");
+                        System.out.println("Appel entrant de " + nomAppelant + " (" + numAppelant + ")  ip=" + ipAppelant);
+                        if (callService != null) {
+                            callService.recevoirAppel(numAppelant, nomAppelant, typeAppel, ipAppelant);
+                        }
                     }
                     break;
                 case CALL_ACCEPT:
-                    if (ecouteur != null) ecouteur.appelAccepte(parts[0]);
-                    break;
+                    // Format serveur : telephoneAccepteur|ipAccepteur
+                    if (parts.length >= 2 && ecouteur != null) {
 
+                        String numeroAccepteur = parts[0];
+                        String ipAccepteur = parts[1];
+
+                        if (callService != null) {
+                            callService.onAccepte(ipAccepteur);
+                        }
+
+                        ecouteur.appelAccepte(numeroAccepteur, ipAccepteur);
+                    }
+                    break;
+                case CALL_REFUSE:
+                    if (ecouteur != null) ecouteur.appelRefuse();
+                    if (callService != null) callService.onTermine();
+                    break;
                 case CALL_END:
-                    if (ecouteur != null) ecouteur.appelTermine(parts[0]);
+                    if (parts.length >= 1 && ecouteur != null) {
+                        String telephone = parts[0];
+                        ecouteur.appelTermine(telephone);
+                        if (callService != null) callService.onTermine();
+                    }
+                    break;
+                case CONVERSATIONS_LIST:
+                    traiterConversationsRecues(data);
+                    break;
+                case MESSAGES_LIST:
+                    traiterMessagesRecus(data);
                     break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
                     break;
 
+            }
+        }
+
+        private void traiterConversationsRecues(String data) {
+            List<Conversation> conversations = new ArrayList<>();
+
+            if (data.isEmpty()) {
+                if (ecouteur != null) ecouteur.conversationsRecues(conversations);
+                return;
+            }
+            // Format : id;type;nomExp;datedernierMsg;nonLus;contenuDerniermsg|id;nom;...
+            String[] convs = data.split("\\|");
+            for (String c : convs) {
+                if (c.isEmpty()) continue;
+                String[] parts = c.split(";", 6);
+                if (parts.length < 5) continue;
+
+                Conversation conv = new Conversation();
+                conv.setIdConversation(Integer.parseInt(parts[0]));
+                conv.setTypeConversation(parts[1]);
+                conv.setNomContact(parts[2]);
+                try {
+                    conv.setDateDernierMessage(java.time.LocalDateTime.parse(parts[3]));
+                } catch (Exception e) {
+                    conv.setDateDernierMessage(null);
+                }
+                conv.setMessagesNonLus(Integer.parseInt(parts[4]));
+                conv.setDernierMessage(parts.length >= 6 ? parts[5] : "");
+                conversations.add(conv);
+            }
+            System.out.println("Conversations reçues : " + conversations.size());
+            if (ecouteur != null) {
+                ecouteur.conversationsRecues(conversations);
+            }
+        }
+
+        private void traiterMessagesRecus(String data) {
+            List<Message> messages = new ArrayList<>();
+
+            if (data == null || data.isEmpty()) {
+                System.out.println("📭 Aucun message dans cette conversation");
+                if (ecouteur != null) ecouteur.messagesRecus(messages);
+                return;
+            }
+
+            // Format : idMessage;telExp;nomExp;contenu;date|idMessage;telExp;nomExp;contenu;date|...
+            String[] msgs = data.split("\\|");
+            for (String m : msgs) {
+                if (m == null || m.isEmpty()) continue;
+                String[] champs = m.split(";", -1);
+                if (champs.length < 5) continue;
+
+                try {
+                    Message msg = new Message();
+                    msg.setIdMessage(Integer.parseInt(champs[0].trim()));
+                    msg.setTelephoneExpediteur(champs[1]);
+                    msg.setNomExpediteur(champs[2]);
+                    msg.setContenuTexte(champs[3]);
+                    try {
+                        msg.setDateEnvoi(LocalDateTime.parse(champs[4]));
+                    } catch (Exception e) {
+                        msg.setDateEnvoi(null);
+                    }
+                    // Déterminer si c'est un message envoyé ou reçu
+                    msg.setEstMoi(moi != null && champs[1].equals(moi.getNumeroTelephone()));
+                    messages.add(msg);
+                } catch (NumberFormatException e) {
+                    System.out.println("❌ Erreur parsing message : " + e.getMessage());
+                }
+            }
+            System.out.println("💬 Messages reçus : " + messages.size());
+            if (ecouteur != null) {
+                ecouteur.messagesRecus(messages);
             }
         }
     }

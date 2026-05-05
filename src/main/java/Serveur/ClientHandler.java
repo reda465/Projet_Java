@@ -1,5 +1,7 @@
 package Serveur;
 
+import lombok.Getter;
+import lombok.Setter;
 import model.Conversation;
 import model.Message;
 import model.Utilisateur;
@@ -9,8 +11,11 @@ import java.net.Socket;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
-
 import Dao.*;
+@Getter
+@Setter
+
+
 
 public class ClientHandler extends Thread {
 
@@ -155,7 +160,10 @@ public class ClientHandler extends Thread {
         String telephoneDest = parts[1];
         String typeAppel     = parts[2]; // "audio" ou "video"
         try {
-            callManager.demanderAppel(telephoneConnecte, telephoneDest, typeAppel);
+            String ipAppelant = socket != null && socket.getInetAddress() != null
+                    ? socket.getInetAddress().getHostAddress()
+                    : "";
+            callManager.demanderAppel(telephoneConnecte, telephoneDest, typeAppel, ipAppelant);
         } catch (SQLException e) {
             e.printStackTrace();
             pw.println(Protocol.CALL_END.name() + "|ERREUR");
@@ -167,7 +175,10 @@ public class ClientHandler extends Thread {
         if (parts.length < 2) return;
         String telephoneAppelant = parts[1];
         try {
-            callManager.accepterAppel(telephoneConnecte, telephoneAppelant);
+            String ipAccepteur = socket != null && socket.getInetAddress() != null
+                    ? socket.getInetAddress().getHostAddress()
+                    : "";
+            callManager.accepterAppel(telephoneConnecte, telephoneAppelant, ipAccepteur);
         } catch (SQLException e) {
             e.printStackTrace();
         }
