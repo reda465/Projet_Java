@@ -180,8 +180,9 @@ public class Appelvideo {
         if (ipDistant != null && !ipDistant.isBlank()) {
            arreterVideo();
             videoUDP = new VideoUDP();
-
-
+           // CallService callService = new CallService(ClientHandlerAuth.getInstance().getClientReseau(),
+            //        ClientHandlerAuth.getInstance().getUtilisateurConnecte());
+            //callService.setVideoView(videoView);
             // Appel entrant (rôle B): j'écoute sur B (5004) et j'envoie vers A (5003)
             videoUDP.demarrer(ipDistant, PORT_VIDEO_A, PORT_VIDEO_B, videoView);
             System.out.println("[Video] Démarré côté appelé → " + ipDistant);
