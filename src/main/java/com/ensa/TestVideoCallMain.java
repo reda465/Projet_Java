@@ -1,4 +1,4 @@
-package com.ensa;
+/*package com.ensa;
 
 import client.ClientReseau;
 import client.EcouteurClient;
@@ -146,4 +146,4 @@ public class TestVideoCallMain extends Application {
     public static void main(String[] args) {
         launch(args);
     }
-}
+}*/

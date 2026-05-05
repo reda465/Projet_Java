@@ -59,6 +59,7 @@ public class ClientHandler extends Thread {
                     case CALL_REFUSE  -> handleCallRefuse(parts);
                     case CALL_END     -> handleCallEnd(parts);
                     //case CALL_CANCEL  -> handleCallCancel(parts);
+                    case FILE_SEND -> handleFileSend(parts);
 
                     default                -> pw.println("UNKNOWN_COMMAND");
                 }
@@ -319,6 +320,31 @@ public class ClientHandler extends Thread {
         } catch (SQLException | NumberFormatException e) {
             e.printStackTrace();
         }
+    }
+    //Envoie des fichiers _______________________________________
+
+    private void handleFileSend(String[] parts) {
+        if (parts.length < 4) return;
+
+        String telDest = parts[1];
+        String fileName = parts[2];
+        String base64 = parts[3];
+
+        ClientHandler destHandler = userManager.getHandler(telDest);
+
+        if (destHandler == null) {
+            pw.println(Protocol.FILE_FAIL.name() + "|DEST_OFFLINE");
+            return;
+        }
+
+        destHandler.sendMessage(
+                Protocol.FILE_RECEIVE.name() + "|" +
+                        telephoneConnecte + "|" +
+                        fileName + "|" +
+                        base64
+        );
+
+        System.out.println("[FILE] fichier transféré de " + telephoneConnecte + " vers " + telDest);
     }
 
 }

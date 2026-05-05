@@ -28,5 +28,10 @@ public enum Protocol {
     CALL_REQUEST,
     CALL_ACCEPT ,
     CALL_REFUSE ,
-    CALL_END
+    CALL_END,
+
+    //fichiers
+    FILE_SEND,
+    FILE_RECEIVE,
+    FILE_FAIL
 }

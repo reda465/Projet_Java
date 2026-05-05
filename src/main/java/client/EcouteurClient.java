@@ -30,4 +30,6 @@ public interface EcouteurClient {
      void appelRefuse();
      void appelTermine(String numero);
 
+   // void fichierRecu(String telephoneExp, String fileName, String base64);
+    // void fichierRecu(String telephoneExp, String fileName, String base64);
 }
