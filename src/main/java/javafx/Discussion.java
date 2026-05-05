@@ -311,18 +311,18 @@ public class Discussion implements EcouteurClient {
         });
     }*/
     @Override
-    public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
+    public void appelEntrant(String numero, String type, String ipAppelant, String name) {
         Platform.runLater(() -> {
-            String nom = trouverNomContact(numero);
+            //String nom = trouverNomContact(numero);
 
             if ("VIDEO".equalsIgnoreCase(type)) {
                 typeAppelEnCours = "VIDEO";
                 // ← AJOUT : Appel vidéo entrant → déléguer à Appelvideo
-                Appelvideo.recevoirAppel(primaryStage, nom, numero, ipAppelant);
+                Appelvideo.recevoirAppel(primaryStage, name, numero, ipAppelant);
             } else {
                 // Appel audio entrant (existant)
                 typeAppelEnCours = "AUDIO";
-                afficherFenetreAppel(nom, false, numero, ipAppelant);
+                afficherFenetreAppel(name, false, numero, ipAppelant);
             }
         });
     }
