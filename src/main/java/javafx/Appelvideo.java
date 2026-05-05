@@ -1,3 +1,4 @@
+
 package javafx;
 import client.ClientHandlerAuth;
 import javafx.geometry.Insets;
@@ -13,11 +14,13 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+
 public class Appelvideo {
 
     // ── Appel vidéo sortant ───────────────────────────────────────────────────
     public static void demarrer(Stage parent, String contactNom,
-                                String numeroContact, int idConversation) {
+                                String numeroContact, int idConversation,
+                                String ipDistant) {
 
         if (!ClientHandlerAuth.getInstance().isConnecteAuServeur()) {
             System.out.println("Impossible d'appeler : client non connecté");
@@ -36,7 +39,7 @@ public class Appelvideo {
         nom.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
         nom.setTextFill(Color.web("#111B21"));
 
-        Label statut = new Label("Appel vidéo en cours...");
+        Label statut = new Label("En communication vidéo...");
         statut.setFont(Font.font("Segoe UI", 13));
         statut.setTextFill(Color.web("#667781"));
 
@@ -46,10 +49,8 @@ public class Appelvideo {
         videoView.setPreserveRatio(true);
         videoView.setStyle("-fx-background-color: black; -fx-border-radius: 10px;");
 
-        // Lier l'ImageView à CallService pour afficher la vidéo reçue
-        if (ClientHandlerAuth.getInstance().getCallService() != null) {
-            ClientHandlerAuth.getInstance().getCallService().setVideoView(videoView);
-        }
+        // IMPORTANT: la vidéo UDP est gérée par CallService (évite double bind/VideoView null).
+        ClientHandlerAuth.getInstance().setVideoView(videoView);
 
         Button btnRaccrocher = new Button("📵  Raccrocher");
         btnRaccrocher.setStyle(
@@ -65,21 +66,21 @@ public class Appelvideo {
             stage.close();
         });
 
+        stage.setOnCloseRequest(e -> {
+            ClientHandlerAuth.getInstance().raccrocher();
+        });
+
         VBox root = new VBox(15, icone, nom, statut, videoView, btnRaccrocher);
         root.setAlignment(Pos.CENTER);
         root.setPadding(new Insets(20));
         root.setStyle("-fx-background-color: #F0F2F5;");
-
         stage.setScene(new Scene(root, 520, 500));
         stage.show();
-
-        // Notifier le serveur du démarrage (VIDEO)
-        ClientHandlerAuth.getInstance().appeler(numeroContact, idConversation, "VIDEO");
     }
 
     // ── Appel vidéo entrant ───────────────────────────────────────────────────
     public static void recevoirAppel(Stage parent, String appelantNom,
-                                     String numeroAppelant) {
+                                     String numeroAppelant, String ipAppelant) {
 
         Stage stage = new Stage();
         stage.initModality(Modality.WINDOW_MODAL);
@@ -103,11 +104,10 @@ public class Appelvideo {
                         "-fx-cursor: hand;"
         );
         btnAccepter.setOnAction(e -> {
-            ClientHandlerAuth.getInstance().accepterAppel();
             stage.close();
-
-            // Ouvrir fenêtre communication (sans appeler à nouveau)
-            ouvrirFenetreCommunication(parent, appelantNom, numeroAppelant);
+            ouvrirFenetreCommunication(parent, appelantNom, numeroAppelant, ipAppelant);
+            // Démarre UDP après avoir attaché la VideoView à CallService
+            ClientHandlerAuth.getInstance().accepterAppel();
         });
 
         Button btnRefuser = new Button("❌  Refuser");
@@ -136,10 +136,11 @@ public class Appelvideo {
         stage.show();
     }
 
-    // ── Fenêtre communication vidéo (sans envoyer CALL_REQUEST) ───────────────
+    // ── Fenêtre communication vidéo ───────────────────────────────────────────
     private static void ouvrirFenetreCommunication(Stage parent,
                                                    String contactNom,
-                                                   String numeroContact) {
+                                                   String numeroContact,
+                                                   String ipDistant) {
 
         Stage stage = new Stage();
         stage.initModality(Modality.WINDOW_MODAL);
@@ -163,10 +164,8 @@ public class Appelvideo {
         videoView.setPreserveRatio(true);
         videoView.setStyle("-fx-background-color: black; -fx-border-radius: 10px;");
 
-        // Lier l'ImageView à CallService pour afficher la vidéo reçue
-        if (ClientHandlerAuth.getInstance().getCallService() != null) {
-            ClientHandlerAuth.getInstance().getCallService().setVideoView(videoView);
-        }
+        // IMPORTANT: la vidéo UDP est gérée par CallService (évite double bind/VideoView null).
+        ClientHandlerAuth.getInstance().setVideoView(videoView);
 
         Button btnRaccrocher = new Button("📵  Raccrocher");
         btnRaccrocher.setStyle(
@@ -180,6 +179,10 @@ public class Appelvideo {
         btnRaccrocher.setOnAction(e -> {
             ClientHandlerAuth.getInstance().raccrocher();
             stage.close();
+        });
+
+        stage.setOnCloseRequest(e -> {
+            ClientHandlerAuth.getInstance().raccrocher();
         });
 
         VBox root = new VBox(15, icone, nom, statut, videoView, btnRaccrocher);

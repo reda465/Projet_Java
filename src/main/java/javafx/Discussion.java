@@ -2,9 +2,9 @@ package javafx;
 import client.AudioUDP;
 import client.ClientHandlerAuth;
 import client.EcouteurClient;
-import model.Contact;
-import model.Conversation;
-import model.Utilisateur;
+import client.VideoUDP;
+import javafx.scene.image.ImageView;
+import model.*;
 import javafx.application.Platform;
 import javafx.geometry.*;
 import javafx.scene.*;
@@ -18,17 +18,18 @@ import javafx.collections.*;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import model.Message;
 import java.util.Objects;
+
+import static org.bytedeco.librealsense.global.RealSense.video;
+
 public class Discussion implements EcouteurClient {
     private Utilisateur utilisateurConnecte;
     private String contactActif = null;
     private Integer idConversationActive = null;
-
     private Stage stageAppel = null;
     private AudioUDP audioUDP = null;
+    private VideoUDP videoUDP = null;
     private Label statutAppelLabel = null;
-
     private VBox messagesBox;
     private ScrollPane scrollPane;
     private Label chatStatus;
@@ -38,11 +39,10 @@ public class Discussion implements EcouteurClient {
     private Button sendBtn;
     private Stage primaryStage;
     ListView<HBox> convList;
-
+    private String typeAppelEnCours = null;
     public Discussion(Utilisateur utilisateur) {
         this.utilisateurConnecte = utilisateur;
     }
-
     public Scene creerScene(Stage stage) {
         this.primaryStage = stage;
         VBox sidebar = new VBox(0);
@@ -161,8 +161,20 @@ public class Discussion implements EcouteurClient {
                         "Aucun contact", "Sélectionnez un contact d'abord.");
             }
         });
+        //BOUTON DE L'appel video
+        Button btnAppelVideo = new Button("📹");
+        styleIconBtn(btnAppelVideo, "#25D366", "#128C7E");
+        btnAppelVideo.setTooltip(new Tooltip("Appel vidéo"));
+        btnAppelVideo.setOnAction(e -> {
+            if (numeroContactUtilisable(contactActif)) {
+                demarrerAppelVideo(contactActif, chatName.getText());
+            } else {
+                showAlert(Alert.AlertType.WARNING,
+                        "Aucun contact", "Sélectionnez un contact d'abord.");
+            }
+        });
 
-        chatHeader.getChildren().addAll(chatAvatar, chatInfo, chatSpacer, btnAppelAudio);
+        chatHeader.getChildren().addAll(chatAvatar, chatInfo, chatSpacer, btnAppelAudio,btnAppelVideo);
 
         messagesBox = new VBox(8);
         messagesBox.setPadding(new Insets(15));
@@ -291,15 +303,31 @@ public class Discussion implements EcouteurClient {
 
     // ── SEULS CHANGEMENTS : les 4 méthodes d'appel ───────────────────────────
 
-    @Override
+   /* @Override
     public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
         Platform.runLater(() -> {
             String nom = trouverNomContact(numero);
             afficherFenetreAppel(nom, false, numero, ipAppelant);
         });
+    }*/
+    @Override
+    public void appelEntrant(String numero, String type, String ipAppelant, String name) {
+        Platform.runLater(() -> {
+            //String nom = trouverNomContact(numero);
+
+            if ("VIDEO".equalsIgnoreCase(type)) {
+                typeAppelEnCours = "VIDEO";
+                // ← AJOUT : Appel vidéo entrant → déléguer à Appelvideo
+                Appelvideo.recevoirAppel(primaryStage, name, numero, ipAppelant);
+            } else {
+                // Appel audio entrant (existant)
+                typeAppelEnCours = "AUDIO";
+                afficherFenetreAppel(name, false, numero, ipAppelant);
+            }
+        });
     }
 
-    @Override
+    /*@Override
     public void appelAccepte(String numero, String ip) {
         Platform.runLater(() -> {
             // Mettre à jour le statut affiché dans la fenêtre d'appel
@@ -317,6 +345,39 @@ public class Discussion implements EcouteurClient {
                         "Impossible de démarrer l'audio : IP distante manquante.");
             }
         });
+    }*/
+    //HADCHI
+    @Override
+    public void appelAccepte(String numero, String ip) {
+        Platform.runLater(() -> {
+            if (statutAppelLabel != null) {
+                statutAppelLabel.setText("En communication...");
+            }
+
+            if (ip != null && !ip.isBlank()) {
+                if ("VIDEO".equalsIgnoreCase(typeAppelEnCours)) {
+                    if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
+                    // ← AJOUT : Démarrer la vidéo via Appelvideo
+                    Appelvideo.demarrer(primaryStage, chatName.getText(), contactActif,
+                            idConversationActive != null ? idConversationActive : -1, ip);
+                    // Fermer la fenêtre d'appel audio si elle est ouverte
+                   /* if (stageAppel != null) {
+                        stageAppel.close();
+                        stageAppel = null;
+                    }*/
+                } else {
+                    // Audio existant
+                    audioUDP = new AudioUDP();
+                    audioUDP.demarrer(ip, 6000, 6001);
+
+                    System.out.println("[Audio] Démarré côté appelant → " + ip);
+                }
+            } else {
+                System.out.println("[Audio/Video] IP distante non reçue, média non démarré.");
+                showAlert(Alert.AlertType.ERROR, "Erreur média",
+                        "Impossible de démarrer : IP distante manquante.");
+            }
+        });
     }
     @Override
     public void appelRefuse() {
@@ -330,11 +391,64 @@ public class Discussion implements EcouteurClient {
     public void appelTermine(String numero) {
         Platform.runLater(() -> {
             if (audioUDP != null) { audioUDP.arreter(); audioUDP = null; }
+            if (videoUDP != null) { videoUDP.arreter(); videoUDP = null; }
             if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
+            typeAppelEnCours = null;
             showAlert(Alert.AlertType.INFORMATION,
                     "Appel terminé", "L'appel est terminé.");
         });
     }
+
+    @Override
+    public void groupeCree(Groupe groupe) {
+
+    }
+
+    @Override
+    public void creationGroupeEchouee(String raison) {
+
+    }
+
+    @Override
+    public void listeGroupesRecue(List<Groupe> groupes) {
+
+    }
+
+    @Override
+    public void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {
+
+    }
+
+    @Override
+    public void messageGroupeRecu(MessageGroupe message) {
+
+    }
+
+    @Override
+    public void membreAjoute(int idGroupe, String numero) {
+
+    }
+
+    @Override
+    public void membreRetire(int idGroupe, String numero) {
+
+    }
+
+    @Override
+    public void aQuitteGroupe(int idGroupe) {
+
+    }
+
+    @Override
+    public void groupeSupprime(int idGroupe) {
+
+    }
+
+    @Override
+    public void nomGroupeModifie(int idGroupe, String nouveauNom) {
+
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     @Override
     public void conversationsRecues(List<Conversation> conversations) {
@@ -570,7 +684,64 @@ public class Discussion implements EcouteurClient {
         );
         afficherFenetreAppel(nomContact, true, numeroContact, null);
     }
+     //pour appel video
+     private void demarrerAppelVideo(String numeroContact, String nomContact) {
+         typeAppelEnCours = "VIDEO";
+         ClientHandlerAuth.getInstance().appeler(
+                 numeroContact,
+                 idConversationActive != null ? idConversationActive : -1,
+                 "VIDEO"
+         );
+         afficherFenetreAttenteVideo(nomContact);
+     }
+     //
+     private void afficherFenetreAttenteVideo(String nomContact) {
+         if (stageAppel != null && stageAppel.isShowing()) return;
 
+         stageAppel = new Stage();
+         stageAppel.initModality(javafx.stage.Modality.WINDOW_MODAL);
+         stageAppel.initOwner(primaryStage);
+         stageAppel.setTitle("Appel vidéo — " + nomContact);
+         stageAppel.setResizable(false);
+
+         Circle cercle = new Circle(45);
+         cercle.setFill(Color.web("#25D366"));
+         Text initiale = new Text(String.valueOf(nomContact.charAt(0)).toUpperCase());
+         initiale.setFill(Color.WHITE);
+         initiale.setFont(Font.font("Segoe UI", FontWeight.BOLD, 36));
+         StackPane avatarGrand = new StackPane(cercle, initiale);
+
+         Label nomLabel = new Label(nomContact);
+         nomLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
+         nomLabel.setTextFill(Color.web("#111B21"));
+
+         statutAppelLabel = new Label("Appel vidéo en cours...");
+         statutAppelLabel.setFont(Font.font("Segoe UI", 14));
+         statutAppelLabel.setTextFill(Color.web("#667781"));
+
+         VBox infoBox = new VBox(16, avatarGrand, nomLabel, statutAppelLabel);
+         infoBox.setAlignment(Pos.CENTER);
+         infoBox.setPadding(new Insets(20, 0, 10, 0));
+
+         Button btnRaccrocher = makeBtnAppel("📵", "#EA2424");
+         btnRaccrocher.setOnAction(e -> {
+             ClientHandlerAuth.getInstance().raccrocher();
+             typeAppelEnCours = null;
+             if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
+         });
+
+         HBox boutonsBox = new HBox(btnRaccrocher);
+         boutonsBox.setAlignment(Pos.CENTER);
+         boutonsBox.setPadding(new Insets(20));
+
+         VBox root = new VBox(infoBox, boutonsBox);
+         root.setAlignment(Pos.CENTER);
+         root.setPadding(new Insets(20));
+         root.setStyle("-fx-background-color: #F0F2F5;");
+
+         stageAppel.setScene(new javafx.scene.Scene(root, 320, 320));
+         stageAppel.show();
+     }
     private void afficherFenetreAppel(String nomContact, boolean estSortant,
                                       String numeroContact, String ipDistant) {
         if (stageAppel != null && stageAppel.isShowing()) return;
@@ -657,7 +828,6 @@ public class Discussion implements EcouteurClient {
         stageAppel.setScene(new javafx.scene.Scene(root, 320, 320));
         stageAppel.show();
     }
-
     private void terminerAppel(String numeroContact) {
         // raccrocher() = méthode correcte dans ClientHandlerAuth
         ClientHandlerAuth.getInstance().raccrocher();
@@ -677,7 +847,6 @@ public class Discussion implements EcouteurClient {
         );
         return btn;
     }
-
     private String trouverNomContact(String numero) {
         for (HBox item : convList.getItems()) {
             Object ud = item.getUserData();

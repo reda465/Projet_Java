@@ -12,7 +12,7 @@ import java.time.format.DateTimeFormatter;
 @NoArgsConstructor
 @Getter
 @Setter
-public class Message {
+public abstract class Message {
     private int idMessage;
     private int idConversation;
     private int idExpediteur;
@@ -35,4 +35,7 @@ public class Message {
     public String toString() {
         return "[" + getDateFormatee() + "] " + contenuTexte;
     }
+
+    // Format réseau: idMessage;idGroupe;telephoneExp;nomExp;contenu;date;nomGroupe
+    public abstract String toNetworkString();
 }

@@ -16,8 +16,6 @@ import Dao.*;
 @Getter
 @Setter
 
-
-
 public class ClientHandler extends Thread {
 
     private final Socket socket;
