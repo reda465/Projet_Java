@@ -18,6 +18,8 @@ import javafx.stage.Stage;
 public class Appelvideo {
 
     private static VideoUDP videoUDP = null;
+    private static final int PORT_VIDEO_A = 5003;
+    private static final int PORT_VIDEO_B = 5004;
 
     // ── Appel vidéo sortant ───────────────────────────────────────────────────
     public static void demarrer(Stage parent, String contactNom,
@@ -54,7 +56,8 @@ public class Appelvideo {
         if (ipDistant != null && !ipDistant.isBlank()) {
             arreterVideo();
             videoUDP = new VideoUDP();
-            videoUDP.demarrer(ipDistant, 5003, 5004, videoView);
+            // Appel sortant (rôle A): j'écoute sur A (5003) et j'envoie vers B (5004)
+            videoUDP.demarrer(ipDistant, PORT_VIDEO_B, PORT_VIDEO_A, videoView);
             System.out.println("[Video] Démarré côté appelant → " + ipDistant);
         } else {
             System.out.println("[Video] IP distante manquante, vidéo non démarrée.");
@@ -83,10 +86,6 @@ public class Appelvideo {
         root.setAlignment(Pos.CENTER);
         root.setPadding(new Insets(20));
         root.setStyle("-fx-background-color: #F0F2F5;");
-        if (ipDistant != null && !ipDistant.isBlank()) {
-            videoUDP = new VideoUDP();
-            videoUDP.demarrer(ipDistant, 5003, 5004, videoView); // ← ports cohérents avec CallService
-        }
         stage.setScene(new Scene(root, 520, 500));
         stage.show();
     }
@@ -179,7 +178,8 @@ public class Appelvideo {
         if (ipDistant != null && !ipDistant.isBlank()) {
             arreterVideo();
             videoUDP = new VideoUDP();
-            videoUDP.demarrer(ipDistant, 5003, 5004, videoView);
+            // Appel entrant (rôle B): j'écoute sur B (5004) et j'envoie vers A (5003)
+            videoUDP.demarrer(ipDistant, PORT_VIDEO_A, PORT_VIDEO_B, videoView);
             System.out.println("[Video] Démarré côté appelé → " + ipDistant);
         } else {
             System.out.println("[Video] IP distante manquante, vidéo non démarrée.");
