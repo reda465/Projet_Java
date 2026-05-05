@@ -299,16 +299,25 @@ public class Discussion implements EcouteurClient {
         });
     }
 
-
-
-
-
-
     @Override
     public void appelAccepte(String numero, String ip) {
-        System.out.println("📞 Appel accepté par " + numero + " ip=" + ip);
-    }
+        Platform.runLater(() -> {
+            // Mettre à jour le statut affiché dans la fenêtre d'appel
+            if (statutAppelLabel != null) {
+                statutAppelLabel.setText("En communication...");
+            }
 
+            if (ip != null && !ip.isBlank()) {
+                audioUDP = new AudioUDP();
+                audioUDP.demarrer(ip, 6000, 6001);
+                System.out.println("[Audio] Démarré côté appelant → " + ip);
+            } else {
+                System.out.println("[Audio] IP distante non reçue, audio non démarré.");
+                showAlert(Alert.AlertType.ERROR, "Erreur audio",
+                        "Impossible de démarrer l'audio : IP distante manquante.");
+            }
+        });
+    }
     @Override
     public void appelRefuse() {
         Platform.runLater(() -> {
@@ -317,7 +326,6 @@ public class Discussion implements EcouteurClient {
                     "Appel refusé", "Le contact a refusé l'appel.");
         });
     }
-
     @Override
     public void appelTermine(String numero) {
         Platform.runLater(() -> {
@@ -327,9 +335,7 @@ public class Discussion implements EcouteurClient {
                     "Appel terminé", "L'appel est terminé.");
         });
     }
-
     // ─────────────────────────────────────────────────────────────────────────
-
     @Override
     public void conversationsRecues(List<Conversation> conversations) {
         Platform.runLater(() -> {
@@ -606,9 +612,21 @@ public class Discussion implements EcouteurClient {
                 // accepterAppel() sans paramètre = méthode correcte
                 ClientHandlerAuth.getInstance().accepterAppel();
                 statutAppelLabel.setText("Appel en cours...");
-                audioUDP = new AudioUDP();
-                audioUDP.demarrer(
-                        ipDistant != null ? ipDistant : numeroContact, 6000, 6001);
+               // audioUDP = new AudioUDP();
+                //audioUDP.demarrer(
+                        //ipDistant != null ? ipDistant : numeroContact, 6000, 6001);
+                if (ipDistant != null && !ipDistant.isBlank()) {
+                            audioUDP = new AudioUDP();
+                            audioUDP.demarrer(ipDistant, 6001, 6000); // ✅ MODIFIÉ — ports inversés par rapport à l'appelant
+                            System.out.println("[Audio] Démarré côté appelé → " + ipDistant);
+                        } else {
+                    showAlert(Alert.AlertType.ERROR, "Erreur audio",
+                            "IP de l'appelant non reçue. Audio impossible.");
+                    ClientHandlerAuth.getInstance().refuserAppel();
+                    stageAppel.close();
+                    stageAppel = null;
+                    return;
+                }
                 VBox root = (VBox) stageAppel.getScene().getRoot();
                 Button btnRacc = makeBtnAppel("📵", "#EA2424");
                 btnRacc.setOnAction(ev -> terminerAppel(numeroContact));
@@ -631,7 +649,6 @@ public class Discussion implements EcouteurClient {
         }
 
         boutonsBox.setPadding(new Insets(20));
-
         VBox root = new VBox(infoBox, boutonsBox);
         root.setAlignment(Pos.CENTER);
         root.setPadding(new Insets(20));
@@ -647,7 +664,6 @@ public class Discussion implements EcouteurClient {
         if (audioUDP != null) { audioUDP.arreter(); audioUDP = null; }
         if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
     }
-
     private Button makeBtnAppel(String icone, String couleur) {
         Button btn = new Button(icone);
         btn.setFont(Font.font("Segoe UI", 20));

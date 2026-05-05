@@ -10,7 +10,6 @@ public interface EcouteurClient {
     // Quand la connexion réussit
     void connexionReussie(Utilisateur moi);
     void inscriptionReussie(String msg);
-
     // Quand ça échoue ou autre erreur
     void erreur(String message);
 
