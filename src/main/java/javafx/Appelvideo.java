@@ -15,7 +15,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-import service.CallService;
 
 public class Appelvideo {
 
@@ -178,11 +177,8 @@ public class Appelvideo {
         videoView.setStyle("-fx-background-color: black; -fx-border-radius: 10px;");
 
         if (ipDistant != null && !ipDistant.isBlank()) {
-           arreterVideo();
+            arreterVideo();
             videoUDP = new VideoUDP();
-           // CallService callService = new CallService(ClientHandlerAuth.getInstance().getClientReseau(),
-            //        ClientHandlerAuth.getInstance().getUtilisateurConnecte());
-            //callService.setVideoView(videoView);
             // Appel entrant (rôle B): j'écoute sur B (5004) et j'envoie vers A (5003)
             videoUDP.demarrer(ipDistant, PORT_VIDEO_A, PORT_VIDEO_B, videoView);
             System.out.println("[Video] Démarré côté appelé → " + ipDistant);
