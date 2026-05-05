@@ -27,18 +27,44 @@ public class VideoUDP {
     private Thread threadEnvoi;
     private Thread threadReception;
     private ImageView videoView;
+    private volatile boolean fluxDistantRecu = false;
 
     static {
         OpenCV.loadLocally();
     }
-
     public VideoUDP() {}
+
+    private VideoCapture ouvrirCamera() {
+        int[] backends = new int[] {
+                Videoio.CAP_ANY,
+                Videoio.CAP_DSHOW,
+                Videoio.CAP_MSMF
+        };
+
+        for (int backend : backends) {
+            for (int index = 0; index <= 2; index++) {
+                VideoCapture tentative = new VideoCapture(index, backend);
+                if (tentative.isOpened()) {
+                    System.out.println("[VideoUDP] Camera ouverte (index=" + index
+                            + ", backend=" + backend + ")");
+                    return tentative;
+                }
+                tentative.release();
+            }
+        }
+        return null;
+    }
+    private Image matVersImage(Mat mat) {
+        MatOfByte buffer = new MatOfByte();
+        Imgcodecs.imencode(".jpg", mat, buffer);
+        return new Image(new ByteArrayInputStream(buffer.toArray()));
+    }
 
     // ===================== LANCER VIDEO =====================
     public void demarrer(String ipDistant, int portDistant, int monPort, ImageView view) {
         try {
             this.videoView = view;
-
+            this.fluxDistantRecu = false;
             InetAddress addr = InetAddress.getByName(ipDistant);
             socketEnvoi = new DatagramSocket();
             socketReception = new DatagramSocket(monPort);
@@ -49,10 +75,12 @@ public class VideoUDP {
             // ================= THREAD ENVOI =================
             threadEnvoi = new Thread(() -> {
                 try {
-                    camera = new VideoCapture(0);
+                    camera = ouvrirCamera();
 
-                    if (!camera.isOpened()) {
-                        System.out.println("❌ Impossible d'ouvrir la caméra !");
+                    if (camera == null || !camera.isOpened()) {
+                        System.out.println("[VideoUDP] Impossible d'ouvrir la camera. "
+                                + "Ferme les applis qui utilisent deja la webcam "
+                                + "(Zoom/Teams/navigateur) puis reessaie.");
                         return;
                     }
                     camera.set(Videoio.CAP_PROP_FRAME_WIDTH,  LARGEUR_FRAME);
@@ -67,9 +95,9 @@ public class VideoUDP {
                     );
 
                     while (actif) {
-                        camera.read(frame);
-
-                        if (frame.empty()) {
+                        //camera.read(frame);
+                        boolean lectureOk = camera.read(frame);
+                        if (!lectureOk || frame.empty()) {
                             Thread.sleep(50);
                             continue;
                         }
@@ -117,13 +145,14 @@ public class VideoUDP {
                             System.arraycopy(packet.getData(), 0, imgData, 0, packet.getLength());
 
                             Image image = new Image(new ByteArrayInputStream(imgData));
+                            if (videoView != null) {
+                                Platform.runLater(() -> videoView.setImage(image));
+                            }
                             if (image.isError()) {
                                 System.err.println("[VideoUDP] Image corrompue reçue");
                                 continue;
                             }
-                            if (videoView != null) {
-                                Platform.runLater(() -> videoView.setImage(image));
-                            }
+                            fluxDistantRecu = true;
                         } catch (java.net.SocketTimeoutException e) {
                             continue;
                         } catch (java.net.SocketException e) {

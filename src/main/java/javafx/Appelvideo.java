@@ -178,11 +178,12 @@ public class Appelvideo {
         videoView.setStyle("-fx-background-color: black; -fx-border-radius: 10px;");
 
         if (ipDistant != null && !ipDistant.isBlank()) {
-            //arreterVideo();
-            CallService callService = new CallService(ClientHandlerAuth.getInstance().getClientReseau(),ClientHandlerAuth.getInstance().getUtilisateurConnecte());
-            callService.setVideoView(videoView);
+           arreterVideo();
+            videoUDP = new VideoUDP();
+
+
             // Appel entrant (rôle B): j'écoute sur B (5004) et j'envoie vers A (5003)
-            //videoUDP.demarrer(ipDistant, PORT_VIDEO_A, PORT_VIDEO_B, videoView);
+            videoUDP.demarrer(ipDistant, PORT_VIDEO_A, PORT_VIDEO_B, videoView);
             System.out.println("[Video] Démarré côté appelé → " + ipDistant);
         } else {
             System.out.println("[Video] IP distante manquante, vidéo non démarrée.");
