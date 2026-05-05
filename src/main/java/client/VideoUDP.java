@@ -95,6 +95,7 @@ public class VideoUDP {
                             Imgcodecs.IMWRITE_JPEG_QUALITY, QUALITE_JPEG
                     );
                     int consecutiveGrabFailures = 0;
+
                     while (actif) {
                         //camera.read(frame);
                         boolean lectureOk = camera.read(frame);
@@ -120,6 +121,7 @@ public class VideoUDP {
                             continue;
                         }
                         consecutiveGrabFailures = 0;
+
                         Imgproc.resize(frame, frameReduit,
                                 new Size(LARGEUR_FRAME, HAUTEUR_FRAME));
 
