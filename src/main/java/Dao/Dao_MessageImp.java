@@ -118,7 +118,12 @@ public class Dao_MessageImp implements DAO_Message {
 
     // ── MAPPING ───────────────────────────────────────────────────────────────
     private Message mapResultSet(ResultSet rs) throws SQLException {
-        Message m = new Message();
+        Message m = new Message() {
+            @Override
+            public String toNetworkString() {
+                return "";
+            }
+        };
         m.setIdMessage(rs.getInt("id_message"));
         m.setIdConversation(rs.getInt("id_conversation"));
         m.setIdExpediteur(rs.getInt("id_expediteur"));

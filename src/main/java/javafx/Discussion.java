@@ -2,9 +2,7 @@ package javafx;
 import client.AudioUDP;
 import client.ClientHandlerAuth;
 import client.EcouteurClient;
-import model.Contact;
-import model.Conversation;
-import model.Utilisateur;
+import model.*;
 import javafx.application.Platform;
 import javafx.geometry.*;
 import javafx.scene.*;
@@ -18,7 +16,6 @@ import javafx.collections.*;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import model.Message;
 import java.util.Objects;
 public class Discussion implements EcouteurClient {
     private Utilisateur utilisateurConnecte;
@@ -335,6 +332,57 @@ public class Discussion implements EcouteurClient {
                     "Appel terminé", "L'appel est terminé.");
         });
     }
+
+    @Override
+    public void groupeCree(Groupe groupe) {
+
+    }
+
+    @Override
+    public void creationGroupeEchouee(String raison) {
+
+    }
+
+    @Override
+    public void listeGroupesRecue(List<Groupe> groupes) {
+
+    }
+
+    @Override
+    public void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {
+
+    }
+
+    @Override
+    public void messageGroupeRecu(MessageGroupe message) {
+
+    }
+
+    @Override
+    public void membreAjoute(int idGroupe, String numero) {
+
+    }
+
+    @Override
+    public void membreRetire(int idGroupe, String numero) {
+
+    }
+
+    @Override
+    public void aQuitteGroupe(int idGroupe) {
+
+    }
+
+    @Override
+    public void groupeSupprime(int idGroupe) {
+
+    }
+
+    @Override
+    public void nomGroupeModifie(int idGroupe, String nouveauNom) {
+
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     @Override
     public void conversationsRecues(List<Conversation> conversations) {

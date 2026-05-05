@@ -5,10 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 import model.Utilisateur;
 import network.Packet;
-import service.AuthService;
-import service.MessageService;
-import service.CallService;
-import service.ContactService;
+import service.*;
 import model.Contact;
 
 @Getter
@@ -23,6 +20,7 @@ public class ClientHandlerAuth {
     private MessageService messageService;
     private boolean connecteAuServeur = false;
     private ContactService contactService;
+    private GroupeService groupeService;
     private CallService callService;
 
     // Constructeur privé (personne ne peut créer directement)
@@ -46,7 +44,7 @@ public class ClientHandlerAuth {
         if (clientReseau.isConnecte()) {
             authService = new AuthService(clientReseau);
             messageService = new MessageService(clientReseau);
-
+            groupeService = new GroupeService(clientReseau);
             contactService = new ContactService(clientReseau);
             connecteAuServeur = true;
             return true;
@@ -74,6 +72,7 @@ public class ClientHandlerAuth {
         }
         return authService.inscrire(nomComplet, numero, password);
     }
+    //gestion des contacts
     public void ajouterContact(String numeroTelephone, String nomAffiche) {
         if (!verifierConnexion()) {
             System.out.println(" Pas connecté au serveur !");
@@ -88,7 +87,50 @@ public class ClientHandlerAuth {
     public void ajouterContact(String numeroTelephone) {
         ajouterContact(numeroTelephone, numeroTelephone);
     }
-    // ===== 3. DÉCONNEXION =====
+    //gestion des groupes
+    public void creerGroupe(String nomGroupe, String... numerosMembres) {
+        if (!verifierConnexion()) return;
+        if (groupeService == null) { System.out.println("❌ GroupeService non initialisé"); return; }
+        groupeService.creerGroupe(nomGroupe, numerosMembres);
+    }
+    public void ajouterMembreAuGroupe(int idGroupe, String numeroMembre) {
+        if (!verifierConnexion()) return;
+        groupeService.ajouterMembre(idGroupe, numeroMembre);
+    }
+
+    public void retirerMembreDuGroupe(int idGroupe, String numeroMembre) {
+        if (!verifierConnexion()) return;
+        groupeService.retirerMembre(idGroupe, numeroMembre);
+    }
+    public void quitterGroupe(int idGroupe) {
+        if (!verifierConnexion()) return;
+        groupeService.quitterGroupe(idGroupe);
+    }
+
+    public void supprimerGroupe(int idGroupe) {
+        if (!verifierConnexion()) return;
+        groupeService.supprimerGroupe(idGroupe);
+    }
+    public void modifierNomGroupe(int idGroupe, String nouveauNom) {
+        if (!verifierConnexion()) return;
+        groupeService.modifierNomGroupe(idGroupe, nouveauNom);
+    }
+
+    public void demanderListeGroupes() {
+        if (!verifierConnexion()) return;
+        groupeService.demanderGroupes();
+    }
+
+    public void demanderMembresGroupe(int idGroupe) {
+        if (!verifierConnexion()) return;
+        groupeService.demanderMembres(idGroupe);
+    }
+    public void envoyerMessageGroupe(int idGroupe, String contenu) {
+        if (!verifierConnexion()) return;
+        groupeService.envoyerMessageGroupe(idGroupe, contenu);
+    }
+
+    // =====  DÉCONNEXION =====
     public void seDeconnecter() {
         if (authService != null) {
             authService.deconnecter();

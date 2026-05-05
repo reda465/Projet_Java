@@ -68,7 +68,12 @@ public class MessageRouter {
         }
 
         // 3. Persister le message en DB
-        Message msg = new Message();
+        Message msg = new Message() {
+            @Override
+            public String toNetworkString() {
+                return "";
+            }
+        };
         msg.setIdConversation(conv.getIdConversation());
         msg.setIdExpediteur(expediteur.getIdUtilisateur());
         msg.setTypeMessage("texte");
