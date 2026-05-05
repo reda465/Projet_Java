@@ -54,18 +54,17 @@ public class VideoUDP {
         }
         return null;
     }
-
     private Image matVersImage(Mat mat) {
         MatOfByte buffer = new MatOfByte();
         Imgcodecs.imencode(".jpg", mat, buffer);
         return new Image(new ByteArrayInputStream(buffer.toArray()));
     }
+
     // ===================== LANCER VIDEO =====================
     public void demarrer(String ipDistant, int portDistant, int monPort, ImageView view) {
         try {
             this.videoView = view;
             this.fluxDistantRecu = false;
-
             InetAddress addr = InetAddress.getByName(ipDistant);
             socketEnvoi = new DatagramSocket();
             socketReception = new DatagramSocket(monPort);
@@ -96,8 +95,8 @@ public class VideoUDP {
                     );
 
                     while (actif) {
+                        //camera.read(frame);
                         boolean lectureOk = camera.read(frame);
-
                         if (!lectureOk || frame.empty()) {
                             Thread.sleep(50);
                             continue;
@@ -105,14 +104,6 @@ public class VideoUDP {
 
                         Imgproc.resize(frame, frameReduit,
                                 new Size(LARGEUR_FRAME, HAUTEUR_FRAME));
-
-                        // Apercu local tant qu'aucune frame distante n'est reçue
-                        if (!fluxDistantRecu && videoView != null) {
-                            Image imageLocale = matVersImage(frameReduit);
-                            if (!imageLocale.isError()) {
-                                Platform.runLater(() -> videoView.setImage(imageLocale));
-                            }
-                        }
 
                         Imgcodecs.imencode(".jpg", frameReduit, mob, params);
                         byte[] data = mob.toArray();
@@ -154,14 +145,14 @@ public class VideoUDP {
                             System.arraycopy(packet.getData(), 0, imgData, 0, packet.getLength());
 
                             Image image = new Image(new ByteArrayInputStream(imgData));
+                            if (videoView != null) {
+                                Platform.runLater(() -> videoView.setImage(image));
+                            }
                             if (image.isError()) {
                                 System.err.println("[VideoUDP] Image corrompue reçue");
                                 continue;
                             }
                             fluxDistantRecu = true;
-                            if (videoView != null) {
-                                Platform.runLater(() -> videoView.setImage(image));
-                            }
                         } catch (java.net.SocketTimeoutException e) {
                             continue;
                         } catch (java.net.SocketException e) {
