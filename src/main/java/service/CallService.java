@@ -14,6 +14,8 @@ import model.enums.TypeAppel;
 import network.Packet;
 
 import java.time.LocalDateTime;
+@Getter
+@Setter
 
 public class CallService {
     private final ClientReseau clientReseau;
