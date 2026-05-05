@@ -15,7 +15,6 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 public class Appelaudio {
-
     // ── Appel audio sortant ───────────────────────────────────────────────────
     public static void demarrer(Stage parent, String contactNom,
                                 String numeroContact, int idConversation) {
@@ -24,7 +23,6 @@ public class Appelaudio {
             System.out.println("Impossible d'appeler : client non connecté");
             return;
         }
-
         Stage stage = new Stage();
         stage.initModality(Modality.WINDOW_MODAL);
         stage.initOwner(parent);
@@ -36,7 +34,6 @@ public class Appelaudio {
         Label nom = new Label(contactNom);
         nom.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
         nom.setTextFill(Color.web("#111B21"));
-
         Label statut = new Label("Appel en cours...");
         statut.setFont(Font.font("Segoe UI", 14));
         statut.setTextFill(Color.web("#667781"));
@@ -85,7 +82,7 @@ public class Appelaudio {
         info.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
         info.setTextFill(Color.web("#111B21"));
 
-        Button btnAccepter = new Button("✅  Accepter");
+        Button btnAccepter = new Button("  Accepter");
         btnAccepter.setStyle(
                 "-fx-background-color: #25D366;" +
                         "-fx-text-fill: white;" +
@@ -101,7 +98,7 @@ public class Appelaudio {
             demarrer(parent, appelantNom, numeroAppelant, -1);
         });
 
-        Button btnRefuser = new Button("❌  Refuser");
+        Button btnRefuser = new Button("  Refuser");
         btnRefuser.setStyle(
                 "-fx-background-color: #EA2424;" +
                         "-fx-text-fill: white;" +
@@ -114,7 +111,6 @@ public class Appelaudio {
             ClientHandlerAuth.getInstance().refuserAppel();
             stage.close();
         });
-
         HBox boutons = new HBox(16, btnAccepter, btnRefuser);
         boutons.setAlignment(Pos.CENTER);
 

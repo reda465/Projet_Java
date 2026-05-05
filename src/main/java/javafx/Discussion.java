@@ -289,7 +289,7 @@ public class Discussion implements EcouteurClient {
         });
     }
 
-    // ── SEULS CHANGEMENTS : les 4 méthodes d'appel ───────────────────────────
+    // ──  CHANGEMENTS : les 4 méthodes d'appel
 
     @Override
     public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
@@ -298,7 +298,6 @@ public class Discussion implements EcouteurClient {
             afficherFenetreAppel(nom, false, numero, ipAppelant);
         });
     }
-
     @Override
     public void appelAccepte(String numero) {
         Platform.runLater(() -> {
@@ -332,7 +331,6 @@ public class Discussion implements EcouteurClient {
                     "Appel terminé", "L'appel est terminé.");
         });
     }
-
     // ─────────────────────────────────────────────────────────────────────────
 
     @Override
@@ -573,7 +571,6 @@ public class Discussion implements EcouteurClient {
     private void afficherFenetreAppel(String nomContact, boolean estSortant,
                                       String numeroContact, String ipDistant) {
         if (stageAppel != null && stageAppel.isShowing()) return;
-
         stageAppel = new Stage();
         stageAppel.initModality(javafx.stage.Modality.WINDOW_MODAL);
         stageAppel.initOwner(primaryStage);
