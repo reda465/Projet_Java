@@ -3,6 +3,7 @@ import client.AudioUDP;
 import client.ClientHandlerAuth;
 import client.EcouteurClient;
 import client.VideoUDP;
+import javafx.scene.image.ImageView;
 import model.*;
 import javafx.application.Platform;
 import javafx.geometry.*;
@@ -18,6 +19,9 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
+
+import static org.bytedeco.librealsense.global.RealSense.video;
+
 public class Discussion implements EcouteurClient {
     private Utilisateur utilisateurConnecte;
     private String contactActif = null;
@@ -312,10 +316,12 @@ public class Discussion implements EcouteurClient {
             String nom = trouverNomContact(numero);
 
             if ("VIDEO".equalsIgnoreCase(type)) {
+                typeAppelEnCours = "VIDEO";
                 // ← AJOUT : Appel vidéo entrant → déléguer à Appelvideo
                 Appelvideo.recevoirAppel(primaryStage, nom, numero, ipAppelant);
             } else {
                 // Appel audio entrant (existant)
+                typeAppelEnCours = "AUDIO";
                 afficherFenetreAppel(nom, false, numero, ipAppelant);
             }
         });
@@ -350,19 +356,20 @@ public class Discussion implements EcouteurClient {
 
             if (ip != null && !ip.isBlank()) {
                 if ("VIDEO".equalsIgnoreCase(typeAppelEnCours)) {
+                    if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
                     // ← AJOUT : Démarrer la vidéo via Appelvideo
                     Appelvideo.demarrer(primaryStage, chatName.getText(), contactActif,
                             idConversationActive != null ? idConversationActive : -1, ip);
-
                     // Fermer la fenêtre d'appel audio si elle est ouverte
-                    if (stageAppel != null) {
+                   /* if (stageAppel != null) {
                         stageAppel.close();
                         stageAppel = null;
-                    }
+                    }*/
                 } else {
                     // Audio existant
                     audioUDP = new AudioUDP();
                     audioUDP.demarrer(ip, 6000, 6001);
+
                     System.out.println("[Audio] Démarré côté appelant → " + ip);
                 }
             } else {

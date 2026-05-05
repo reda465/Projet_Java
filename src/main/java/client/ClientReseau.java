@@ -173,7 +173,7 @@ public class ClientReseau {
                         String nomAppelant = parts[1];
                         String typeAppel = parts[2];
                         String ipAppelant  = parts[4];
-                        ecouteur.appelEntrant(numAppelant, nomAppelant, typeAppel, "");
+                        ecouteur.appelEntrant(numAppelant, nomAppelant, typeAppel, ipAppelant);
                         System.out.println("Appel entrant de " + nomAppelant + " (" + numAppelant + ")  ip=" + ipAppelant);
                         if (callService != null) {
                             callService.recevoirAppel(numAppelant, nomAppelant, typeAppel, ipAppelant);
