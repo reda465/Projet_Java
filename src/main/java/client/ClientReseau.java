@@ -8,7 +8,6 @@ import network.*;
 import model.*;
 import service.CallService;
 import service.MessageService;
-
 import java.io.*;
 import java.net.*;
 import java.time.LocalDateTime;
@@ -132,7 +131,6 @@ public class ClientReseau {
                     System.out.println("Connecté : " + moi.getNomComplet());
                     }
                     //ClientHandlerAuth.demanderConversations();
-                    ClientHandlerAuth.getInstance().onConnexionReussie(moi);
                     break;
 
                 case LOGIN_FAIL:
