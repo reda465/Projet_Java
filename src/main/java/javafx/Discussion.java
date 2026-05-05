@@ -173,7 +173,7 @@ public class Discussion implements EcouteurClient {
             }
         });
 
-        chatHeader.getChildren().addAll(chatAvatar, chatInfo, chatSpacer, btnAppelAudio);
+        chatHeader.getChildren().addAll(chatAvatar, chatInfo, chatSpacer, btnAppelAudio,btnAppelVideo);
 
         messagesBox = new VBox(8);
         messagesBox.setPadding(new Insets(15));
@@ -302,15 +302,29 @@ public class Discussion implements EcouteurClient {
 
     // ── SEULS CHANGEMENTS : les 4 méthodes d'appel ───────────────────────────
 
-    @Override
+   /* @Override
     public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
         Platform.runLater(() -> {
             String nom = trouverNomContact(numero);
             afficherFenetreAppel(nom, false, numero, ipAppelant);
         });
+    }*/
+    @Override
+    public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
+        Platform.runLater(() -> {
+            String nom = trouverNomContact(numero);
+
+            if ("VIDEO".equalsIgnoreCase(type)) {
+                // ← AJOUT : Appel vidéo entrant → déléguer à Appelvideo
+                Appelvideo.recevoirAppel(primaryStage, nom, numero, ipAppelant);
+            } else {
+                // Appel audio entrant (existant)
+                afficherFenetreAppel(nom, false, numero, ipAppelant);
+            }
+        });
     }
 
-    @Override
+    /*@Override
     public void appelAccepte(String numero, String ip) {
         Platform.runLater(() -> {
             // Mettre à jour le statut affiché dans la fenêtre d'appel
@@ -328,6 +342,38 @@ public class Discussion implements EcouteurClient {
                         "Impossible de démarrer l'audio : IP distante manquante.");
             }
         });
+    }*/
+    //HADCHI
+    @Override
+    public void appelAccepte(String numero, String ip) {
+        Platform.runLater(() -> {
+            if (statutAppelLabel != null) {
+                statutAppelLabel.setText("En communication...");
+            }
+
+            if (ip != null && !ip.isBlank()) {
+                if ("VIDEO".equalsIgnoreCase(typeAppelEnCours)) {
+                    // ← AJOUT : Démarrer la vidéo via Appelvideo
+                    Appelvideo.demarrer(primaryStage, chatName.getText(), contactActif,
+                            idConversationActive != null ? idConversationActive : -1, ip);
+
+                    // Fermer la fenêtre d'appel audio si elle est ouverte
+                    if (stageAppel != null) {
+                        stageAppel.close();
+                        stageAppel = null;
+                    }
+                } else {
+                    // Audio existant
+                    audioUDP = new AudioUDP();
+                    audioUDP.demarrer(ip, 6000, 6001);
+                    System.out.println("[Audio] Démarré côté appelant → " + ip);
+                }
+            } else {
+                System.out.println("[Audio/Video] IP distante non reçue, média non démarré.");
+                showAlert(Alert.AlertType.ERROR, "Erreur média",
+                        "Impossible de démarrer : IP distante manquante.");
+            }
+        });
     }
     @Override
     public void appelRefuse() {
@@ -341,7 +387,9 @@ public class Discussion implements EcouteurClient {
     public void appelTermine(String numero) {
         Platform.runLater(() -> {
             if (audioUDP != null) { audioUDP.arreter(); audioUDP = null; }
+            if (videoUDP != null) { videoUDP.arreter(); videoUDP = null; }
             if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
+            typeAppelEnCours = null;
             showAlert(Alert.AlertType.INFORMATION,
                     "Appel terminé", "L'appel est terminé.");
         });
@@ -744,7 +792,6 @@ public class Discussion implements EcouteurClient {
         );
         return btn;
     }
-
     private String trouverNomContact(String numero) {
         for (HBox item : convList.getItems()) {
             Object ud = item.getUserData();
