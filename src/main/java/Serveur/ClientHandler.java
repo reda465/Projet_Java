@@ -171,6 +171,10 @@ public class ClientHandler extends Thread {
     // ── MSG_SEND — sprint suivant ─────────────────────────────────────────────
         private void handleMessage(String[] parts) {
             if (parts.length < 3) return;
+            if (telephoneConnecte == null) {
+                pw.println("ERREUR|Non authentifié");
+                return;
+            }
 
             String telephoneDest = parts[1];
             String contenu = parts[2];
@@ -275,12 +279,15 @@ public class ClientHandler extends Thread {
 
             for (Conversation c : convs) {
                 String nomAffichage;
+                String numeroContact = "";
 
                 // Pour conversation individuelle → nom de l'autre participant
                 if ("individuelle".equals(c.getTypeConversation())) {
                     Utilisateur autre = convDAO.getAutreParticipant(
                             c.getIdConversation(), u.getIdUtilisateur());
                     nomAffichage = (autre != null) ? autre.getNomComplet() : "Inconnu";
+                    numeroContact = (autre != null && autre.getNumeroTelephone() != null)
+                            ? autre.getNumeroTelephone() : "";
                 } else {
                     nomAffichage = c.getNomGroupe() != null ? c.getNomGroupe() : "Groupe";
                 }
@@ -297,6 +304,7 @@ public class ClientHandler extends Thread {
                 sb.append(c.getIdConversation()).append(";")
                         .append(c.getTypeConversation()).append(";")
                         .append(nomAffichage).append(";")
+                        .append(numeroContact).append(";")
                         .append((c.getDateDernierMessage() != null)
                                 ? c.getDateDernierMessage().toString() : "").append(";")
                         .append(nbNonLus).append(";")
