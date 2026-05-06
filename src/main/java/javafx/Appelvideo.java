@@ -1,6 +1,7 @@
 
 package javafx;
 import client.ClientHandlerAuth;
+import client.VideoUDP;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -14,9 +15,8 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-
 public class Appelvideo {
-
+    private static VideoUDP videoUDP = null;
     // ── Appel vidéo sortant ───────────────────────────────────────────────────
     public static void demarrer(Stage parent, String contactNom,
                                 String numeroContact, int idConversation,
@@ -26,7 +26,6 @@ public class Appelvideo {
             System.out.println("Impossible d'appeler : client non connecté");
             return;
         }
-
         Stage stage = new Stage();
         stage.initModality(Modality.WINDOW_MODAL);
         stage.initOwner(parent);

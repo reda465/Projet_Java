@@ -352,6 +352,7 @@ public class Discussion implements EcouteurClient {
                 // ← AJOUT : Appel vidéo entrant → déléguer à Appelvideo
                 Appelvideo.recevoirAppel(primaryStage, name, numero, ipAppelant);
             } else {
+                typeAppelEnCours = "AUDIO";
                 // Appel audio entrant (existant)
                 typeAppelEnCours = "AUDIO";
                 afficherFenetreAppel(name, false, numero, ipAppelant);
@@ -375,7 +376,11 @@ public class Discussion implements EcouteurClient {
                     Appelvideo.demarrer(primaryStage, chatName.getText(), contactActif,
                             idConversationActive != null ? idConversationActive : -1, ip);
                     // Fermer la fenêtre d'appel audio si elle est ouverte
+
                    /* if (stageAppel != null) {
+=======
+                    /*if (stageAppel != null) {
+>>>>>>> 35b4224715f9d41e178a2d8d2900f56f865f37c2
                         stageAppel.close();
                         stageAppel = null;
                     }*/
