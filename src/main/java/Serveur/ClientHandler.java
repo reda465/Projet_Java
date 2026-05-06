@@ -24,6 +24,7 @@ public class ClientHandler extends Thread {
     private final CallManager callManager = CallManager.getInstance();
     private final UserManager      userManager = UserManager.getInstance();
     private final  Dao_UtilisateurImp userDAO   = new Dao_UtilisateurImp();
+
     // Dans les attributs de ClientHandler — ajouter ces deux
     private final DaoConversationImp convDAO    = new DaoConversationImp();
     private final Dao_MessageImp     messageDAO = new Dao_MessageImp();
