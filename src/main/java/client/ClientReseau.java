@@ -155,7 +155,12 @@ public class ClientReseau {
                     break;
                 case MSG_RECEIVE:
                     if (parts.length >= 2) {
-                        Message msg = new Message();
+                        Message msg = new Message() {
+                            @Override
+                            public String toNetworkString() {
+                                return "";
+                            }
+                        };
                         msg.setTelephoneExpediteur(parts[0]);
                         msg.setContenuTexte(parts[1]);
                         System.out.println("Message " + msg.getContenuTexte());
@@ -205,6 +210,20 @@ public class ClientReseau {
                     break;
                 case MESSAGES_LIST:
                     traiterMessagesRecus(data);
+                    break;
+                case ADD_CONTACT_OK:
+                    if (parts.length >= 3 && ecouteur != null) {
+                        Contact contactAjoute = new Contact();
+                        contactAjoute.setNomComplet(parts[1]);
+                        contactAjoute.setNumeroTelephone(parts[0]);
+                        System.out.println("✅ Contact ajouté: " + contactAjoute.getNomComplet());
+                        ecouteur.contactAjoute(contactAjoute);
+                    }
+                    break;
+                case ADD_CONTACT_FAIL:
+                    if (ecouteur != null) {
+                        ecouteur.erreur("Échec ajout contact: " + p.getData());
+                    }
                     break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
@@ -263,7 +282,12 @@ public class ClientReseau {
                 if (champs.length < 5) continue;
 
                 try {
-                    Message msg = new Message();
+                    Message msg = new Message() {
+                        @Override
+                        public String toNetworkString() {
+                            return "";
+                        }
+                    };
                     msg.setIdMessage(Integer.parseInt(champs[0].trim()));
                     msg.setTelephoneExpediteur(champs[1]);
                     msg.setNomExpediteur(champs[2]);
@@ -277,10 +301,10 @@ public class ClientReseau {
                     msg.setEstMoi(moi != null && champs[1].equals(moi.getNumeroTelephone()));
                     messages.add(msg);
                 } catch (NumberFormatException e) {
-                    System.out.println("❌ Erreur parsing message : " + e.getMessage());
+                    System.out.println(" Erreur parsing message : " + e.getMessage());
                 }
             }
-            System.out.println("💬 Messages reçus : " + messages.size());
+            System.out.println(" Messages reçus : " + messages.size());
             if (ecouteur != null) {
                 ecouteur.messagesRecus(messages);
             }
