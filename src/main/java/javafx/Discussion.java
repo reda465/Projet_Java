@@ -3,9 +3,8 @@ import client.AudioUDP;
 import client.ClientHandlerAuth;
 import client.EcouteurClient;
 import client.VideoUDP;
-import model.Contact;
-import model.Conversation;
-import model.Utilisateur;
+import javafx.scene.image.ImageView;
+import model.*;
 import javafx.application.Platform;
 import javafx.geometry.*;
 import javafx.scene.*;
@@ -19,8 +18,10 @@ import javafx.collections.*;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import model.Message;
 import java.util.Objects;
+
+import static org.bytedeco.librealsense.global.RealSense.video;
+
 public class Discussion implements EcouteurClient {
     private Utilisateur utilisateurConnecte;
     private String contactActif = null;
@@ -310,7 +311,7 @@ public class Discussion implements EcouteurClient {
         });
     }*/
     @Override
-    public void appelEntrant(String numero, String type, String ipAppelant,String name) {
+    public void appelEntrant(String numero, String type, String ipAppelant, String name) {
         Platform.runLater(() -> {
             //String nom = trouverNomContact(numero);
 
@@ -319,8 +320,8 @@ public class Discussion implements EcouteurClient {
                 // ← AJOUT : Appel vidéo entrant → déléguer à Appelvideo
                 Appelvideo.recevoirAppel(primaryStage, name, numero, ipAppelant);
             } else {
-                typeAppelEnCours = "AUDIO";
                 // Appel audio entrant (existant)
+                typeAppelEnCours = "AUDIO";
                 afficherFenetreAppel(name, false, numero, ipAppelant);
             }
         });
@@ -359,9 +360,8 @@ public class Discussion implements EcouteurClient {
                     // ← AJOUT : Démarrer la vidéo via Appelvideo
                     Appelvideo.demarrer(primaryStage, chatName.getText(), contactActif,
                             idConversationActive != null ? idConversationActive : -1, ip);
-
                     // Fermer la fenêtre d'appel audio si elle est ouverte
-                    /*if (stageAppel != null) {
+                   /* if (stageAppel != null) {
                         stageAppel.close();
                         stageAppel = null;
                     }*/
@@ -369,6 +369,7 @@ public class Discussion implements EcouteurClient {
                     // Audio existant
                     audioUDP = new AudioUDP();
                     audioUDP.demarrer(ip, 6000, 6001);
+
                     System.out.println("[Audio] Démarré côté appelant → " + ip);
                 }
             } else {
@@ -397,6 +398,57 @@ public class Discussion implements EcouteurClient {
                     "Appel terminé", "L'appel est terminé.");
         });
     }
+
+    @Override
+    public void groupeCree(Groupe groupe) {
+
+    }
+
+    @Override
+    public void creationGroupeEchouee(String raison) {
+
+    }
+
+    @Override
+    public void listeGroupesRecue(List<Groupe> groupes) {
+
+    }
+
+    @Override
+    public void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {
+
+    }
+
+    @Override
+    public void messageGroupeRecu(MessageGroupe message) {
+
+    }
+
+    @Override
+    public void membreAjoute(int idGroupe, String numero) {
+
+    }
+
+    @Override
+    public void membreRetire(int idGroupe, String numero) {
+
+    }
+
+    @Override
+    public void aQuitteGroupe(int idGroupe) {
+
+    }
+
+    @Override
+    public void groupeSupprime(int idGroupe) {
+
+    }
+
+    @Override
+    public void nomGroupeModifie(int idGroupe, String nouveauNom) {
+
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     @Override
     public void conversationsRecues(List<Conversation> conversations) {
@@ -805,4 +857,5 @@ public class Discussion implements EcouteurClient {
         }
         return numero;
     }
+
 }

@@ -1,9 +1,13 @@
-/*package service;
+package service;
 
 import Serveur.Protocol;
 import client.ClientReseau;
+import lombok.Getter;
+import lombok.Setter;
 import network.Packet;
 
+@Getter
+@Setter
 public class ContactService {
 
     private ClientReseau client;
@@ -12,37 +16,18 @@ public class ContactService {
         this.client = client;
     }
 
+    // ===== AJOUTER UN CONTACT =====
+    // Format: ADD_CONTACT|numeroContact|nomAffiche (nomAffiche optionnel)
+    public void ajouterContact(String numeroTelephone, String nomAffiche) {
+        String data = numeroTelephone + "|" + (nomAffiche != null ? nomAffiche : numeroTelephone);
+        Packet p = new Packet(Protocol.ADD_CONTACT, data);
+        client.envoyer(p);
+        System.out.println(" Demande d'ajout contact envoyée: " + numeroTelephone);
+    }
+
+    // Surcharge: ajouter avec le nom par défaut (résolu par le serveur)
     public void ajouterContact(String numeroTelephone) {
-
-        // Format : AJOUTER_CONTACT|monNumero|numeroAAjouter
-        String monNumero = client.getMoi() != null ? client.getMoi().getNumeroTelephone() : "";
-        if (monNumero.isEmpty()) {
-            return;
-        }
-        String data = monNumero + "|" + numeroTelephone;
-        Packet p = new Packet(Protocol.AJOUTER_CONTACT, data);
-        client.envoyer(p);
-
-        System.out.println(" Demande d'ajout envoyée pour " + numeroTelephone);
+        ajouterContact(numeroTelephone, numeroTelephone);
     }
 
-    // ===== 2. SUPPRIMER UN CONTACT =====
-    public void supprimerContact(String numeroTelephone) {
-        String monNumero = client.getMoi() != null ? client.getMoi().getNumeroTelephone() : "";
-
-        String data = monNumero + "|" + numeroTelephone;
-        Packet p = new Packet(Protocol.SUPPRIMER_CONTACT, data);
-        client.envoyer(p);
-
-        System.out.println(" Demande de suppression envoyée pour " + numeroTelephone);
-    }
-
-    public void demanderListeContacts(){
-        String monNumero = client.getMoi() != null ? client.getMoi().getNumeroTelephone() : "";
-
-        Packet p = new Packet(Protocol.LISTE_CONTACTS, monNumero);
-        client.envoyer(p);
-
-        System.out.println(" Demande de liste des contacts envoyée");
-    }
-}*/
+}
