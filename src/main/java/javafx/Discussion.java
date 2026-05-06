@@ -15,11 +15,14 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
 import javafx.collections.*;
+import service.Fileservice;
+import java.io.File;
+import java.util.Base64;
+import service.Fileservice;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
-
 import static org.bytedeco.librealsense.global.RealSense.video;
 
 public class Discussion implements EcouteurClient {
@@ -40,11 +43,15 @@ public class Discussion implements EcouteurClient {
     private Stage primaryStage;
     ListView<HBox> convList;
     private String typeAppelEnCours = null;
+    private Fileservice fileService;//fichier
+    private Button attachBtn;
     public Discussion(Utilisateur utilisateur) {
         this.utilisateurConnecte = utilisateur;
     }
     public Scene creerScene(Stage stage) {
         this.primaryStage = stage;
+        //fichier
+        this.fileService = new Fileservice(ClientHandlerAuth.getInstance().getClientReseau());
         VBox sidebar = new VBox(0);
         sidebar.setPrefWidth(300);
         sidebar.setStyle(
@@ -194,7 +201,36 @@ public class Discussion implements EcouteurClient {
         inputBar.setAlignment(Pos.CENTER);
         inputBar.setPadding(new Insets(10, 12, 10, 12));
         inputBar.setStyle("-fx-background-color: #f0f0f0;");
+        //fichier   bouton
+        attachBtn = new Button("📎");
+        styleIconBtn(attachBtn, "#25D366", "#128C7E");
+        attachBtn.setTooltip(new Tooltip("Envoyer un fichier"));
+        attachBtn.setDisable(true);
+        //fichier
+        attachBtn.setOnAction(e -> {
+            if (!numeroContactUtilisable(contactActif)) return;
 
+            // Ouvre l'explorateur de fichiers natif
+            javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+            chooser.setTitle("Choisir un fichier à envoyer");
+            chooser.getExtensionFilters().addAll(
+                    new javafx.stage.FileChooser.ExtensionFilter("Tous les fichiers", "*.*"),
+                    new javafx.stage.FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"),
+                    new javafx.stage.FileChooser.ExtensionFilter("Documents", "*.pdf", "*.docx", "*.txt", "*.xlsx")
+            );
+
+            File fichier = chooser.showOpenDialog(primaryStage);
+            if (fichier != null) {
+                // Envoyer le fichier via le service
+                fileService.envoyerFichier(contactActif, fichier);
+
+                // Afficher une bulle de confirmation dans le chat
+                String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+                HBox bulle = Messagefx.Messageenvoyer("📎 " + fichier.getName(), time);
+                messagesBox.getChildren().add(bulle);
+                scrollToBottom();
+            }
+        });
         msgField = new TextField();
         msgField.setPromptText("Tapez un message");
         msgField.setStyle(
@@ -205,6 +241,7 @@ public class Discussion implements EcouteurClient {
                         "-fx-padding: 10px 14px;" +
                         "-fx-font-size: 14px;"
         );
+
         msgField.setDisable(true);
         HBox.setHgrow(msgField, Priority.ALWAYS);
 
@@ -228,7 +265,7 @@ public class Discussion implements EcouteurClient {
         sendBtn.setOnAction(e -> sendAction.run());
         msgField.setOnAction(e -> sendAction.run());
 
-        inputBar.getChildren().addAll(msgField, sendBtn);
+        inputBar.getChildren().addAll(attachBtn,msgField, sendBtn);
         chatPanel.getChildren().addAll(chatHeader, scrollPane, inputBar);
 
         HBox root = new HBox(0, sidebar, chatPanel);
@@ -303,13 +340,7 @@ public class Discussion implements EcouteurClient {
 
     // ── SEULS CHANGEMENTS : les 4 méthodes d'appel ───────────────────────────
 
-   /* @Override
-    public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
-        Platform.runLater(() -> {
-            String nom = trouverNomContact(numero);
-            afficherFenetreAppel(nom, false, numero, ipAppelant);
-        });
-    }*/
+
     @Override
     public void appelEntrant(String numero, String type, String ipAppelant, String name) {
         Platform.runLater(() -> {
@@ -320,6 +351,7 @@ public class Discussion implements EcouteurClient {
                 // ← AJOUT : Appel vidéo entrant → déléguer à Appelvideo
                 Appelvideo.recevoirAppel(primaryStage, name, numero, ipAppelant);
             } else {
+                typeAppelEnCours = "AUDIO";
                 // Appel audio entrant (existant)
                 typeAppelEnCours = "AUDIO";
                 afficherFenetreAppel(name, false, numero, ipAppelant);
@@ -327,25 +359,7 @@ public class Discussion implements EcouteurClient {
         });
     }
 
-    /*@Override
-    public void appelAccepte(String numero, String ip) {
-        Platform.runLater(() -> {
-            // Mettre à jour le statut affiché dans la fenêtre d'appel
-            if (statutAppelLabel != null) {
-                statutAppelLabel.setText("En communication...");
-            }
 
-            if (ip != null && !ip.isBlank()) {
-                audioUDP = new AudioUDP();
-                audioUDP.demarrer(ip, 6000, 6001);
-                System.out.println("[Audio] Démarré côté appelant → " + ip);
-            } else {
-                System.out.println("[Audio] IP distante non reçue, audio non démarré.");
-                showAlert(Alert.AlertType.ERROR, "Erreur audio",
-                        "Impossible de démarrer l'audio : IP distante manquante.");
-            }
-        });
-    }*/
     //HADCHI
     @Override
     public void appelAccepte(String numero, String ip) {
@@ -361,7 +375,11 @@ public class Discussion implements EcouteurClient {
                     Appelvideo.demarrer(primaryStage, chatName.getText(), contactActif,
                             idConversationActive != null ? idConversationActive : -1, ip);
                     // Fermer la fenêtre d'appel audio si elle est ouverte
+
                    /* if (stageAppel != null) {
+=======
+                    /*if (stageAppel != null) {
+>>>>>>> 35b4224715f9d41e178a2d8d2900f56f865f37c2
                         stageAppel.close();
                         stageAppel = null;
                     }*/
@@ -447,6 +465,38 @@ public class Discussion implements EcouteurClient {
     @Override
     public void nomGroupeModifie(int idGroupe, String nouveauNom) {
 
+    }
+
+    //fichier
+    @Override
+    public void fichierRecu(String telephoneExp, String fileName, String base64) {
+        Platform.runLater(() -> {
+            try {
+                // Décoder et sauvegarder le fichier localement
+                byte[] data = Base64.getDecoder().decode(base64);
+                File outFile = new File("downloads/" + fileName);
+                outFile.getParentFile().mkdirs();
+                java.nio.file.Files.write(outFile.toPath(), data);
+
+                System.out.println("📥 Fichier reçu : " + outFile.getAbsolutePath());
+
+                // Afficher une bulle dans le chat (uniquement si conversation active)
+                String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+                HBox bulle = Messagefx.Messagerecu("📎 " + fileName, time);
+                messagesBox.getChildren().add(bulle);
+                scrollToBottom();
+
+                // Notifier l'utilisateur si la conversation n'est pas active
+                if (!telephoneExp.equals(contactActif)) {
+                    mettreAJourBadgeNonLu(telephoneExp);
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                showAlert(Alert.AlertType.ERROR, "Erreur fichier",
+                        "Impossible de recevoir le fichier : " + fileName);
+            }
+        });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -561,7 +611,10 @@ public class Discussion implements EcouteurClient {
 
     private void majEtatBoutonEnvoi() {
         if (sendBtn == null) return;
-        sendBtn.setDisable(!numeroContactUtilisable(contactActif));
+        //sendBtn.setDisable(!numeroContactUtilisable(contactActif));
+        boolean actif = numeroContactUtilisable(contactActif);
+        sendBtn.setDisable(!actif);
+        if (attachBtn != null) attachBtn.setDisable(!actif);
     }
 
     private String infererNumeroInterlocuteur(List<Message> messages) {
@@ -857,4 +910,5 @@ public class Discussion implements EcouteurClient {
         }
         return numero;
     }
+
 }
