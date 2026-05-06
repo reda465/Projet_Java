@@ -225,6 +225,18 @@ public class ClientReseau {
                         ecouteur.erreur("Échec ajout contact: " + p.getData());
                     }
                     break;
+                    //fichier
+                case FILE_RECEIVE:
+                    if (parts.length >= 3) {
+                        String telExp = parts[0];
+                        String fileName = parts[1];
+                        String base64 = parts[2];
+
+                        if (ecouteur != null) {
+                            ecouteur.fichierRecu(telExp, fileName, base64);
+                        }
+                    }
+                    break;
                 case CREATE_GROUP_OK:
                     if (ecouteur != null && parts.length >= 2) {
                         Groupe g = Groupe.fromNetworkString(parts[0] + ";" + parts[1]); // adapter selon format serveur
@@ -406,5 +418,12 @@ public class ClientReseau {
                 ecouteur.messagesRecus(messages);
             }
         }
+    }
+
+    //fichiers
+    public void envoyerFichier(String telDest, String fileName, byte[] dataBase64) {
+        String contenu = telDest + "|" + fileName + "|" + new String(dataBase64);
+        Packet p = new Packet(Protocol.FILE_SEND, contenu);
+        envoyer(p);
     }
 }
