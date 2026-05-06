@@ -23,7 +23,6 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
-
 import static org.bytedeco.librealsense.global.RealSense.video;
 
 public class Discussion implements EcouteurClient {
