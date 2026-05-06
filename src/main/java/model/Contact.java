@@ -12,4 +12,7 @@ public class Contact {
     private String nomAffiche;
     private boolean estBloque;
     private java.time.LocalDateTime dateAjout;
+    private String nomComplet;
+    private String numeroTelephone;
+    private String photoProfil;
 }

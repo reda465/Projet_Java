@@ -1,10 +1,7 @@
 /*package com.ensa;
 import client.ClientReseau;
 import client.EcouteurClient;
-import model.Contact;
-import model.Conversation;
-import model.Message;
-import model.Utilisateur;
+import model.*;
 import model.enums.TypeAppel;
 import service.CallService;
 
@@ -48,6 +45,56 @@ public class TestCallMain {
             @Override
             public void appelTermine(String numero) {
                 System.out.println("[CLIENT1] appel terminé avec " + numero);
+            }
+
+            @Override
+            public void groupeCree(Groupe groupe) {
+
+            }
+
+            @Override
+            public void creationGroupeEchouee(String raison) {
+
+            }
+
+            @Override
+            public void listeGroupesRecue(List<Groupe> groupes) {
+
+            }
+
+            @Override
+            public void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {
+
+            }
+
+            @Override
+            public void messageGroupeRecu(MessageGroupe message) {
+
+            }
+
+            @Override
+            public void membreAjoute(int idGroupe, String numero) {
+
+            }
+
+            @Override
+            public void membreRetire(int idGroupe, String numero) {
+
+            }
+
+            @Override
+            public void aQuitteGroupe(int idGroupe) {
+
+            }
+
+            @Override
+            public void groupeSupprime(int idGroupe) {
+
+            }
+
+            @Override
+            public void nomGroupeModifie(int idGroupe, String nouveauNom) {
+
             }
         });
 
@@ -105,6 +152,56 @@ public class TestCallMain {
             @Override
             public void appelTermine(String numero) {
                 System.out.println("[CLIENT2] appel terminé avec " + numero);
+            }
+
+            @Override
+            public void groupeCree(Groupe groupe) {
+
+            }
+
+            @Override
+            public void creationGroupeEchouee(String raison) {
+
+            }
+
+            @Override
+            public void listeGroupesRecue(List<Groupe> groupes) {
+
+            }
+
+            @Override
+            public void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {
+
+            }
+
+            @Override
+            public void messageGroupeRecu(MessageGroupe message) {
+
+            }
+
+            @Override
+            public void membreAjoute(int idGroupe, String numero) {
+
+            }
+
+            @Override
+            public void membreRetire(int idGroupe, String numero) {
+
+            }
+
+            @Override
+            public void aQuitteGroupe(int idGroupe) {
+
+            }
+
+            @Override
+            public void groupeSupprime(int idGroupe) {
+
+            }
+
+            @Override
+            public void nomGroupeModifie(int idGroupe, String nouveauNom) {
+
             }
         });
 

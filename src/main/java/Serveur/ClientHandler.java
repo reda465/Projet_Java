@@ -15,8 +15,6 @@ import Dao.*;
 @Getter
 @Setter
 
-
-
 public class ClientHandler extends Thread {
 
     private final Socket socket;
@@ -59,8 +57,8 @@ public class ClientHandler extends Thread {
                     case CALL_REFUSE  -> handleCallRefuse(parts);
                     case CALL_END     -> handleCallEnd(parts);
                     //case CALL_CANCEL  -> handleCallCancel(parts);
+                   //fichier
                     case FILE_SEND -> handleFileSend(parts);
-
                     default                -> pw.println("UNKNOWN_COMMAND");
                 }
             }
@@ -71,6 +69,7 @@ public class ClientHandler extends Thread {
             handleLogout();
         }
     }
+
 
     // ── LOGIN|numero_telephone|mot_de_passe ──────────────────────────────────
     private void handleLogin(String[] parts) {
@@ -321,7 +320,7 @@ public class ClientHandler extends Thread {
             e.printStackTrace();
         }
     }
-    //Envoie des fichiers _______________________________________
+    //fichier
 
     private void handleFileSend(String[] parts) {
         if (parts.length < 4) return;

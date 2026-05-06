@@ -116,15 +116,6 @@ public class ClientReseau {
             }
         }
 
-        //________________Envoie des fichiers______________
-
-        public void envoyerFichier(String telDest, String fileName, byte[] dataBase64) {
-            String contenu = telDest + "|" + fileName + "|" + new String(dataBase64);
-            Packet p = new Packet(Protocol.FILE_SEND, contenu);
-            envoyer(p);
-        }
-
-
         private void traiterPacket(Packet p) {
             String data = p.getData();
             String[] parts = data.split("\\|", -1); // -1 pour garder les champs vides
@@ -164,7 +155,12 @@ public class ClientReseau {
                     break;
                 case MSG_RECEIVE:
                     if (parts.length >= 2) {
-                        Message msg = new Message();
+                        Message msg = new Message() {
+                            @Override
+                            public String toNetworkString() {
+                                return "";
+                            }
+                        };
                         msg.setTelephoneExpediteur(parts[0]);
                         msg.setContenuTexte(parts[1]);
                         System.out.println("Message " + msg.getContenuTexte());
@@ -177,7 +173,7 @@ public class ClientReseau {
                         String nomAppelant = parts[1];
                         String typeAppel = parts[2];
                         String ipAppelant  = parts[4];
-                        ecouteur.appelEntrant(numAppelant, nomAppelant, typeAppel, "");
+                        ecouteur.appelEntrant(numAppelant, typeAppel, ipAppelant,nomAppelant);
                         System.out.println("Appel entrant de " + nomAppelant + " (" + numAppelant + ")  ip=" + ipAppelant);
                         if (callService != null) {
                             callService.recevoirAppel(numAppelant, nomAppelant, typeAppel, ipAppelant);
@@ -215,7 +211,21 @@ public class ClientReseau {
                 case MESSAGES_LIST:
                     traiterMessagesRecus(data);
                     break;
-
+                case ADD_CONTACT_OK:
+                    if (parts.length >= 3 && ecouteur != null) {
+                        Contact contactAjoute = new Contact();
+                        contactAjoute.setNomComplet(parts[1]);
+                        contactAjoute.setNumeroTelephone(parts[0]);
+                        System.out.println("✅ Contact ajouté: " + contactAjoute.getNomComplet());
+                        ecouteur.contactAjoute(contactAjoute);
+                    }
+                    break;
+                case ADD_CONTACT_FAIL:
+                    if (ecouteur != null) {
+                        ecouteur.erreur("Échec ajout contact: " + p.getData());
+                    }
+                    break;
+                    //fichier
                 case FILE_RECEIVE:
                     if (parts.length >= 3) {
                         String telExp = parts[0];
@@ -227,7 +237,6 @@ public class ClientReseau {
                         }
                     }
                     break;
-
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
                     break;
@@ -285,7 +294,12 @@ public class ClientReseau {
                 if (champs.length < 5) continue;
 
                 try {
-                    Message msg = new Message();
+                    Message msg = new Message() {
+                        @Override
+                        public String toNetworkString() {
+                            return "";
+                        }
+                    };
                     msg.setIdMessage(Integer.parseInt(champs[0].trim()));
                     msg.setTelephoneExpediteur(champs[1]);
                     msg.setNomExpediteur(champs[2]);
@@ -299,13 +313,20 @@ public class ClientReseau {
                     msg.setEstMoi(moi != null && champs[1].equals(moi.getNumeroTelephone()));
                     messages.add(msg);
                 } catch (NumberFormatException e) {
-                    System.out.println("❌ Erreur parsing message : " + e.getMessage());
+                    System.out.println(" Erreur parsing message : " + e.getMessage());
                 }
             }
-            System.out.println("💬 Messages reçus : " + messages.size());
+            System.out.println(" Messages reçus : " + messages.size());
             if (ecouteur != null) {
                 ecouteur.messagesRecus(messages);
             }
         }
+    }
+
+    //fichiers
+    public void envoyerFichier(String telDest, String fileName, byte[] dataBase64) {
+        String contenu = telDest + "|" + fileName + "|" + new String(dataBase64);
+        Packet p = new Packet(Protocol.FILE_SEND, contenu);
+        envoyer(p);
     }
 }

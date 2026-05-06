@@ -85,12 +85,11 @@ public class CallService {
 
         envoyer(Protocol.CALL_ACCEPT, numeroCorrespondant); // celui qui a appelé
         audioUDP.demarrer(ipCorrespondant, PORT_AUDIO_A, PORT_AUDIO_B);
+
         // Video seulement si VIDEO
         if (appelEnCours.getTypeAppel() == TypeAppel.VIDEO) {
-            if (videoView == null) {
-                System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
-            }
-            videoUDP.demarrer(ipCorrespondant, PORT_VIDEO_A, PORT_VIDEO_B, videoView);
+            // Côté appelé (rôle B): j'écoute sur B et j'envoie vers A
+            demarrerVideoSiPossible(ipCorrespondant, PORT_VIDEO_A, PORT_VIDEO_B);
         }
 
         System.out.println("[APPEL] Accepté, UDP démarré");
@@ -105,13 +104,10 @@ public class CallService {
         communicationActive = true;
 
         audioUDP.demarrer(ipAccepteur, PORT_AUDIO_B, PORT_AUDIO_A);
-
         // Video seulement si VIDEO
         if (appelEnCours.getTypeAppel() == TypeAppel.VIDEO) {
-            if (videoView == null) {
-                System.out.println("⚠️ VideoView null : vidéo ne peut pas s'afficher !");
-            }
-            videoUDP.demarrer(ipAccepteur, PORT_VIDEO_B, PORT_VIDEO_A, videoView);
+            // Côté appelant (rôle A): j'écoute sur A et j'envoie vers B
+            demarrerVideoSiPossible(ipAccepteur, PORT_VIDEO_B, PORT_VIDEO_A);
         }
 
 
