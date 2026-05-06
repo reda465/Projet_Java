@@ -225,11 +225,108 @@ public class ClientReseau {
                         ecouteur.erreur("Échec ajout contact: " + p.getData());
                     }
                     break;
+                case CREATE_GROUP_OK:
+                    if (ecouteur != null && parts.length >= 2) {
+                        Groupe g = Groupe.fromNetworkString(parts[0] + ";" + parts[1]); // adapter selon format serveur
+                        // Ou mieux: le serveur envoie le groupe complet sérialisé
+                        ecouteur.groupeCree(g);
+                    }
+                    break;
+
+                case CREATE_GROUP_FAIL:
+                    if (ecouteur != null) ecouteur.creationGroupeEchouee(data);
+                    break;
+                case GROUPS_LIST:
+                    traiterGroupesRecus(data);
+                    break;
+
+                case GROUP_MEMBERS_LIST:
+                    if (parts.length >= 2) {
+                        int idGroupe = Integer.parseInt(parts[0]);
+                        traiterMembresGroupe(idGroupe, parts[1]);
+                    }
+                    break;
+                case GROUP_MSG_RECEIVE:
+                    if (ecouteur != null) {
+                        MessageGroupe mg = MessageGroupe.fromNetworkString(data);
+                        // Déterminer si c'est mon message
+                        if (moi != null) mg.setEstMoi(mg.getTelephoneExpediteur().equals(moi.getNumeroTelephone()));
+                        ecouteur.messageGroupeRecu(mg);
+                    }
+                    break;
+                case ADD_MEMBER_OK:
+                    if (ecouteur != null && parts.length >= 2) {
+                        ecouteur.membreAjoute(Integer.parseInt(parts[0]), parts[1]);
+                    }
+                    break;
+
+                case REMOVE_MEMBER_OK:
+                    if (ecouteur != null && parts.length >= 2) {
+                        ecouteur.membreRetire(Integer.parseInt(parts[0]), parts[1]);
+                    }
+                    break;
+                case LEAVE_GROUP_OK:
+                    if (ecouteur != null) ecouteur.aQuitteGroupe(Integer.parseInt(data));
+                    break;
+
+                case DELETE_GROUP_OK:
+                    if (ecouteur != null) ecouteur.groupeSupprime(Integer.parseInt(data));
+                    break;
+
+                case UPDATE_GROUP_NAME_OK:
+                    if (ecouteur != null && parts.length >= 2) {
+                        ecouteur.nomGroupeModifie(Integer.parseInt(parts[0]), parts[1]);
+                    }
+                    break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
                     break;
 
             }
+        }
+
+        private void traiterGroupesRecus(String data) {
+            List<Groupe> groupes = new ArrayList<>();
+            if (data == null || data.isEmpty()) {
+                if (ecouteur != null) ecouteur.listeGroupesRecue(groupes);
+                return;
+            }
+
+            String[] grps = data.split("\\|");
+            for (String g : grps) {
+                if (g.isEmpty()) continue;
+                try {
+                    groupes.add(Groupe.fromNetworkString(g));
+                } catch (Exception e) {
+                    System.out.println("❌ Erreur parsing groupe: " + e.getMessage());
+                }
+            }
+            System.out.println("👥 Groupes reçus: " + groupes.size());
+            if (ecouteur != null) ecouteur.listeGroupesRecue(groupes);
+        }
+
+        // ===== TRAITER MEMBRES GROUPE =====
+        private void traiterMembresGroupe(int idGroupe, String data) {
+            List<Utilisateur> membres = new ArrayList<>();
+            if (data == null || data.isEmpty()) {
+                if (ecouteur != null) ecouteur.membresGroupeRecus(idGroupe, membres);
+                return;
+            }
+
+            String[] usrs = data.split("\\|");
+            for (String u : usrs) {
+                if (u.isEmpty()) continue;
+                String[] parts = u.split(";", -1);
+                if (parts.length < 3) continue;
+                Utilisateur user = new Utilisateur();
+                user.setIdUtilisateur(Integer.parseInt(parts[0]));
+                user.setNomComplet(parts[1]);
+                user.setNumeroTelephone(parts[2]);
+                user.setPhotoProfil(parts.length >= 4 && !parts[3].isEmpty() ? parts[3] : null);
+                //user.setEnLigne(parts.length >= 5 && Boolean.parseBoolean(parts[4]));
+                membres.add(user);
+            }
+            if (ecouteur != null) ecouteur.membresGroupeRecus(idGroupe, membres);
         }
 
         private void traiterConversationsRecues(String data) {
