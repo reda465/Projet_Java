@@ -279,6 +279,11 @@ public class login extends Application implements EcouteurClient {
 
     }
 
+    @Override
+    public void fichierRecu(String telephoneExp, String fileName, String base64) {
+
+    }
+
 
     @Override
     public void conversationsRecues(List<Conversation> conversations) {
