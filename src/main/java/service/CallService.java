@@ -151,7 +151,7 @@ public class CallService {
         envoyer(Protocol.CALL_REFUSE, numeroCorrespondant);
         arreter();
     }
- //  Je Raccrocher
+    //  Je Raccrocher
     public void raccrocher() {
         if (appelEnCours == null) return;
         envoyer(Protocol.CALL_END, numeroCorrespondant);
@@ -166,7 +166,7 @@ public class CallService {
     private void envoyer(Protocol protocol, String data) {
         clientReseau.envoyer(new Packet(protocol, data));
     }
-  //arreter l'audio et vidau
+    //arreter l'audio et vidau
     private void arreter() {
         audioUDP.arreter();
         videoUDP.arreter();

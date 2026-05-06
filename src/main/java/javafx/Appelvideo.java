@@ -1,5 +1,6 @@
 package javafx;
 import client.ClientHandlerAuth;
+import client.VideoUDP;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -13,9 +14,8 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
-
 public class Appelvideo {
-
+    private static VideoUDP videoUDP = null;
     // ── Appel vidéo sortant ───────────────────────────────────────────────────
     public static void demarrer(Stage parent, String contactNom,
                                 String numeroContact, int idConversation,
@@ -25,7 +25,6 @@ public class Appelvideo {
             System.out.println("Impossible d'appeler : client non connecté");
             return;
         }
-
         Stage stage = new Stage();
         stage.initModality(Modality.WINDOW_MODAL);
         stage.initOwner(parent);
@@ -73,6 +72,7 @@ public class Appelvideo {
         root.setAlignment(Pos.CENTER);
         root.setPadding(new Insets(20));
         root.setStyle("-fx-background-color: #F0F2F5;");
+
         stage.setScene(new Scene(root, 520, 500));
         stage.show();
     }
@@ -103,10 +103,9 @@ public class Appelvideo {
                         "-fx-cursor: hand;"
         );
         btnAccepter.setOnAction(e -> {
+            ClientHandlerAuth.getInstance().accepterAppel();
             stage.close();
             ouvrirFenetreCommunication(parent, appelantNom, numeroAppelant, ipAppelant);
-            // Démarre UDP après avoir attaché la VideoView à CallService
-            ClientHandlerAuth.getInstance().accepterAppel();
         });
 
         Button btnRefuser = new Button("❌  Refuser");
@@ -163,8 +162,14 @@ public class Appelvideo {
         videoView.setPreserveRatio(true);
         videoView.setStyle("-fx-background-color: black; -fx-border-radius: 10px;");
 
-        // IMPORTANT: la vidéo UDP est gérée par CallService (évite double bind/VideoView null).
-        ClientHandlerAuth.getInstance().setVideoView(videoView);
+        if (ipDistant != null && !ipDistant.isBlank()) {
+            arreterVideo();
+            videoUDP = new VideoUDP();
+            videoUDP.demarrer(ipDistant, 6003, 6002, videoView);
+            System.out.println("[Video] Démarré côté appelé → " + ipDistant);
+        } else {
+            System.out.println("[Video] IP distante manquante, vidéo non démarrée.");
+        }
 
         Button btnRaccrocher = new Button("📵  Raccrocher");
         btnRaccrocher.setStyle(
@@ -177,11 +182,12 @@ public class Appelvideo {
         );
         btnRaccrocher.setOnAction(e -> {
             ClientHandlerAuth.getInstance().raccrocher();
+            arreterVideo();
             stage.close();
         });
 
         stage.setOnCloseRequest(e -> {
-            ClientHandlerAuth.getInstance().raccrocher();
+            arreterVideo();
         });
 
         VBox root = new VBox(15, icone, nom, statut, videoView, btnRaccrocher);
@@ -191,5 +197,13 @@ public class Appelvideo {
 
         stage.setScene(new Scene(root, 520, 500));
         stage.show();
+    }
+    // ── Arrêter la vidéo ──────────────────────────────────────────────────────
+    private static void arreterVideo() {
+        if (videoUDP != null) {
+            videoUDP.arreter();
+            videoUDP = null;
+            System.out.println("[Video] Arrêté");
+        }
     }
 }
