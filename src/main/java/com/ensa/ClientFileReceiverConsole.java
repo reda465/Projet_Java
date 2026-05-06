@@ -1,4 +1,4 @@
-package com.ensa;
+/*package com.ensa;
 import Serveur.Protocol;
 import client.ClientReseau;
 import client.EcouteurClient;
@@ -67,3 +67,5 @@ public class ClientFileReceiverConsole {
         System.out.println("📌 Client receiver prêt (2222). Attente fichiers...");
     }
 }
+
+ */

@@ -1,4 +1,4 @@
-package javafx;
+/*package javafx;
 
 import Serveur.Protocol;
 import client.ClientReseau;
@@ -185,4 +185,4 @@ public class FichierUI extends Application implements EcouteurClient {
     public static void main(String[] args) {
         launch(args);
     }
-}
+}*/
