@@ -34,4 +34,7 @@ public interface EcouteurClient {
     void aQuitteGroupe(int idGroupe);                   // LEAVE_GROUP_OK
     void groupeSupprime(int idGroupe);                  // DELETE_GROUP_OK
     void nomGroupeModifie(int idGroupe, String nouveauNom);
+
+    //fichier
+    void fichierRecu(String telephoneExp, String fileName, String base64);
 }
