@@ -19,7 +19,6 @@ public class VideoUDP {
     private static final int HAUTEUR_FRAME  = 240;
     private static final int QUALITE_JPEG   = 30;
     private static final int TIMEOUT_RECEPTION_MS = 500;
-
     private DatagramSocket socketEnvoi;
     private DatagramSocket socketReception;
     private boolean actif = false;

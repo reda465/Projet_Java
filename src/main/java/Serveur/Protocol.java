@@ -63,5 +63,10 @@ public enum Protocol {
     GROUP_MSG_RECEIVE,      // Recevoir message de groupe
 
     UPDATE_GROUP_NAME,      // Modifier nom du groupe (admin)
-    UPDATE_GROUP_NAME_OK
+    UPDATE_GROUP_NAME_OK,
+
+    //fichier
+    FILE_SEND,
+    FILE_RECEIVE,
+    FILE_FAIL
 }
