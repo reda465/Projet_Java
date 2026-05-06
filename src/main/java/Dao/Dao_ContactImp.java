@@ -161,10 +161,8 @@ public class Dao_ContactImp implements DAO_Contact {
     /** Récupère les demandes en attente pour un utilisateur à sa reconnexion */
     public List<Contact> getDemandesEnAttente(int idUtilisateur) throws SQLException {
         List<Contact> liste = new ArrayList<>();
-        String sql = "SELECT c.*, u.numero_telephone, u.nom_complet "
-                + "FROM contacts c "
-                + "JOIN utilisateurs u ON c.id_contact_utilisateur = u.id_utilisateur "
-                + "WHERE c.id_utilisateur = ? AND c.nom_affiche = 'PENDING'";
+        String sql = "SELECT * FROM contacts "
+                + "WHERE id_utilisateur = ? AND nom_affiche = 'PENDING'";
         try (Connection con = DataBase.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, idUtilisateur);
