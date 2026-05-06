@@ -452,11 +452,13 @@ public class ClientHandler extends Thread {
                                 + "|" + moi.getNumeroTelephone()
                                 + "|" + moi.getNomComplet()
                 );
+            } else {
+                // ← Bob est hors ligne : persister la demande
+                contactDAO.ajouterDemandeEnAttente(
+                        moi.getIdUtilisateur(),
+                        contact.getIdUtilisateur()
+                );
             }
-
-            System.out.println("[CONTACT] " + telephoneConnecte
-                    + " a ajouté " + telephoneContact);
-
         } catch (SQLException e) {
             e.printStackTrace();
             pw.println(Protocol.ADD_CONTACT_FAIL.name() + "|ERREUR_SERVEUR");
@@ -470,11 +472,11 @@ public class ClientHandler extends Thread {
         String telephoneAlice = parts[1].trim();
 
         try {
-            Utilisateur moi   = userDAO.findByTelephone(telephoneConnecte);
+            Utilisateur moi   = userDAO.findByTelephone(telephoneConnecte); // Bob
             Utilisateur alice = userDAO.findByTelephone(telephoneAlice);
             if (moi == null || alice == null) return;
 
-            // Mettre à jour le contact PENDING → nom réel de Alice
+            // 1. Mettre à jour PENDING → nom réel d'Alice côté Bob
             String sql = "UPDATE contacts SET nom_affiche=? "
                     + "WHERE id_utilisateur=? AND id_contact_utilisateur=? "
                     + "AND nom_affiche='PENDING'";
@@ -486,8 +488,19 @@ public class ClientHandler extends Thread {
                 ps.executeUpdate();
             }
 
-            // Confirmer à Bob seulement — Alice ne sait rien
+            // 2. Confirmer à Bob
             pw.println(Protocol.CONTACT_ACCEPTED.name() + "|OK");
+
+            // 3. ← NOUVEAU : notifier Alice que Bob a accepté
+            ClientHandler aliceHandler = userManager.getHandler(telephoneAlice);
+            if (aliceHandler != null) {
+                aliceHandler.sendMessage(
+                        Protocol.CONTACT_ACCEPTED.name()
+                                + "|" + moi.getNumeroTelephone()
+                                + "|" + moi.getNomComplet()
+                );
+            }
+
             System.out.println("[CONTACT] " + telephoneConnecte
                     + " a accepté " + telephoneAlice);
 
