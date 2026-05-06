@@ -1,9 +1,6 @@
 package Serveur;
 
-import Dao.DaoConversationImp;
-import Dao.Dao_MessageImp;
-import Dao.Dao_MessageFileAttenteImp;
-import Dao.Dao_UtilisateurImp;
+import Dao.*;
 import model.Conversation;
 import model.Message;
 import model.MessageFileAttente;
@@ -38,7 +35,17 @@ public class MessageRouter {
         // 1. Retrouver les deux utilisateurs en DB
         Utilisateur expediteur   = utilisateurDAO.findByTelephone(telephoneExpediteur);
         Utilisateur destinataire = utilisateurDAO.findByTelephone(telephoneDest);
-
+        Dao_ContactImp contactDAO = new Dao_ContactImp();
+        if (contactDAO.estBloque(destinataire.getIdUtilisateur(),
+                expediteur.getIdUtilisateur())) {
+            System.out.println("[MSG] Bloqué — " + telephoneExpediteur
+                    + " est bloqué par " + telephoneDest);
+            // Optionnel : notifier l'expéditeur
+            ClientHandler expHandler = userManager.getHandler(telephoneExpediteur);
+            if (expHandler != null)
+                expHandler.sendMessage("MSG_FAIL|BLOQUE");
+            return;
+        }
         if (expediteur == null || destinataire == null) {
             System.out.println("[MSG] Utilisateur introuvable : "
                     + telephoneExpediteur + " → " + telephoneDest);
