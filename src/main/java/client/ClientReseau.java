@@ -356,7 +356,7 @@ public class ClientReseau {
                 if (parts.length < 5) continue;
 
                 Conversation conv = new Conversation();
-                conv.setIdConversation(Integer.parseInt(parts[0]));
+                conv.setIdConversation(Integer.parseInt(parts[0].trim()));
                 conv.setTypeConversation(parts[1]);
                 conv.setNomContact(parts[2]);
                 try {
