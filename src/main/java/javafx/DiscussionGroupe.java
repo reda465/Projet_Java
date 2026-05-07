@@ -23,9 +23,12 @@ import model.MessageGroupe;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 public class DiscussionGroupe {
+    private static final Map<Integer, DiscussionGroupe> discussionsOuvertes = new HashMap<>();
     private final Groupe groupe;
     private final VBox messagesBox = new VBox(8);
 
@@ -37,6 +40,8 @@ public class DiscussionGroupe {
         Stage stage = new Stage();
         stage.initOwner(owner);
         stage.setTitle("Groupe - " + groupe.getNomGroupe());
+        discussionsOuvertes.put(groupe.getIdGroupe(), this);
+        stage.setOnCloseRequest(e -> discussionsOuvertes.remove(groupe.getIdGroupe()));
 
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: #e5ddd5;");
@@ -143,5 +148,11 @@ public class DiscussionGroupe {
         String contenu = msg.getContenu() != null ? msg.getContenu() : "";
         String heure = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
         messagesBox.getChildren().add(Messagefx.Messagerecu(msg.getNomExpediteur() + " : " + contenu, heure));
+    }
+
+    public static void afficherMessageSiOuvert(MessageGroupe msg) {
+        if (msg == null) return;
+        DiscussionGroupe d = discussionsOuvertes.get(msg.getIdGroupe());
+        if (d != null) d.afficherMessage(msg);
     }
 }
