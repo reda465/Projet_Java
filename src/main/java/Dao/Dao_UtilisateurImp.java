@@ -18,8 +18,7 @@ public class Dao_UtilisateurImp implements Dao_Utilisateur {
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, u.getNomComplet());
             ps.setString(2, u.getNumeroTelephone());
-            ps.setString(3, u.getMotDePasse());
-
+           
             return ps.executeUpdate();
         }
     }
