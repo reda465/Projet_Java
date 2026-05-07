@@ -121,16 +121,24 @@ public class Discussion implements EcouteurClient {
         groupesList.setOnMouseClicked(e -> {
             HBox selected = groupesList.getSelectionModel().getSelectedItem();
             if (selected == null || selected.getUserData() == null) return;
-            String[] parts = selected.getUserData().toString().split(";", 2);
-            if (parts.length < 3) return;
-            Groupe g = new Groupe();
-            g.setIdGroupe(Integer.parseInt(parts[0]));
-            g.setNomGroupe(parts[1]);
-            int nb = Integer.parseInt(parts[2]);
-            ArrayList<String> membres = new ArrayList<>();
-            for (int i = 0; i < nb; i++) membres.add("");
-            g.setNumerosMembres(membres);
-            new DiscussionGroupe(g).ouvrir(primaryStage);
+            try {
+                String[] parts = selected.getUserData().toString().split(";", 3);
+                if (parts.length < 2) return;
+                Groupe g = new Groupe();
+                g.setIdGroupe(Integer.parseInt(parts[0]));
+                g.setNomGroupe(parts[1]);
+                int nb = 0;
+                if (parts.length >= 3) {
+                    try { nb = Integer.parseInt(parts[2]); } catch (Exception ignored) {}
+                }
+                ArrayList<String> membres = new ArrayList<>();
+                for (int i = 0; i < nb; i++) membres.add("");
+                g.setNumerosMembres(membres);
+                new DiscussionGroupe(g).ouvrir(primaryStage);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                showAlert(Alert.AlertType.ERROR, "Groupe", "Impossible d'ouvrir ce groupe.");
+            }
         });
 
         ToggleButton tabConversations = new ToggleButton("💬 Conversations");
