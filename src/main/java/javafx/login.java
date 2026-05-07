@@ -27,6 +27,7 @@ public class login extends Application implements EcouteurClient {
         ClientHandlerAuth.getInstance()
                 .connecterAuServeur("10.226.120.18", 5000, this);
     }
+    /////////////////////
     public Scene creerScene(Stage stage) {
         String fs = fieldStyle();
         String bs = btnStyle();
