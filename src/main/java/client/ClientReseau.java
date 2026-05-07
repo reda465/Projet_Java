@@ -237,8 +237,6 @@ public class ClientReseau {
                         }
                     }
                     break;
-
-                    break;
                 case CREATE_GROUP_OK:
                     traiterCreateGroupOk(data);
                     break;
