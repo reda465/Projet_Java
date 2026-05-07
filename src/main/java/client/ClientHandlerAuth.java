@@ -124,11 +124,15 @@ public class ClientHandlerAuth {
 
     public void demanderMembresGroupe(int idGroupe) {
         if (!verifierConnexion()) return;
-        groupeService.demanderMembres(idGroupe);
+        groupeService.demanderMessagesGroupe(idGroupe);
     }
     public void envoyerMessageGroupe(int idGroupe, String contenu) {
         if (!verifierConnexion()) return;
         groupeService.envoyerMessageGroupe(idGroupe, contenu);
+    }
+    public void demanderMessagesGroupe(int idGroupe) {
+        if (!verifierConnexion()) return;
+        groupeService.demanderMessagesGroupe(idGroupe);
     }
 
     // =====  DÉCONNEXION =====

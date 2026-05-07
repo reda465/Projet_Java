@@ -225,6 +225,40 @@ public class ClientReseau {
                         ecouteur.erreur("Échec ajout contact: " + p.getData());
                     }
                     break;
+                case CREATE_GROUP_OK:
+                    traiterCreateGroupOk(data);
+                    break;
+                case CREATE_GROUP_FAIL:
+                    if (ecouteur != null) ecouteur.creationGroupeEchouee(data);
+                    break;
+                case GROUPS_LIST:
+                    traiterGroupesRecus(data);
+                    break;
+                case GROUP_MESSAGES_LIST:
+                    traiterMessagesGroupeRecus(data);
+                    break;
+                case GROUP_MESSAGE_RECEIVE:
+                    traiterMessageGroupeRecu(parts);
+                    break;
+                case ADD_GROUP_MEMBER_OK:
+                    if (parts.length >= 2 && ecouteur != null) {
+                        ecouteur.membreAjoute(Integer.parseInt(parts[0]), parts[1]);
+                    }
+                    break;
+                case REMOVE_GROUP_MEMBER_OK:
+                    if (parts.length >= 2 && ecouteur != null) {
+                        ecouteur.membreRetire(Integer.parseInt(parts[0]), parts[1]);
+                    }
+                    break;
+                case QUIT_GROUP_OK:
+                    if (parts.length >= 1 && ecouteur != null) ecouteur.aQuitteGroupe(Integer.parseInt(parts[0]));
+                    break;
+                case DELETE_GROUP_OK:
+                    if (parts.length >= 1 && ecouteur != null) ecouteur.groupeSupprime(Integer.parseInt(parts[0]));
+                    break;
+                case RENAME_GROUP_OK:
+                    if (parts.length >= 2 && ecouteur != null) ecouteur.nomGroupeModifie(Integer.parseInt(parts[0]), parts[1]);
+                    break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
                     break;
@@ -308,6 +342,77 @@ public class ClientReseau {
             if (ecouteur != null) {
                 ecouteur.messagesRecus(messages);
             }
+        }
+
+        private void traiterCreateGroupOk(String data) {
+            try {
+                String[] parts = data.split("\\|", -1);
+                Groupe groupe = new Groupe();
+                if (parts.length > 0) groupe.setIdGroupe(Integer.parseInt(parts[0]));
+                if (parts.length > 1) groupe.setNomGroupe(parts[1]);
+                if (parts.length > 2) groupe.setNumeroCreateur(parts[2]);
+                if (parts.length > 3) groupe.setDateCreation(parts[3]);
+                List<String> membres = new ArrayList<>();
+                if (parts.length > 4) {
+                    String[] nums = parts[4].split(";", -1);
+                    for (String num : nums) if (!num.isEmpty()) membres.add(num);
+                }
+                groupe.setNumerosMembres(membres);
+                if (ecouteur != null) ecouteur.groupeCree(groupe);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void traiterGroupesRecus(String data) {
+            List<Groupe> groupes = new ArrayList<>();
+            if (data == null || data.isEmpty()) {
+                if (ecouteur != null) ecouteur.listeGroupesRecue(groupes);
+                return;
+            }
+            String[] lignes = data.split("\\|");
+            for (String ligne : lignes) {
+                String[] champs = ligne.split(";", -1);
+                if (champs.length < 4) continue;
+                Groupe g = new Groupe();
+                g.setIdGroupe(Integer.parseInt(champs[0]));
+                g.setNomGroupe(champs[1]);
+                g.setNumeroCreateur(champs[2]);
+                List<String> membres = new ArrayList<>();
+                int nb = 0;
+                try { nb = Integer.parseInt(champs[3]); } catch (Exception ignored) {}
+                for (int i = 0; i < nb; i++) membres.add("");
+                g.setNumerosMembres(membres);
+                groupes.add(g);
+            }
+            if (ecouteur != null) ecouteur.listeGroupesRecue(groupes);
+        }
+
+        private void traiterMessagesGroupeRecus(String data) {
+            if (data == null || data.isEmpty()) return;
+            String[] lignes = data.split("\\|");
+            for (String ligne : lignes) {
+                String[] champs = ligne.split(";", -1);
+                if (champs.length < 5) continue;
+                MessageGroupe msg = new MessageGroupe();
+                try { msg.setIdMessage(Integer.parseInt(champs[0])); } catch (Exception ignored) {}
+                msg.setTelephoneExpediteur(champs[1]);
+                msg.setNomExpediteur(champs[2]);
+                msg.setContenu(champs[3]);
+                try { msg.setDateEnvoi(LocalDateTime.parse(champs[4])); } catch (Exception e) { msg.setDateEnvoi(null); }
+                if (ecouteur != null) ecouteur.messageGroupeRecu(msg);
+            }
+        }
+
+        private void traiterMessageGroupeRecu(String[] parts) {
+            if (parts.length < 5) return;
+            MessageGroupe msg = new MessageGroupe();
+            msg.setIdGroupe(Integer.parseInt(parts[0]));
+            msg.setTelephoneExpediteur(parts[1]);
+            msg.setNomExpediteur(parts[2]);
+            msg.setContenu(parts[3]);
+            try { msg.setDateEnvoi(LocalDateTime.parse(parts[4])); } catch (Exception e) { msg.setDateEnvoi(null); }
+            if (ecouteur != null) ecouteur.messageGroupeRecu(msg);
         }
     }
 }

@@ -17,6 +17,7 @@ import javafx.stage.Stage;
 import javafx.collections.*;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -39,6 +40,7 @@ public class Discussion implements EcouteurClient {
     private Button sendBtn;
     private Stage primaryStage;
     ListView<HBox> convList;
+    ListView<HBox> groupesList;
     private String typeAppelEnCours = null;
     public Discussion(Utilisateur utilisateur) {
         this.utilisateurConnecte = utilisateur;
@@ -103,6 +105,47 @@ public class Discussion implements EcouteurClient {
         placeholder.setFont(Font.font("Segoe UI", 13));
         convList.setPlaceholder(placeholder);
 
+        groupesList = new ListView<>();
+        groupesList.setVisible(false);
+        groupesList.setManaged(false);
+        VBox.setVgrow(groupesList, Priority.ALWAYS);
+        groupesList.setItems(FXCollections.observableArrayList());
+        groupesList.setOnMouseClicked(e -> {
+            HBox selected = groupesList.getSelectionModel().getSelectedItem();
+            if (selected == null || selected.getUserData() == null) return;
+            String[] parts = selected.getUserData().toString().split(";", 2);
+            if (parts.length < 2) return;
+            Groupe g = new Groupe();
+            g.setIdGroupe(Integer.parseInt(parts[0]));
+            g.setNomGroupe(parts[1]);
+            g.setNumerosMembres(new ArrayList<>());
+            new DiscussionGroupe(g).ouvrir(primaryStage);
+        });
+
+        ToggleButton tabConversations = new ToggleButton("💬 Conversations");
+        ToggleButton tabGroupes = new ToggleButton("👥 Groupes");
+        ToggleGroup toggleGroup = new ToggleGroup();
+        tabConversations.setToggleGroup(toggleGroup);
+        tabGroupes.setToggleGroup(toggleGroup);
+        tabConversations.setSelected(true);
+        tabConversations.setStyle("-fx-background-color:#25D366;-fx-text-fill:white;");
+        tabGroupes.setStyle("-fx-background-color:#f0f0f0;");
+        tabConversations.setOnAction(e -> {
+            convList.setVisible(true); convList.setManaged(true);
+            groupesList.setVisible(false); groupesList.setManaged(false);
+            tabConversations.setStyle("-fx-background-color:#25D366;-fx-text-fill:white;");
+            tabGroupes.setStyle("-fx-background-color:#f0f0f0;");
+        });
+        tabGroupes.setOnAction(e -> {
+            convList.setVisible(false); convList.setManaged(false);
+            groupesList.setVisible(true); groupesList.setManaged(true);
+            tabConversations.setStyle("-fx-background-color:#f0f0f0;");
+            tabGroupes.setStyle("-fx-background-color:#25D366;-fx-text-fill:white;");
+            ClientHandlerAuth.getInstance().demanderListeGroupes();
+        });
+        HBox tabs = new HBox(6, tabConversations, tabGroupes);
+        tabs.setPadding(new Insets(6, 10, 6, 10));
+
         addContactBtn.setOnAction(e ->
                 Ajouter_contacte.show(stage, convList, ClientHandlerAuth.getInstance())
         );
@@ -123,7 +166,7 @@ public class Discussion implements EcouteurClient {
             }
         });
 
-        sidebar.getChildren().addAll(sideHeader, searchBox, convList);
+        sidebar.getChildren().addAll(sideHeader, searchBox, tabs, convList, groupesList);
 
         VBox chatPanel = new VBox(0);
         VBox.setVgrow(chatPanel, Priority.ALWAYS);
@@ -401,17 +444,28 @@ public class Discussion implements EcouteurClient {
 
     @Override
     public void groupeCree(Groupe groupe) {
-
+        Platform.runLater(() -> {
+            showAlert(Alert.AlertType.INFORMATION, "Groupe", "Groupe créé : " + groupe.getNomGroupe());
+            ClientHandlerAuth.getInstance().demanderListeGroupes();
+        });
     }
 
     @Override
     public void creationGroupeEchouee(String raison) {
-
+        Platform.runLater(() -> showAlert(Alert.AlertType.ERROR, "Groupe", "Création échouée : " + raison));
     }
 
     @Override
     public void listeGroupesRecue(List<Groupe> groupes) {
-
+        Platform.runLater(() -> {
+            groupesList.getItems().clear();
+            if (groupes == null) return;
+            for (Groupe g : groupes) {
+                HBox row = makeConvItem(g.getNomGroupe(), "", "Groupe", "#25D366", g.getIdGroupe(), 0);
+                row.setUserData(g.getIdGroupe() + ";" + g.getNomGroupe());
+                groupesList.getItems().add(row);
+            }
+        });
     }
 
     @Override
@@ -421,7 +475,7 @@ public class Discussion implements EcouteurClient {
 
     @Override
     public void messageGroupeRecu(MessageGroupe message) {
-
+        Platform.runLater(() -> System.out.println("Message groupe reçu: " + message.getContenu()));
     }
 
     @Override
