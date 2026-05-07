@@ -78,6 +78,11 @@ public class Ajouter_contacte {
             HBox item = Discussion.makeConvItem(name, phone, "maintenant", color,-1,0);
             convList.getItems().add(item);
             //
+            
+            // ── 3. Envoyer la requête au serveur pour enregistrer en base de données ──
+            if (client != null) {
+                client.ajouterContact(phone, name);
+            }
 
             message.setTextFill(Color.web("#25D366"));
             message.setText("✓ Contact \"" + name + "\" ajouté !");

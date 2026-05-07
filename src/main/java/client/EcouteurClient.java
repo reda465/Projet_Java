@@ -1,19 +1,15 @@
 package client;
 
 import model.*;
-
 import java.util.List;
-
 public interface EcouteurClient {
     // Quand la connexion réussit
     void connexionReussie(Utilisateur moi);
     void inscriptionReussie(String msg);
     // Quand ça échoue ou autre erreur
     void erreur(String message);
-
     // Quand on reçoit un message
     void messageRecu(String numeroDest, String message);
-
     void conversationsRecues(List<Conversation> conversations);
     void messagesRecus(List<Message> messages); // Pour une conversation donnée
     //Contact
@@ -23,7 +19,6 @@ public interface EcouteurClient {
     // Quand on se déconnecte
     void deconnexion();
     void appelEntrant(String numero,String type, String ipAppelant, String name);
-
     void appelAccepte(String numero, String ip);
      void appelRefuse();
      void appelTermine(String numero);
@@ -39,4 +34,7 @@ public interface EcouteurClient {
     void aQuitteGroupe(int idGroupe);                   // LEAVE_GROUP_OK
     void groupeSupprime(int idGroupe);                  // DELETE_GROUP_OK
     void nomGroupeModifie(int idGroupe, String nouveauNom);
+
+    //fichier
+    void fichierRecu(String telephoneExp, String fileName, String base64);
 }
