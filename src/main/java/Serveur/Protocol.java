@@ -16,7 +16,15 @@ public enum Protocol {
     // Messagerie
     MSG_SEND ,
     MSG_RECEIVE ,
+    // Contacts
 
+    BLOCK_CONTACT,
+    BLOCK_OK,
+
+    // Notification de premier message
+    CONTACT_REQUEST,    // ← notification envoyée au destinataire
+    CONTACT_ACCEPTED,   // ← le destinataire accepte
+    CONTACT_BLOCKED,    // ← le destinataire bloque
     //conversation
     GET_CONVERSATIONS,   // client demande sa liste de conversations
     CONVERSATIONS_LIST,
@@ -63,5 +71,10 @@ public enum Protocol {
     GROUP_MSG_RECEIVE,      // Recevoir message de groupe
 
     UPDATE_GROUP_NAME,      // Modifier nom du groupe (admin)
-    UPDATE_GROUP_NAME_OK
+    UPDATE_GROUP_NAME_OK,
+
+    //fichier
+    FILE_SEND,
+    FILE_RECEIVE,
+    FILE_FAIL
 }
