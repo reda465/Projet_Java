@@ -28,6 +28,7 @@ public class ClientReseau {
     private Utilisateur moi;
     private MessageService messageService;
     private CallService callService;
+    private int dernierIdGroupeDemande = -1;
 
 
     public ClientReseau(EcouteurClient ecouteur){//lier a l'interface graphique pour les signales
@@ -76,6 +77,9 @@ public class ClientReseau {
             return;
         }
         if (stylo != null) {
+            if (packet.getProtocol() == Protocol.GET_GROUP_MESSAGES) {
+                try { dernierIdGroupeDemande = Integer.parseInt(packet.getData()); } catch (Exception ignored) {}
+            }
             stylo.println(packet.toString());
             System.out.println(" Envoyé : " + packet.getProtocol());
         }
@@ -409,11 +413,21 @@ public class ClientReseau {
                 String[] champs = ligne.split(";", -1);
                 if (champs.length < 5) continue;
                 MessageGroupe msg = new MessageGroupe();
-                try { msg.setIdMessage(Integer.parseInt(champs[0])); } catch (Exception ignored) {}
-                msg.setTelephoneExpediteur(champs[1]);
-                msg.setNomExpediteur(champs[2]);
-                msg.setContenu(champs[3]);
-                try { msg.setDateEnvoi(LocalDateTime.parse(champs[4])); } catch (Exception e) { msg.setDateEnvoi(null); }
+                if (champs.length >= 6) {
+                    try { msg.setIdMessage(Integer.parseInt(champs[0])); } catch (Exception ignored) {}
+                    try { msg.setIdGroupe(Integer.parseInt(champs[1])); } catch (Exception ignored) {}
+                    msg.setTelephoneExpediteur(champs[2]);
+                    msg.setNomExpediteur(champs[3]);
+                    msg.setContenu(champs[4]);
+                    try { msg.setDateEnvoi(LocalDateTime.parse(champs[5])); } catch (Exception e) { msg.setDateEnvoi(null); }
+                } else {
+                    try { msg.setIdMessage(Integer.parseInt(champs[0])); } catch (Exception ignored) {}
+                    msg.setIdGroupe(dernierIdGroupeDemande);
+                    msg.setTelephoneExpediteur(champs[1]);
+                    msg.setNomExpediteur(champs[2]);
+                    msg.setContenu(champs[3]);
+                    try { msg.setDateEnvoi(LocalDateTime.parse(champs[4])); } catch (Exception e) { msg.setDateEnvoi(null); }
+                }
                 if (ecouteur != null) ecouteur.messageGroupeRecu(msg);
             }
         }

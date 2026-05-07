@@ -529,7 +529,10 @@ public class Discussion implements EcouteurClient {
 
     @Override
     public void messageGroupeRecu(MessageGroupe message) {
-        Platform.runLater(() -> System.out.println("Message groupe reçu: " + message.getContenu()));
+        Platform.runLater(() -> {
+            DiscussionGroupe.afficherMessageSiOuvert(message);
+            System.out.println("Message groupe reçu: " + message.getContenu());
+        });
     }
 
     @Override
