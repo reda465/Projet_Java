@@ -18,17 +18,11 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import Dao.*;
 @Getter
 @Setter
 
 public class ClientHandler extends Thread {
-    private static final Map<Integer, Groupe> groupes = new ConcurrentHashMap<>();
-    private static final Map<Integer, List<MessageGroupe>> messagesGroupes = new ConcurrentHashMap<>();
-    private static int sequenceGroupe = 1;
-    private static int sequenceMessageGroupe = 1;
-
     private final Socket socket;
     private PrintWriter pw;
     private String telephoneConnecte; // null = pas encore authentifié
@@ -41,6 +35,8 @@ public class ClientHandler extends Thread {
     private final DaoConversationImp convDAO    = new DaoConversationImp();
     private final Dao_MessageImp     messageDAO = new Dao_MessageImp();
     private final Dao_MessageFileAttenteImp fileDAO = new Dao_MessageFileAttenteImp();
+    private final Dao_GroupeImp groupeDAO = new Dao_GroupeImp();
+    private final Dao_MessageGroupeImp messageGroupeDAO = new Dao_MessageGroupeImp();
     public ClientHandler(Socket s) {
         this.socket = s;
     }
@@ -549,21 +545,11 @@ public class ClientHandler extends Thread {
                 pw.println(Protocol.CREATE_GROUP_FAIL.name() + "|Données invalides");
                 return;
             }
-            Groupe groupe = new Groupe();
-            synchronized (ClientHandler.class) {
-                groupe.setIdGroupe(sequenceGroupe++);
-            }
-            groupe.setNomGroupe(parts[1]);
-            groupe.setNumeroCreateur(parts[2]);
-            groupe.setDateCreation(LocalDateTime.now().toString());
             List<String> membres = new ArrayList<>();
-            membres.add(parts[2]);
             for (int i = 3; i < parts.length; i++) {
-                if (!parts[i].isBlank() && !membres.contains(parts[i])) membres.add(parts[i]);
+                if (!parts[i].isBlank()) membres.add(parts[i].trim());
             }
-            groupe.setNumerosMembres(membres);
-            groupes.put(groupe.getIdGroupe(), groupe);
-            messagesGroupes.put(groupe.getIdGroupe(), new ArrayList<>());
+            Groupe groupe = groupeDAO.creerGroupe(parts[1].trim(), parts[2].trim(), membres);
             pw.println(Protocol.CREATE_GROUP_OK.name() + "|"
                     + groupe.getIdGroupe() + "|"
                     + groupe.getNomGroupe() + "|"
@@ -577,56 +563,64 @@ public class ClientHandler extends Thread {
     }
 
     private void handleGetGroups(String[] parts) {
-        String numero = parts.length >= 2 ? parts[1] : telephoneConnecte;
-        StringBuilder sb = new StringBuilder();
-        for (Groupe g : groupes.values()) {
-            if (g.getNumerosMembres() == null || !g.getNumerosMembres().contains(numero)) continue;
-            if (sb.length() > 0) sb.append("|");
-            sb.append(g.getIdGroupe()).append(";")
-                    .append(g.getNomGroupe()).append(";")
-                    .append(g.getNumeroCreateur()).append(";")
-                    .append(g.getNumerosMembres() != null ? g.getNumerosMembres().size() : 0);
+        try {
+            String numero = parts.length >= 2 ? parts[1] : telephoneConnecte;
+            List<Groupe> groupes = groupeDAO.getGroupesPourMembre(numero);
+            StringBuilder sb = new StringBuilder();
+            for (Groupe g : groupes) {
+                if (sb.length() > 0) sb.append("|");
+                sb.append(g.getIdGroupe()).append(";")
+                        .append(g.getNomGroupe()).append(";")
+                        .append(g.getNumeroCreateur()).append(";")
+                        .append(g.getNumerosMembres() != null ? g.getNumerosMembres().size() : 0);
+            }
+            pw.println(Protocol.GROUPS_LIST.name() + "|" + sb);
+        } catch (Exception e) {
+            e.printStackTrace();
+            pw.println(Protocol.GROUPS_LIST.name() + "|");
         }
-        pw.println(Protocol.GROUPS_LIST.name() + "|" + sb);
     }
 
     private void handleSendGroupMessage(String[] parts) {
-        if (parts.length < 4) return;
-        int idGroupe = Integer.parseInt(parts[1]);
-        Groupe g = groupes.get(idGroupe);
-        if (g == null) return;
+        try {
+            if (parts.length < 4) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            Groupe g = groupeDAO.getById(idGroupe);
+            if (g == null) return;
 
-        MessageGroupe msg = new MessageGroupe();
-        synchronized (ClientHandler.class) {
-            msg.setIdMessage(sequenceMessageGroupe++);
-        }
-        msg.setIdGroupe(idGroupe);
-        msg.setTelephoneExpediteur(parts[2]);
-        msg.setNomExpediteur(parts[2]);
-        msg.setContenu(parts[3]);
-        msg.setDateEnvoi(LocalDateTime.now());
+            Utilisateur exp = userDAO.findByTelephone(parts[2]);
+            String nomExp = exp != null ? exp.getNomComplet() : parts[2];
 
-        List<MessageGroupe> liste = messagesGroupes.computeIfAbsent(idGroupe, k -> new ArrayList<>());
-        synchronized (liste) { liste.add(msg); }
+            MessageGroupe msg = new MessageGroupe();
+            msg.setIdGroupe(idGroupe);
+            msg.setTelephoneExpediteur(parts[2]);
+            msg.setNomExpediteur(nomExp);
+            msg.setContenu(parts[3]);
+            msg.setDateEnvoi(LocalDateTime.now());
+            int idMsg = messageGroupeDAO.ajouter(msg);
+            msg.setIdMessage(idMsg);
 
-        String payload = Protocol.GROUP_MESSAGE_RECEIVE.name() + "|"
-                + idGroupe + "|"
-                + msg.getTelephoneExpediteur() + "|"
-                + msg.getNomExpediteur() + "|"
-                + msg.getContenu() + "|"
-                + msg.getDateEnvoi();
-        for (String membre : g.getNumerosMembres()) {
-            ClientHandler h = userManager.getHandler(membre);
-            if (h != null) h.sendMessage(payload);
+            String payload = Protocol.GROUP_MESSAGE_RECEIVE.name() + "|"
+                    + idGroupe + "|"
+                    + msg.getTelephoneExpediteur() + "|"
+                    + msg.getNomExpediteur() + "|"
+                    + msg.getContenu() + "|"
+                    + msg.getDateEnvoi();
+            for (String membre : g.getNumerosMembres()) {
+                ClientHandler h = userManager.getHandler(membre);
+                if (h != null) h.sendMessage(payload);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
     private void handleGetGroupMessages(String[] parts) {
-        if (parts.length < 2) return;
-        int idGroupe = Integer.parseInt(parts[1]);
-        List<MessageGroupe> liste = messagesGroupes.getOrDefault(idGroupe, new ArrayList<>());
-        StringBuilder sb = new StringBuilder();
-        synchronized (liste) {
+        try {
+            if (parts.length < 2) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            List<MessageGroupe> liste = messageGroupeDAO.getByGroupe(idGroupe);
+            StringBuilder sb = new StringBuilder();
             for (MessageGroupe msg : liste) {
                 if (sb.length() > 0) sb.append("|");
                 sb.append(msg.getIdMessage()).append(";")
@@ -635,72 +629,86 @@ public class ClientHandler extends Thread {
                         .append(msg.getContenu()).append(";")
                         .append(msg.getDateEnvoi() != null ? msg.getDateEnvoi().toString() : "");
             }
+            pw.println(Protocol.GROUP_MESSAGES_LIST.name() + "|" + sb);
+        } catch (Exception e) {
+            e.printStackTrace();
+            pw.println(Protocol.GROUP_MESSAGES_LIST.name() + "|");
         }
-        pw.println(Protocol.GROUP_MESSAGES_LIST.name() + "|" + sb);
     }
 
     private void handleAddGroupMember(String[] parts) {
-        if (parts.length < 4) return;
-        int idGroupe = Integer.parseInt(parts[1]);
-        String numAdmin = parts[2];
-        String numNew = parts[3];
-        Groupe g = groupes.get(idGroupe);
-        if (g == null || !numAdmin.equals(g.getNumeroCreateur())) {
-            pw.println(Protocol.ADD_GROUP_MEMBER_FAIL.name() + "|Permission refusée");
-            return;
+        try {
+            if (parts.length < 4) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String numAdmin = parts[2];
+            String numNew = parts[3];
+            if (!groupeDAO.estAdmin(idGroupe, numAdmin)) {
+                pw.println(Protocol.ADD_GROUP_MEMBER_FAIL.name() + "|Permission refusée");
+                return;
+            }
+            groupeDAO.ajouterMembre(idGroupe, numNew);
+            pw.println(Protocol.ADD_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numNew);
+        } catch (Exception e) {
+            e.printStackTrace();
+            pw.println(Protocol.ADD_GROUP_MEMBER_FAIL.name() + "|Erreur serveur");
         }
-        synchronized (g) {
-            if (!g.getNumerosMembres().contains(numNew)) g.getNumerosMembres().add(numNew);
-        }
-        pw.println(Protocol.ADD_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numNew);
     }
 
     private void handleRemoveGroupMember(String[] parts) {
-        if (parts.length < 4) return;
-        int idGroupe = Integer.parseInt(parts[1]);
-        String numAdmin = parts[2];
-        String numMembre = parts[3];
-        Groupe g = groupes.get(idGroupe);
-        if (g == null || !numAdmin.equals(g.getNumeroCreateur())) {
-            pw.println(Protocol.REMOVE_GROUP_MEMBER_FAIL.name() + "|Permission refusée");
-            return;
+        try {
+            if (parts.length < 4) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String numAdmin = parts[2];
+            String numMembre = parts[3];
+            if (!groupeDAO.estAdmin(idGroupe, numAdmin)) {
+                pw.println(Protocol.REMOVE_GROUP_MEMBER_FAIL.name() + "|Permission refusée");
+                return;
+            }
+            groupeDAO.retirerMembre(idGroupe, numMembre);
+            pw.println(Protocol.REMOVE_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numMembre);
+        } catch (Exception e) {
+            e.printStackTrace();
+            pw.println(Protocol.REMOVE_GROUP_MEMBER_FAIL.name() + "|Erreur serveur");
         }
-        synchronized (g) { g.getNumerosMembres().remove(numMembre); }
-        pw.println(Protocol.REMOVE_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numMembre);
     }
 
     private void handleQuitGroup(String[] parts) {
-        if (parts.length < 3) return;
-        int idGroupe = Integer.parseInt(parts[1]);
-        String numero = parts[2];
-        Groupe g = groupes.get(idGroupe);
-        if (g == null) return;
-        synchronized (g) { g.getNumerosMembres().remove(numero); }
-        pw.println(Protocol.QUIT_GROUP_OK.name() + "|" + idGroupe);
+        try {
+            if (parts.length < 3) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String numero = parts[2];
+            groupeDAO.retirerMembre(idGroupe, numero);
+            pw.println(Protocol.QUIT_GROUP_OK.name() + "|" + idGroupe);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void handleDeleteGroup(String[] parts) {
-        if (parts.length < 3) return;
-        int idGroupe = Integer.parseInt(parts[1]);
-        String admin = parts[2];
-        Groupe g = groupes.get(idGroupe);
-        if (g == null) return;
-        if (!admin.equals(g.getNumeroCreateur())) return;
-        groupes.remove(idGroupe);
-        messagesGroupes.remove(idGroupe);
-        pw.println(Protocol.DELETE_GROUP_OK.name() + "|" + idGroupe);
+        try {
+            if (parts.length < 3) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String admin = parts[2];
+            if (!groupeDAO.estAdmin(idGroupe, admin)) return;
+            groupeDAO.supprimerGroupe(idGroupe);
+            pw.println(Protocol.DELETE_GROUP_OK.name() + "|" + idGroupe);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void handleRenameGroup(String[] parts) {
-        if (parts.length < 4) return;
-        int idGroupe = Integer.parseInt(parts[1]);
-        String admin = parts[2];
-        String nouveauNom = parts[3];
-        Groupe g = groupes.get(idGroupe);
-        if (g == null) return;
-        if (!admin.equals(g.getNumeroCreateur())) return;
-        g.setNomGroupe(nouveauNom);
-        pw.println(Protocol.RENAME_GROUP_OK.name() + "|" + idGroupe + "|" + nouveauNom);
+        try {
+            if (parts.length < 4) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String admin = parts[2];
+            String nouveauNom = parts[3];
+            if (!groupeDAO.estAdmin(idGroupe, admin)) return;
+            groupeDAO.renommerGroupe(idGroupe, nouveauNom);
+            pw.println(Protocol.RENAME_GROUP_OK.name() + "|" + idGroupe + "|" + nouveauNom);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
 }
