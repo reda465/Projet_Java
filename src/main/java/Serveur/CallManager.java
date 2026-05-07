@@ -166,7 +166,7 @@ public class CallManager {
             destHandler.sendMessage(
                     Protocol.CALL_END.name() + "|" + telephoneAppelant);
 
-        System.out.println("[APPEL] Terminé — durée : " + dureeSecondes + "s");
+        System.out.println("[APPEL]Terminé — durée : " + dureeSecondes + "s");
     }
 
     // ── Appel manqué (appelant annule avant réponse) ──────────────────────────
