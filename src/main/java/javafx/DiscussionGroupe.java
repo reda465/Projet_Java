@@ -5,6 +5,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
@@ -22,6 +23,7 @@ import model.MessageGroupe;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Optional;
 
 public class DiscussionGroupe {
     private final Groupe groupe;
@@ -48,7 +50,56 @@ public class DiscussionGroupe {
         title.setTextFill(Color.WHITE);
         title.setFont(Font.font("Segoe UI", 15));
         MenuButton menu = new MenuButton("⋮");
-        menu.getItems().addAll(new MenuItem("Ajouter membre"), new MenuItem("Retirer membre"), new MenuItem("Renommer"), new MenuItem("Quitter"), new MenuItem("Supprimer"));
+        MenuItem ajouterItem = new MenuItem("Ajouter membre");
+        MenuItem retirerItem = new MenuItem("Retirer membre");
+        MenuItem renommerItem = new MenuItem("Renommer");
+        MenuItem quitterItem = new MenuItem("Quitter");
+        MenuItem supprimerItem = new MenuItem("Supprimer");
+        menu.getItems().addAll(ajouterItem, retirerItem, renommerItem, quitterItem, supprimerItem);
+
+        ajouterItem.setOnAction(e -> {
+            TextInputDialog d = new TextInputDialog();
+            d.setTitle("Ajouter membre");
+            d.setHeaderText(null);
+            d.setContentText("Numéro du membre :");
+            Optional<String> r = d.showAndWait();
+            r.ifPresent(num -> {
+                String numero = num.trim();
+                if (!numero.isEmpty()) ClientHandlerAuth.getInstance().ajouterMembreAuGroupe(groupe.getIdGroupe(), numero);
+            });
+        });
+        retirerItem.setOnAction(e -> {
+            TextInputDialog d = new TextInputDialog();
+            d.setTitle("Retirer membre");
+            d.setHeaderText(null);
+            d.setContentText("Numéro du membre :");
+            d.showAndWait().ifPresent(num -> {
+                String numero = num.trim();
+                if (!numero.isEmpty()) ClientHandlerAuth.getInstance().retirerMembreDuGroupe(groupe.getIdGroupe(), numero);
+            });
+        });
+        renommerItem.setOnAction(e -> {
+            TextInputDialog d = new TextInputDialog(groupe.getNomGroupe());
+            d.setTitle("Renommer groupe");
+            d.setHeaderText(null);
+            d.setContentText("Nouveau nom :");
+            d.showAndWait().ifPresent(nom -> {
+                String nv = nom.trim();
+                if (!nv.isEmpty()) {
+                    ClientHandlerAuth.getInstance().modifierNomGroupe(groupe.getIdGroupe(), nv);
+                    groupe.setNomGroupe(nv);
+                    title.setText(groupe.getNomGroupe() + " (" + (groupe.getNumerosMembres() != null ? groupe.getNumerosMembres().size() : 0) + " membres)");
+                }
+            });
+        });
+        quitterItem.setOnAction(e -> {
+            ClientHandlerAuth.getInstance().quitterGroupe(groupe.getIdGroupe());
+            stage.close();
+        });
+        supprimerItem.setOnAction(e -> {
+            ClientHandlerAuth.getInstance().supprimerGroupe(groupe.getIdGroupe());
+            stage.close();
+        });
         HBox spacer = new HBox();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         header.getChildren().addAll(title, spacer, menu);
@@ -70,13 +121,19 @@ public class DiscussionGroupe {
             String txt = field.getText();
             if (txt == null || txt.trim().isEmpty()) return;
             ClientHandlerAuth.getInstance().envoyerMessageGroupe(groupe.getIdGroupe(), txt.trim());
-            afficherMessage(new MessageGroupe());
+            MessageGroupe msg = new MessageGroupe();
+            msg.setNomExpediteur(ClientHandlerAuth.getInstance().getUtilisateurConnecte() != null
+                    ? ClientHandlerAuth.getInstance().getUtilisateurConnecte().getNomComplet()
+                    : "Moi");
+            msg.setContenu(txt.trim());
+            afficherMessage(msg);
             field.clear();
         };
         send.setOnAction(e -> action.run());
         field.setOnAction(e -> action.run());
         input.getChildren().addAll(field, send);
         root.setBottom(input);
+        ClientHandlerAuth.getInstance().demanderMessagesGroupe(groupe.getIdGroupe());
 
         stage.setScene(new Scene(root, 620, 520));
         stage.show();

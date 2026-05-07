@@ -122,11 +122,14 @@ public class Discussion implements EcouteurClient {
             HBox selected = groupesList.getSelectionModel().getSelectedItem();
             if (selected == null || selected.getUserData() == null) return;
             String[] parts = selected.getUserData().toString().split(";", 2);
-            if (parts.length < 2) return;
+            if (parts.length < 3) return;
             Groupe g = new Groupe();
             g.setIdGroupe(Integer.parseInt(parts[0]));
             g.setNomGroupe(parts[1]);
-            g.setNumerosMembres(new ArrayList<>());
+            int nb = Integer.parseInt(parts[2]);
+            ArrayList<String> membres = new ArrayList<>();
+            for (int i = 0; i < nb; i++) membres.add("");
+            g.setNumerosMembres(membres);
             new DiscussionGroupe(g).ouvrir(primaryStage);
         });
 
@@ -165,10 +168,19 @@ public class Discussion implements EcouteurClient {
                 Ajouter_contacte.show(stage, convList, ClientHandlerAuth.getInstance());
                 return;
             }
-            CreerGroupeDialog dialog = new CreerGroupeDialog();
+            List<Contact> contacts = extraireContactsDepuisConversations();
+            if (contacts.isEmpty()) {
+                showAlert(Alert.AlertType.WARNING, "Groupe", "Aucun contact disponible pour créer un groupe.");
+                return;
+            }
+            CreerGroupeDialog dialog = new CreerGroupeDialog(contacts);
             dialog.showAndWait().ifPresent(res -> {
                 if (res.nomGroupe == null || res.nomGroupe.trim().isEmpty()) {
                     showAlert(Alert.AlertType.WARNING, "Groupe", "Nom du groupe requis.");
+                    return;
+                }
+                if (res.numeros == null || res.numeros.length < 2) {
+                    showAlert(Alert.AlertType.WARNING, "Groupe", "Choisissez au moins 2 membres.");
                     return;
                 }
                 ClientHandlerAuth.getInstance().creerGroupe(res.nomGroupe.trim(), res.numeros);
@@ -495,7 +507,8 @@ public class Discussion implements EcouteurClient {
             if (groupes == null) return;
             for (Groupe g : groupes) {
                 HBox row = makeConvItem(g.getNomGroupe(), "", "Groupe", "#25D366", g.getIdGroupe(), 0);
-                row.setUserData(g.getIdGroupe() + ";" + g.getNomGroupe());
+                int nb = g.getNumerosMembres() != null ? g.getNumerosMembres().size() : 0;
+                row.setUserData(g.getIdGroupe() + ";" + g.getNomGroupe() + ";" + nb);
                 groupesList.getItems().add(row);
             }
         });
@@ -513,27 +526,36 @@ public class Discussion implements EcouteurClient {
 
     @Override
     public void membreAjoute(int idGroupe, String numero) {
-
+        Platform.runLater(() -> {
+            showAlert(Alert.AlertType.INFORMATION, "Groupe", "Membre ajouté : " + numero);
+            ClientHandlerAuth.getInstance().demanderListeGroupes();
+        });
     }
 
     @Override
     public void membreRetire(int idGroupe, String numero) {
-
+        Platform.runLater(() -> {
+            showAlert(Alert.AlertType.INFORMATION, "Groupe", "Membre retiré : " + numero);
+            ClientHandlerAuth.getInstance().demanderListeGroupes();
+        });
     }
 
     @Override
     public void aQuitteGroupe(int idGroupe) {
-
+        Platform.runLater(() -> ClientHandlerAuth.getInstance().demanderListeGroupes());
     }
 
     @Override
     public void groupeSupprime(int idGroupe) {
-
+        Platform.runLater(() -> {
+            showAlert(Alert.AlertType.INFORMATION, "Groupe", "Groupe supprimé");
+            ClientHandlerAuth.getInstance().demanderListeGroupes();
+        });
     }
 
     @Override
     public void nomGroupeModifie(int idGroupe, String nouveauNom) {
-
+        Platform.runLater(() -> ClientHandlerAuth.getInstance().demanderListeGroupes());
     }
 
     //fichier
@@ -651,6 +673,25 @@ public class Discussion implements EcouteurClient {
                     });
             break;
         }
+    }
+
+    private List<Contact> extraireContactsDepuisConversations() {
+        List<Contact> contacts = new ArrayList<>();
+        List<String> deja = new ArrayList<>();
+        for (HBox item : convList.getItems()) {
+            Object ud = item.getUserData();
+            if (ud == null) continue;
+            String[] parts = ud.toString().split(";", 3);
+            if (parts.length < 3) continue;
+            String numero = parts[1] != null ? parts[1].trim() : "";
+            if (numero.isEmpty() || deja.contains(numero)) continue;
+            Contact c = new Contact();
+            c.setNumeroTelephone(numero);
+            c.setNomComplet(parts[2]);
+            contacts.add(c);
+            deja.add(numero);
+        }
+        return contacts;
     }
 
     private void afficherAccueil() {
