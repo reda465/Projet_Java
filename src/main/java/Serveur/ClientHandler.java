@@ -3,19 +3,28 @@ package Serveur;
 import lombok.Getter;
 import lombok.Setter;
 import model.Conversation;
+import model.Groupe;
 import model.Message;
+import model.MessageGroupe;
 import model.Utilisateur;
 
 import java.io.*;
 import java.net.Socket;
+import java.time.LocalDateTime;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import Dao.*;
 @Getter
 @Setter
 
 public class ClientHandler extends Thread {
+    private static final Map<Integer, Groupe> groupes = new ConcurrentHashMap<>();
+    private static final Map<Integer, List<MessageGroupe>> messagesGroupes = new ConcurrentHashMap<>();
+    private static int sequenceGroupe = 1;
+    private static int sequenceMessageGroupe = 1;
 
     private final Socket socket;
     private PrintWriter pw;
@@ -56,7 +65,15 @@ public class ClientHandler extends Thread {
                     case CALL_ACCEPT  -> handleCallAccept(parts);
                     case CALL_REFUSE  -> handleCallRefuse(parts);
                     case CALL_END     -> handleCallEnd(parts);
-                    //case CALL_CANCEL  -> handleCallCancel(parts);
+                    case CREATE_GROUP -> handleCreateGroup(parts);
+                    case GET_GROUPS -> handleGetGroups(parts);
+                    case SEND_GROUP_MESSAGE -> handleSendGroupMessage(parts);
+                    case GET_GROUP_MESSAGES -> handleGetGroupMessages(parts);
+                    case ADD_GROUP_MEMBER -> handleAddGroupMember(parts);
+                    case REMOVE_GROUP_MEMBER -> handleRemoveGroupMember(parts);
+                    case QUIT_GROUP -> handleQuitGroup(parts);
+                    case DELETE_GROUP -> handleDeleteGroup(parts);
+                    case RENAME_GROUP -> handleRenameGroup(parts);
 
                     default                -> pw.println("UNKNOWN_COMMAND");
                 }
@@ -317,6 +334,167 @@ public class ClientHandler extends Thread {
         } catch (SQLException | NumberFormatException e) {
             e.printStackTrace();
         }
+    }
+
+    // ── GROUPES V2 ───────────────────────────────────────────────────────────
+    private void handleCreateGroup(String[] parts) {
+        try {
+            if (parts.length < 3) {
+                pw.println(Protocol.CREATE_GROUP_FAIL.name() + "|Données invalides");
+                return;
+            }
+            Groupe groupe = new Groupe();
+            synchronized (ClientHandler.class) {
+                groupe.setIdGroupe(sequenceGroupe++);
+            }
+            groupe.setNomGroupe(parts[1]);
+            groupe.setNumeroCreateur(parts[2]);
+            groupe.setDateCreation(LocalDateTime.now().toString());
+            List<String> membres = new ArrayList<>();
+            membres.add(parts[2]);
+            for (int i = 3; i < parts.length; i++) {
+                if (!parts[i].isBlank() && !membres.contains(parts[i])) membres.add(parts[i]);
+            }
+            groupe.setNumerosMembres(membres);
+            groupes.put(groupe.getIdGroupe(), groupe);
+            messagesGroupes.put(groupe.getIdGroupe(), new ArrayList<>());
+            pw.println(Protocol.CREATE_GROUP_OK.name() + "|"
+                    + groupe.getIdGroupe() + "|"
+                    + groupe.getNomGroupe() + "|"
+                    + groupe.getNumeroCreateur() + "|"
+                    + groupe.getDateCreation() + "|"
+                    + String.join(";", groupe.getNumerosMembres()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            pw.println(Protocol.CREATE_GROUP_FAIL.name() + "|Erreur création groupe");
+        }
+    }
+
+    private void handleGetGroups(String[] parts) {
+        String numero = parts.length >= 2 ? parts[1] : telephoneConnecte;
+        StringBuilder sb = new StringBuilder();
+        for (Groupe g : groupes.values()) {
+            if (g.getNumerosMembres() == null || !g.getNumerosMembres().contains(numero)) continue;
+            if (sb.length() > 0) sb.append("|");
+            sb.append(g.getIdGroupe()).append(";")
+                    .append(g.getNomGroupe()).append(";")
+                    .append(g.getNumeroCreateur()).append(";")
+                    .append(g.getNumerosMembres() != null ? g.getNumerosMembres().size() : 0);
+        }
+        pw.println(Protocol.GROUPS_LIST.name() + "|" + sb);
+    }
+
+    private void handleSendGroupMessage(String[] parts) {
+        if (parts.length < 4) return;
+        int idGroupe = Integer.parseInt(parts[1]);
+        Groupe g = groupes.get(idGroupe);
+        if (g == null) return;
+
+        MessageGroupe msg = new MessageGroupe();
+        synchronized (ClientHandler.class) {
+            msg.setIdMessage(sequenceMessageGroupe++);
+        }
+        msg.setIdGroupe(idGroupe);
+        msg.setTelephoneExpediteur(parts[2]);
+        msg.setNomExpediteur(parts[2]);
+        msg.setContenu(parts[3]);
+        msg.setDateEnvoi(LocalDateTime.now());
+
+        List<MessageGroupe> liste = messagesGroupes.computeIfAbsent(idGroupe, k -> new ArrayList<>());
+        synchronized (liste) { liste.add(msg); }
+
+        String payload = Protocol.GROUP_MESSAGE_RECEIVE.name() + "|"
+                + idGroupe + "|"
+                + msg.getTelephoneExpediteur() + "|"
+                + msg.getNomExpediteur() + "|"
+                + msg.getContenu() + "|"
+                + msg.getDateEnvoi();
+        for (String membre : g.getNumerosMembres()) {
+            ClientHandler h = userManager.getHandler(membre);
+            if (h != null) h.sendMessage(payload);
+        }
+    }
+
+    private void handleGetGroupMessages(String[] parts) {
+        if (parts.length < 2) return;
+        int idGroupe = Integer.parseInt(parts[1]);
+        List<MessageGroupe> liste = messagesGroupes.getOrDefault(idGroupe, new ArrayList<>());
+        StringBuilder sb = new StringBuilder();
+        synchronized (liste) {
+            for (MessageGroupe msg : liste) {
+                if (sb.length() > 0) sb.append("|");
+                sb.append(msg.getIdMessage()).append(";")
+                        .append(msg.getTelephoneExpediteur()).append(";")
+                        .append(msg.getNomExpediteur()).append(";")
+                        .append(msg.getContenu()).append(";")
+                        .append(msg.getDateEnvoi() != null ? msg.getDateEnvoi().toString() : "");
+            }
+        }
+        pw.println(Protocol.GROUP_MESSAGES_LIST.name() + "|" + sb);
+    }
+
+    private void handleAddGroupMember(String[] parts) {
+        if (parts.length < 4) return;
+        int idGroupe = Integer.parseInt(parts[1]);
+        String numAdmin = parts[2];
+        String numNew = parts[3];
+        Groupe g = groupes.get(idGroupe);
+        if (g == null || !numAdmin.equals(g.getNumeroCreateur())) {
+            pw.println(Protocol.ADD_GROUP_MEMBER_FAIL.name() + "|Permission refusée");
+            return;
+        }
+        synchronized (g) {
+            if (!g.getNumerosMembres().contains(numNew)) g.getNumerosMembres().add(numNew);
+        }
+        pw.println(Protocol.ADD_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numNew);
+    }
+
+    private void handleRemoveGroupMember(String[] parts) {
+        if (parts.length < 4) return;
+        int idGroupe = Integer.parseInt(parts[1]);
+        String numAdmin = parts[2];
+        String numMembre = parts[3];
+        Groupe g = groupes.get(idGroupe);
+        if (g == null || !numAdmin.equals(g.getNumeroCreateur())) {
+            pw.println(Protocol.REMOVE_GROUP_MEMBER_FAIL.name() + "|Permission refusée");
+            return;
+        }
+        synchronized (g) { g.getNumerosMembres().remove(numMembre); }
+        pw.println(Protocol.REMOVE_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numMembre);
+    }
+
+    private void handleQuitGroup(String[] parts) {
+        if (parts.length < 3) return;
+        int idGroupe = Integer.parseInt(parts[1]);
+        String numero = parts[2];
+        Groupe g = groupes.get(idGroupe);
+        if (g == null) return;
+        synchronized (g) { g.getNumerosMembres().remove(numero); }
+        pw.println(Protocol.QUIT_GROUP_OK.name() + "|" + idGroupe);
+    }
+
+    private void handleDeleteGroup(String[] parts) {
+        if (parts.length < 3) return;
+        int idGroupe = Integer.parseInt(parts[1]);
+        String admin = parts[2];
+        Groupe g = groupes.get(idGroupe);
+        if (g == null) return;
+        if (!admin.equals(g.getNumeroCreateur())) return;
+        groupes.remove(idGroupe);
+        messagesGroupes.remove(idGroupe);
+        pw.println(Protocol.DELETE_GROUP_OK.name() + "|" + idGroupe);
+    }
+
+    private void handleRenameGroup(String[] parts) {
+        if (parts.length < 4) return;
+        int idGroupe = Integer.parseInt(parts[1]);
+        String admin = parts[2];
+        String nouveauNom = parts[3];
+        Groupe g = groupes.get(idGroupe);
+        if (g == null) return;
+        if (!admin.equals(g.getNumeroCreateur())) return;
+        g.setNomGroupe(nouveauNom);
+        pw.println(Protocol.RENAME_GROUP_OK.name() + "|" + idGroupe + "|" + nouveauNom);
     }
 
 }
