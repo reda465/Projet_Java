@@ -44,6 +44,7 @@ public class Discussion implements EcouteurClient {
     private Stage primaryStage;
     ListView<HBox> convList;
     ListView<HBox> groupesList;
+    private boolean ongletGroupesActif = false;
     private String typeAppelEnCours = null;
     private Fileservice fileService;//fichier
     private Button attachBtn;
@@ -138,24 +139,41 @@ public class Discussion implements EcouteurClient {
         tabConversations.setStyle("-fx-background-color:#25D366;-fx-text-fill:white;");
         tabGroupes.setStyle("-fx-background-color:#f0f0f0;");
         tabConversations.setOnAction(e -> {
+            ongletGroupesActif = false;
             convList.setVisible(true); convList.setManaged(true);
             groupesList.setVisible(false); groupesList.setManaged(false);
             tabConversations.setStyle("-fx-background-color:#25D366;-fx-text-fill:white;");
             tabGroupes.setStyle("-fx-background-color:#f0f0f0;");
+            addContactBtn.setText("👤+");
+            addContactBtn.setTooltip(new Tooltip("Ajouter un contact"));
         });
         tabGroupes.setOnAction(e -> {
+            ongletGroupesActif = true;
             convList.setVisible(false); convList.setManaged(false);
             groupesList.setVisible(true); groupesList.setManaged(true);
             tabConversations.setStyle("-fx-background-color:#f0f0f0;");
             tabGroupes.setStyle("-fx-background-color:#25D366;-fx-text-fill:white;");
+            addContactBtn.setText("👥+");
+            addContactBtn.setTooltip(new Tooltip("Créer un groupe"));
             ClientHandlerAuth.getInstance().demanderListeGroupes();
         });
         HBox tabs = new HBox(6, tabConversations, tabGroupes);
         tabs.setPadding(new Insets(6, 10, 6, 10));
 
-        addContactBtn.setOnAction(e ->
-                Ajouter_contacte.show(stage, convList, ClientHandlerAuth.getInstance())
-        );
+        addContactBtn.setOnAction(e -> {
+            if (!ongletGroupesActif) {
+                Ajouter_contacte.show(stage, convList, ClientHandlerAuth.getInstance());
+                return;
+            }
+            CreerGroupeDialog dialog = new CreerGroupeDialog();
+            dialog.showAndWait().ifPresent(res -> {
+                if (res.nomGroupe == null || res.nomGroupe.trim().isEmpty()) {
+                    showAlert(Alert.AlertType.WARNING, "Groupe", "Nom du groupe requis.");
+                    return;
+                }
+                ClientHandlerAuth.getInstance().creerGroupe(res.nomGroupe.trim(), res.numeros);
+            });
+        });
 
         convList.setOnMouseClicked(e -> {
             HBox selected = convList.getSelectionModel().getSelectedItem();
@@ -419,10 +437,7 @@ public class Discussion implements EcouteurClient {
                             idConversationActive != null ? idConversationActive : -1, ip);
                     // Fermer la fenêtre d'appel audio si elle est ouverte
 
-                   /* if (stageAppel != null) {
-=======
                     /*if (stageAppel != null) {
->>>>>>> 35b4224715f9d41e178a2d8d2900f56f865f37c2
                         stageAppel.close();
                         stageAppel = null;
                     }*/
