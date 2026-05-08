@@ -19,7 +19,10 @@ import java.util.Base64;
                 byte[] bytes = Files.readAllBytes(file.toPath());
                 String base64 = Base64.getEncoder().encodeToString(bytes);
 
-                String data = telDest + "|" + file.getName() + "|" + base64;
+                long taille = file.length();
+
+                String data = telDest + "|" + file.getName() + "|" + taille + "|" + base64;
+
                 clientReseau.envoyer(new Packet(Protocol.FILE_SEND, data));
 
                 System.out.println("[FILE] fichier envoyé au serveur : " + file.getName());

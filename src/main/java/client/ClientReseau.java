@@ -227,14 +227,13 @@ public class ClientReseau {
                     break;
                     //fichier
                 case FILE_RECEIVE:
-                    if (parts.length >= 3) {
+                    // format : telExp|fileName|taille|base64
+                    if (parts.length >= 4 && ecouteur != null) {
                         String telExp = parts[0];
                         String fileName = parts[1];
-                        String base64 = parts[2];
+                        String base64 = parts[3];
 
-                        if (ecouteur != null) {
-                            ecouteur.fichierRecu(telExp, fileName, base64);
-                        }
+                        ecouteur.fichierRecu(telExp, fileName, base64);
                     }
                     break;
                 case CREATE_GROUP_OK:

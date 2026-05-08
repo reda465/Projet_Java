@@ -108,6 +108,8 @@ public class ClientHandler extends Thread {
         } catch (SQLException e) {
             e.printStackTrace();
             pw.println(Protocol.LOGIN_FAIL);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -359,27 +361,87 @@ public class ClientHandler extends Thread {
     //fichier
 
     private void handleFileSend(String[] parts) {
-        if (parts.length < 4) return;
+        if (parts.length < 5) return;
 
         String telDest = parts[1];
         String fileName = parts[2];
-        String base64 = parts[3];
+        long taille = Long.parseLong(parts[3]);
+        String base64 = parts[4];
 
-        ClientHandler destHandler = userManager.getHandler(telDest);
+        try {
+            // 1) récupérer users
+            Utilisateur expediteur = userDAO.findByTelephone(telephoneConnecte);
+            Utilisateur destinataire = userDAO.findByTelephone(telDest);
 
-        if (destHandler == null) {
-            pw.println(Protocol.FILE_FAIL.name() + "|DEST_OFFLINE");
-            return;
+            if (expediteur == null || destinataire == null) return;
+
+            // 2) trouver / créer conversation
+            Conversation conv = convDAO.findIndividuelle(expediteur.getIdUtilisateur(), destinataire.getIdUtilisateur());
+
+            if (conv == null) {
+                conv = new Conversation();
+                conv.setTypeConversation("individuelle");
+                conv.setNomGroupe(null);
+                conv.setIdCreateur(null);
+
+                int idConv = convDAO.Add(conv);
+                conv.setIdConversation(idConv);
+
+                convDAO.ajouterParticipant(idConv, expediteur.getIdUtilisateur());
+                convDAO.ajouterParticipant(idConv, destinataire.getIdUtilisateur());
+            }
+
+            // 3) sauvegarder fichier sur serveur disque
+            byte[] fileBytes = java.util.Base64.getDecoder().decode(base64);
+
+            java.io.File dossier = new java.io.File("server_files/conv_" + conv.getIdConversation());
+            if (!dossier.exists()) dossier.mkdirs();
+
+            java.io.File fichierServeur = new java.io.File(dossier, fileName);
+            java.nio.file.Files.write(fichierServeur.toPath(), fileBytes);
+
+            // 4) sauvegarder dans messages
+            Message msg = new Message() {
+                @Override
+                public String toNetworkString() {
+                    return "";
+                }
+            };
+
+            msg.setIdConversation(conv.getIdConversation());
+            msg.setIdExpediteur(expediteur.getIdUtilisateur());
+            msg.setTypeMessage("fichier");
+            msg.setContenuTexte(null);
+            msg.setUrlFichier(fichierServeur.getAbsolutePath());
+            msg.setNomFichier(fileName);
+            msg.setTailleFichier(taille);
+
+            messageDAO.Add(msg);
+
+            // 5) update conversation
+            convDAO.updateDateDernierMessage(conv.getIdConversation());
+
+            // 6) envoyer ou mettre en attente
+            ClientHandler destHandler = userManager.getHandler(telDest);
+
+            if (destHandler != null) {
+                destHandler.sendMessage(
+                        Protocol.FILE_RECEIVE.name() + "|" +
+                                telephoneConnecte + "|" +
+                                fileName + "|" +
+                                taille + "|" +
+                                base64
+                );
+                System.out.println("[FILE] livré directement à " + telDest);
+
+            } else {
+                fileDAO.ajouterEnAttente(msg.getIdMessage(), destinataire.getIdUtilisateur());
+                System.out.println("[FILE] mis en attente pour " + telDest);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        destHandler.sendMessage(
-                Protocol.FILE_RECEIVE.name() + "|" +
-                        telephoneConnecte + "|" +
-                        fileName + "|" +
-                        base64
-        );
-
-        System.out.println("[FILE] fichier transféré de " + telephoneConnecte + " vers " + telDest);
     }
     // ── ADD_CONTACT|telephoneContact ─────────────────────────────────────────
 // Flux :

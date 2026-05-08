@@ -6,6 +6,7 @@ import model.Message;
 import model.MessageFileAttente;
 import model.Utilisateur;
 
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -113,7 +114,7 @@ public class MessageRouter {
 
     // ── DÉLIVRER LES MESSAGES EN ATTENTE ─────────────────────────────────────
     // Appelé dans ClientHandler.handleLogin() après un login réussi
-    public void delivrerMessagesEnAttente(String telephone) throws SQLException {
+    public void delivrerMessagesEnAttente(String telephone) throws SQLException, IOException {
 
         // 1. Retrouver l'utilisateur
         Utilisateur utilisateur = utilisateurDAO.findByTelephone(telephone);
@@ -140,11 +141,32 @@ public class MessageRouter {
             Utilisateur expediteur = utilisateurDAO.getByID(msg.getIdExpediteur());
             if (expediteur == null) continue;
 
-            String ligne = Protocol.MSG_RECEIVE.name()        + "|"
-                    + expediteur.getNumeroTelephone()    + "|"
-                    + msg.getContenuTexte()             ;
+            // ===== TEXTE =====
+            if ("texte".equalsIgnoreCase(msg.getTypeMessage())) {
+                String ligne = Protocol.MSG_RECEIVE.name() + "|"
+                        + expediteur.getNumeroTelephone() + "|"
+                        + msg.getContenuTexte();
 
-            handler.sendMessage(ligne);
+                handler.sendMessage(ligne);
+            }
+
+            // ===== FICHIER =====
+            else if ("fichier".equalsIgnoreCase(msg.getTypeMessage())) {
+
+                java.io.File fichier = new java.io.File(msg.getUrlFichier());
+                if (!fichier.exists()) continue;
+
+                byte[] bytes = java.nio.file.Files.readAllBytes(fichier.toPath());
+                String base64 = java.util.Base64.getEncoder().encodeToString(bytes);
+
+                String ligne = Protocol.FILE_RECEIVE.name() + "|"
+                        + expediteur.getNumeroTelephone() + "|"
+                        + msg.getNomFichier() + "|"
+                        + msg.getTailleFichier() + "|"
+                        + base64;
+
+                handler.sendMessage(ligne);
+            }
         }
 
         // 5. Marquer tous comme délivrés en DB
