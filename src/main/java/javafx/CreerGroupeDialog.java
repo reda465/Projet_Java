@@ -17,7 +17,7 @@ import java.util.List;
 public class CreerGroupeDialog extends Dialog<CreerGroupeDialog.ResultatCreation> {
     private final TextField nomField = new TextField();
     private final List<CheckBox> membres = new ArrayList<>();
-    private final List<Contact> contacts;
+    private List<Contact> contacts = null;
 
     public CreerGroupeDialog(List<Contact> contacts) {
         this.contacts = contacts != null ? contacts : new ArrayList<>();
@@ -64,6 +64,10 @@ public class CreerGroupeDialog extends Dialog<CreerGroupeDialog.ResultatCreation
             }
             return null;
         });
+    }
+
+    public CreerGroupeDialog() {
+
     }
 
     public static class ResultatCreation {

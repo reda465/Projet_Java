@@ -30,4 +30,15 @@ public class ContactService {
         ajouterContact(numeroTelephone, numeroTelephone);
     }
 
+    public void accepterDemandeContact(String numeroDemandeur) {
+        if (client == null) return;
+        String d = numeroDemandeur != null ? numeroDemandeur.trim() : "";
+        client.envoyer(new Packet(Protocol.CONTACT_ACCEPTED, d));
+    }
+
+    public void bloquerNumero(String numero) {
+        if (client == null) return;
+        String n = numero != null ? numero.trim() : "";
+        client.envoyer(new Packet(Protocol.BLOCK_CONTACT, n));
+    }
 }

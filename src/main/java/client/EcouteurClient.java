@@ -14,6 +14,10 @@ public interface EcouteurClient {
     void messagesRecus(List<Message> messages); // Pour une conversation donnée
     //Contact
     void contactAjoute(Contact contact);           // Quand un contact est ajouté
+    /** Demande entrante (autre utilisateur souhaite vous ajouter). */
+    default void demandeContactRecue(String numeroDemandeur, String nomDemandeur) {}
+    /** Vous avez accepté une demande : rafraîchir les conversations / contacts. */
+    default void contactAcceptationConfirmee() {}
     void listeContactsRecue(List<Contact> contacts);
 
     // Quand on se déconnecte
