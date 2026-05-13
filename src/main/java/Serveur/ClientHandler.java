@@ -462,12 +462,6 @@ public class ClientHandler extends Thread {
                                 + "|" + moi.getNumeroTelephone()
                                 + "|" + moi.getNomComplet()
                 );
-            } else {
-                // ← CORRECTION : inverser les paramètres !
-                contactDAO.ajouterDemandeEnAttente(
-                        contact.getIdUtilisateur(),  // destinataire = Bob
-                        moi.getIdUtilisateur()       // demandeur = Alice
-                );
             }
 
         } catch (SQLException e) {
