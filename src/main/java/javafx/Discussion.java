@@ -1,9 +1,9 @@
 package javafx;
+
 import client.AudioUDP;
 import client.ClientHandlerAuth;
 import client.EcouteurClient;
 import client.VideoUDP;
-import javafx.scene.image.ImageView;
 import model.*;
 import javafx.application.Platform;
 import javafx.geometry.*;
@@ -18,13 +18,11 @@ import javafx.collections.*;
 import service.Fileservice;
 import java.io.File;
 import java.util.Base64;
-import service.Fileservice;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import static org.bytedeco.librealsense.global.RealSense.video;
+import java.util.Optional;
 
 public class Discussion implements EcouteurClient {
     private Utilisateur utilisateurConnecte;
@@ -42,25 +40,31 @@ public class Discussion implements EcouteurClient {
     private TextField msgField;
     private Button sendBtn;
     private Stage primaryStage;
-    ListView<HBox> convList;
-    ListView<HBox> groupesList;
+    private ListView<HBox> convList;
+    private ListView<HBox> groupesList;
     private boolean ongletGroupesActif = false;
     private String typeAppelEnCours = null;
-    private Fileservice fileService;//fichier
+    private Fileservice fileService;
     private Button attachBtn;
+
+    // Nouveaux champs pour les groupes
+    private Groupe groupeActif = null;
+    private boolean estEnGroupe = false;
+    private MenuButton groupMenu;
+    private Button btnAppelAudio;
+    private Button btnAppelVideo;
+
     public Discussion(Utilisateur utilisateur) {
         this.utilisateurConnecte = utilisateur;
     }
+
     public Scene creerScene(Stage stage) {
         this.primaryStage = stage;
-        //fichier
         this.fileService = new Fileservice(ClientHandlerAuth.getInstance().getClientReseau());
+
         VBox sidebar = new VBox(0);
         sidebar.setPrefWidth(300);
-        sidebar.setStyle(
-                "-fx-background-color: #000000;" +
-                        "-fx-border-color: #dadada;" +
-                        "-fx-border-width: 0 1 0 0;");
+        sidebar.setStyle("-fx-background-color: #ffffff; -fx-border-color: #dadada; -fx-border-width: 0 1 0 0;");
 
         HBox sideHeader = new HBox(10);
         sideHeader.setAlignment(Pos.CENTER_LEFT);
@@ -71,151 +75,93 @@ public class Discussion implements EcouteurClient {
                 String.valueOf(utilisateurConnecte.getNomComplet().charAt(0)).toUpperCase() : "?";
         StackPane userAvatar = makeAvatar(initiale, "#075E54");
 
-        Label userName = new Label(utilisateurConnecte != null ?
-                utilisateurConnecte.getNomComplet() : "Utilisateur");
+        Label userName = new Label(utilisateurConnecte != null ? utilisateurConnecte.getNomComplet() : "Utilisateur");
         userName.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
         userName.setTextFill(Color.WHITE);
+
         Region spacerHeader = new Region();
         HBox.setHgrow(spacerHeader, Priority.ALWAYS);
 
-        Button addContactBtn = new Button("👤+");
-        styleIconBtn(addContactBtn, "#25D366", "#128C7E");
-        addContactBtn.setTooltip(new Tooltip("Ajouter un contact"));
+        Button actionBtn = new Button("👤+");
+        styleIconBtn(actionBtn, "#25D366", "#128C7E");
 
-        sideHeader.getChildren().addAll(userAvatar, userName, spacerHeader, addContactBtn);
+        sideHeader.getChildren().addAll(userAvatar, userName, spacerHeader, actionBtn);
 
         TextField search = new TextField();
         search.setPromptText("🔍  Rechercher");
-        search.setStyle("-fx-background-color: #f0f0f0;" +
-                "-fx-border-color: transparent;" +
-                "-fx-border-radius: 8px;" +
-                "-fx-background-radius: 8px;" +
-                "-fx-padding: 8px 12px;" +
-                "-fx-font-size: 13px;"
-        );
+        search.setStyle("-fx-background-color: #f0f0f0; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 8px 12px;");
         HBox searchBox = new HBox(search);
         HBox.setHgrow(search, Priority.ALWAYS);
         searchBox.setPadding(new Insets(8, 10, 8, 10));
-        searchBox.setStyle("-fx-background-color: #ffffff;");
 
         convList = new ListView<>();
-        convList.setStyle(
-                "-fx-background-insets: 0;" +
-                        "-fx-padding: 0;" +
-                        "-fx-border-color: transparent;"
-        );
         VBox.setVgrow(convList, Priority.ALWAYS);
-        convList.setItems(FXCollections.observableArrayList());
-
-        Label placeholder = new Label("Aucun contact.\nAppuyez sur 👤+ pour en ajouter.");
-        placeholder.setTextAlignment(TextAlignment.CENTER);
-        placeholder.setTextFill(Color.web("#8696a0"));
-        placeholder.setFont(Font.font("Segoe UI", 13));
-        convList.setPlaceholder(placeholder);
+        convList.setOnMouseClicked(e -> {
+            HBox selected = convList.getSelectionModel().getSelectedItem();
+            if (selected == null || selected.getUserData() == null) return;
+            String[] parts = selected.getUserData().toString().split(";", 3);
+            try {
+                ouvrirConversation(Integer.parseInt(parts[0]), parts[1], parts[2]);
+            } catch (Exception ex) { ex.printStackTrace(); }
+        });
 
         groupesList = new ListView<>();
         groupesList.setVisible(false);
         groupesList.setManaged(false);
         VBox.setVgrow(groupesList, Priority.ALWAYS);
-        groupesList.setItems(FXCollections.observableArrayList());
         groupesList.setOnMouseClicked(e -> {
             HBox selected = groupesList.getSelectionModel().getSelectedItem();
-            if (selected == null || selected.getUserData() == null) return;
-            try {
-                String[] parts = selected.getUserData().toString().split(";", 3);
-                if (parts.length < 2) return;
-                Groupe g = new Groupe();
-                g.setIdGroupe(Integer.parseInt(parts[0]));
-                g.setNomGroupe(parts[1]);
-                int nb = 0;
-                if (parts.length >= 3) {
-                    try { nb = Integer.parseInt(parts[2]); } catch (Exception ignored) {}
-                }
-                ArrayList<String> membres = new ArrayList<>();
-                for (int i = 0; i < nb; i++) membres.add("");
-                g.setNumerosMembres(membres);
-                new DiscussionGroupe(g).ouvrir(primaryStage);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                showAlert(Alert.AlertType.ERROR, "Groupe", "Impossible d'ouvrir ce groupe.");
-            }
+            if (selected == null) return;
+            Object ud = selected.getUserData();
+            if (ud instanceof Groupe g) ouvrirGroupe(g);
         });
 
-        ToggleButton tabConversations = new ToggleButton("💬 Conversations");
-        ToggleButton tabGroupes = new ToggleButton("👥 Groupes");
-        ToggleGroup toggleGroup = new ToggleGroup();
-        tabConversations.setToggleGroup(toggleGroup);
-        tabGroupes.setToggleGroup(toggleGroup);
-        tabConversations.setSelected(true);
-        tabConversations.setStyle("-fx-background-color:#25D366;-fx-text-fill:white;");
-        tabGroupes.setStyle("-fx-background-color:#f0f0f0;");
-        tabConversations.setOnAction(e -> {
+        ToggleButton tabConv = new ToggleButton("💬 Conversations");
+        ToggleButton tabGroup = new ToggleButton("👥 Groupes");
+        ToggleGroup tg = new ToggleGroup();
+        tabConv.setToggleGroup(tg); tabGroup.setToggleGroup(tg);
+        tabConv.setSelected(true);
+        tabConv.setStyle("-fx-background-color:#25D366; -fx-text-fill:white;");
+        tabGroup.setStyle("-fx-background-color:#f0f0f0;");
+
+        tabConv.setOnAction(e -> {
             ongletGroupesActif = false;
             convList.setVisible(true); convList.setManaged(true);
             groupesList.setVisible(false); groupesList.setManaged(false);
-            tabConversations.setStyle("-fx-background-color:#25D366;-fx-text-fill:white;");
-            tabGroupes.setStyle("-fx-background-color:#f0f0f0;");
-            addContactBtn.setText("👤+");
-            addContactBtn.setTooltip(new Tooltip("Ajouter un contact"));
+            tabConv.setStyle("-fx-background-color:#25D366; -fx-text-fill:white;");
+            tabGroup.setStyle("-fx-background-color:#f0f0f0;");
+            actionBtn.setText("👤+");
         });
-        tabGroupes.setOnAction(e -> {
+        tabGroup.setOnAction(e -> {
             ongletGroupesActif = true;
             convList.setVisible(false); convList.setManaged(false);
             groupesList.setVisible(true); groupesList.setManaged(true);
-            tabConversations.setStyle("-fx-background-color:#f0f0f0;");
-            tabGroupes.setStyle("-fx-background-color:#25D366;-fx-text-fill:white;");
-            addContactBtn.setText("👥+");
-            addContactBtn.setTooltip(new Tooltip("Créer un groupe"));
+            tabConv.setStyle("-fx-background-color:#f0f0f0;");
+            tabGroup.setStyle("-fx-background-color:#25D366; -fx-text-fill:white;");
+            actionBtn.setText("👥+");
             ClientHandlerAuth.getInstance().demanderListeGroupes();
         });
-        HBox tabs = new HBox(6, tabConversations, tabGroupes);
-        tabs.setPadding(new Insets(6, 10, 6, 10));
 
-        addContactBtn.setOnAction(e -> {
+        actionBtn.setOnAction(e -> {
             if (!ongletGroupesActif) {
                 Ajouter_contacte.show(stage, convList, ClientHandlerAuth.getInstance());
-                return;
-            }
-            List<Contact> contacts = extraireContactsDepuisConversations();
-            if (contacts.isEmpty()) {
-                showAlert(Alert.AlertType.WARNING, "Groupe", "Aucun contact disponible pour créer un groupe.");
-                return;
-            }
-            CreerGroupeDialog dialog = new CreerGroupeDialog(contacts);
-            dialog.showAndWait().ifPresent(res -> {
-                if (res.nomGroupe == null || res.nomGroupe.trim().isEmpty()) {
-                    showAlert(Alert.AlertType.WARNING, "Groupe", "Nom du groupe requis.");
-                    return;
-                }
-                if (res.numeros == null || res.numeros.length < 2) {
-                    showAlert(Alert.AlertType.WARNING, "Groupe", "Choisissez au moins 2 membres.");
-                    return;
-                }
-                ClientHandlerAuth.getInstance().creerGroupe(res.nomGroupe.trim(), res.numeros);
-            });
-        });
-
-        convList.setOnMouseClicked(e -> {
-            HBox selected = convList.getSelectionModel().getSelectedItem();
-            if (selected == null) return;
-            Object ud = selected.getUserData();
-            if (ud == null) return;
-            String[] parts = ((String) ud).split(";", 3);
-            try {
-                int idConv = Integer.parseInt(parts[0]);
-                String numero = parts[1];
-                String nom = parts[2];
-                ouvrirConversation(idConv, numero, nom);
-            } catch (NumberFormatException ex) {
-                System.out.println(" ID conversation invalide");
+            } else {
+                List<Contact> contacts = extraireContactsDepuisConversations();
+                if (contacts.isEmpty()) { showAlert(Alert.AlertType.WARNING, "Groupe", "Aucun contact disponible."); return; }
+                CreerGroupeDialog dialog = new CreerGroupeDialog(contacts);
+                dialog.showAndWait().ifPresent(res -> {
+                    if (res.nomGroupe != null && !res.nomGroupe.isBlank() && res.numeros.length >= 2) {
+                        ClientHandlerAuth.getInstance().creerGroupe(res.nomGroupe.trim(), res.numeros);
+                    }
+                });
             }
         });
 
-        sidebar.getChildren().addAll(sideHeader, searchBox, tabs, convList, groupesList);
+        sidebar.getChildren().addAll(sideHeader, searchBox, new HBox(5, tabConv, tabGroup), convList, groupesList);
 
         VBox chatPanel = new VBox(0);
-        VBox.setVgrow(chatPanel, Priority.ALWAYS);
         chatPanel.setStyle("-fx-background-color: #e5ddd5;");
+        VBox.setVgrow(chatPanel, Priority.ALWAYS);
 
         HBox chatHeader = new HBox(10);
         chatHeader.setAlignment(Pos.CENTER_LEFT);
@@ -223,106 +169,65 @@ public class Discussion implements EcouteurClient {
         chatHeader.setStyle("-fx-background-color: #25D366;");
 
         chatAvatar = makeAvatar("?", "#dfe5e7");
-
-        VBox chatInfo = new VBox(2);
         chatName = new Label("");
         chatName.setFont(Font.font("Segoe UI", FontWeight.BOLD, 15));
-        chatName.setTextFill(Color.web("#ffffff"));
-
+        chatName.setTextFill(Color.WHITE);
         chatStatus = new Label("");
         chatStatus.setFont(Font.font("Segoe UI", 12));
-        chatStatus.setTextFill(Color.web("#ffffff"));
+        chatStatus.setTextFill(Color.WHITE);
+        VBox chatInfo = new VBox(2, chatName, chatStatus);
 
-        chatInfo.getChildren().addAll(chatName, chatStatus);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Region chatSpacer = new Region();
-        HBox.setHgrow(chatSpacer, Priority.ALWAYS);
-
-        Button btnAppelAudio = new Button("📞");
+        btnAppelAudio = new Button("📞");
         styleIconBtn(btnAppelAudio, "#25D366", "#128C7E");
-        btnAppelAudio.setTooltip(new Tooltip("Appel audio"));
-        btnAppelAudio.setOnAction(e -> {
-            if (numeroContactUtilisable(contactActif)) {
-                demarrerAppelAudio(contactActif, chatName.getText());
-            } else {
-                showAlert(Alert.AlertType.WARNING,
-                        "Aucun contact", "Sélectionnez un contact d'abord.");
-            }
-        });
-        //BOUTON DE L'appel video
-        Button btnAppelVideo = new Button("📹");
-        styleIconBtn(btnAppelVideo, "#25D366", "#128C7E");
-        btnAppelVideo.setTooltip(new Tooltip("Appel vidéo"));
-        btnAppelVideo.setOnAction(e -> {
-            if (numeroContactUtilisable(contactActif)) {
-                demarrerAppelVideo(contactActif, chatName.getText());
-            } else {
-                showAlert(Alert.AlertType.WARNING,
-                        "Aucun contact", "Sélectionnez un contact d'abord.");
-            }
-        });
+        btnAppelAudio.setOnAction(e -> demarrerAppelAudio(contactActif, chatName.getText()));
 
-        chatHeader.getChildren().addAll(chatAvatar, chatInfo, chatSpacer, btnAppelAudio,btnAppelVideo);
+        btnAppelVideo = new Button("📹");
+        styleIconBtn(btnAppelVideo, "#25D366", "#128C7E");
+        btnAppelVideo.setOnAction(e -> demarrerAppelVideo(contactActif, chatName.getText()));
+
+        groupMenu = new MenuButton("⋮");
+        groupMenu.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 18px;");
+        groupMenu.setVisible(false); groupMenu.setManaged(false);
+        GroupeDiscussionActions actionsGroupe = new GroupeDiscussionActions() {
+            @Override public void ajouterMembreAuGroupe(int idGroupe, String numeroTelephone) {
+                ClientHandlerAuth.getInstance().ajouterMembreAuGroupe(idGroupe, numeroTelephone);
+            }
+            @Override public void retirerMembreDuGroupe(int idGroupe, String numeroTelephone) {
+                ClientHandlerAuth.getInstance().retirerMembreDuGroupe(idGroupe, numeroTelephone);
+            }
+            @Override public void modifierNomGroupe(int idGroupe, String nouveauNom) {
+                ClientHandlerAuth.getInstance().modifierNomGroupe(idGroupe, nouveauNom);
+            }
+            @Override public void quitterGroupe(int idGroupe) {
+                ClientHandlerAuth.getInstance().quitterGroupe(idGroupe);
+            }
+            @Override public void supprimerGroupe(int idGroupe) {
+                ClientHandlerAuth.getInstance().supprimerGroupe(idGroupe);
+            }
+        };
+        DiscussionGroupeFX.configurerMenu(groupMenu, primaryStage, () -> groupeActif, () -> extraireContactsDepuisConversations(), actionsGroupe, this::afficherAccueil);
+
+        chatHeader.getChildren().addAll(chatAvatar, chatInfo, spacer, btnAppelAudio, btnAppelVideo, groupMenu);
 
         messagesBox = new VBox(8);
         messagesBox.setPadding(new Insets(15));
-        messagesBox.setFillWidth(true);
-
-        afficherAccueil();
-
         scrollPane = new ScrollPane(messagesBox);
         scrollPane.setFitToWidth(true);
-        scrollPane.setStyle(
-                "-fx-background-color: transparent;" +
-                        "-fx-background: transparent;"
-        );
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
         HBox inputBar = new HBox(8);
+        inputBar.setPadding(new Insets(10));
         inputBar.setAlignment(Pos.CENTER);
-        inputBar.setPadding(new Insets(10, 12, 10, 12));
-        inputBar.setStyle("-fx-background-color: #f0f0f0;");
-        //fichier   bouton
         attachBtn = new Button("📎");
         styleIconBtn(attachBtn, "#25D366", "#128C7E");
-        attachBtn.setTooltip(new Tooltip("Envoyer un fichier"));
         attachBtn.setDisable(true);
-        //fichier
-        attachBtn.setOnAction(e -> {
-            if (!numeroContactUtilisable(contactActif)) return;
+        attachBtn.setOnAction(e -> handleAttachFile());
 
-            // Ouvre l'explorateur de fichiers natif
-            javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
-            chooser.setTitle("Choisir un fichier à envoyer");
-            chooser.getExtensionFilters().addAll(
-                    new javafx.stage.FileChooser.ExtensionFilter("Tous les fichiers", "*.*"),
-                    new javafx.stage.FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"),
-                    new javafx.stage.FileChooser.ExtensionFilter("Documents", "*.pdf", "*.docx", "*.txt", "*.xlsx")
-            );
-
-            File fichier = chooser.showOpenDialog(primaryStage);
-            if (fichier != null) {
-                // Envoyer le fichier via le service
-                fileService.envoyerFichier(contactActif, fichier);
-
-                // Afficher une bulle de confirmation dans le chat
-                String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-                HBox bulle = Messagefx.Messageenvoyer("📎 " + fichier.getName(), time);
-                messagesBox.getChildren().add(bulle);
-                scrollToBottom();
-            }
-        });
         msgField = new TextField();
         msgField.setPromptText("Tapez un message");
-        msgField.setStyle(
-                "-fx-background-color: white;" +
-                        "-fx-border-color: transparent;" +
-                        "-fx-border-radius: 21px;" +
-                        "-fx-background-radius: 21px;" +
-                        "-fx-padding: 10px 14px;" +
-                        "-fx-font-size: 14px;"
-        );
-
         msgField.setDisable(true);
         HBox.setHgrow(msgField, Priority.ALWAYS);
 
@@ -331,337 +236,256 @@ public class Discussion implements EcouteurClient {
         sendBtn.setDisable(true);
 
         Runnable sendAction = () -> {
-            String text = msgField.getText().trim();
-            if (text.isEmpty() || !numeroContactUtilisable(contactActif)) return;
-
+            String txt = msgField.getText().trim();
+            if (txt.isEmpty()) return;
             String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-
-            messagesBox.getChildren().add(Messagefx.Messageenvoyer(text, time));
-            scrollToBottom();
+            if (estEnGroupe && groupeActif != null) {
+                // On n'ajoute pas localement pour les groupes, on attend l'écho du serveur pour éviter les doublons avec l'historique
+                ClientHandlerAuth.getInstance().envoyerMessageGroupe(groupeActif.getIdGroupe(), txt);
+            } else if (numeroContactUtilisable(contactActif)) {
+                messagesBox.getChildren().add(Messagefx.Messageenvoyer(txt, time));
+                ClientHandlerAuth.getInstance().envoyerMessage(contactActif, txt);
+            }
             msgField.clear();
-
-            ClientHandlerAuth.getInstance().envoyerMessage(contactActif, text);
+            scrollToBottom();
         };
 
         sendBtn.setOnAction(e -> sendAction.run());
         msgField.setOnAction(e -> sendAction.run());
 
-        inputBar.getChildren().addAll(attachBtn,msgField, sendBtn);
+        inputBar.getChildren().addAll(attachBtn, msgField, sendBtn);
         chatPanel.getChildren().addAll(chatHeader, scrollPane, inputBar);
 
-        HBox root = new HBox(0, sidebar, chatPanel);
-        HBox.setHgrow(chatPanel, Priority.ALWAYS);
+        afficherAccueil();
 
+        HBox root = new HBox(sidebar, chatPanel);
+        HBox.setHgrow(chatPanel, Priority.ALWAYS);
         return new Scene(root, 900, 620);
     }
 
-    private void ouvrirConversation(int idconversation, String numero, String nom) {
-        this.idConversationActive = idconversation;
-        contactActif = normaliserNumeroContact(numero);
-        chatName.setText(nom);
-        chatStatus.setText("en ligne");
-        chatStatus.setTextFill(Color.web("#ffffff"));
-
-        mettreAJourAvatar(chatAvatar, String.valueOf(nom.charAt(0)).toUpperCase(), "#25D366");
-        messagesBox.getChildren().clear();
-        msgField.setDisable(false);
-        majEtatBoutonEnvoi();
-        msgField.requestFocus();
-        if (idconversation != -1) {
-            ClientHandlerAuth.getInstance().demanderMessages(idconversation);
+    private void handleAttachFile() {
+        if (!estEnGroupe && !numeroContactUtilisable(contactActif)) return;
+        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+        File f = chooser.showOpenDialog(primaryStage);
+        if (f != null && !estEnGroupe) {
+            fileService.envoyerFichier(contactActif, f);
+            messagesBox.getChildren().add(Messagefx.Messageenvoyer("📎 " + f.getName(), LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))));
+            scrollToBottom();
         }
     }
 
-    @Override
-    public void connexionReussie(Utilisateur moi) {
-        this.utilisateurConnecte = moi;
-        Platform.runLater(() ->
-                System.out.println("[Discussion] Connecté : " + moi.getNomComplet())
-        );
+    private void ouvrirGroupe(Groupe g) {
+        this.groupeActif = g; this.estEnGroupe = true; this.contactActif = null; this.idConversationActive = null;
+        chatName.setText(g.getNomGroupe());
+        int nb = g.getNumerosMembres() != null ? g.getNumerosMembres().size() : 0;
+        chatStatus.setText(nb + " membres");
+        mettreAJourAvatar(chatAvatar, String.valueOf(g.getNomGroupe().charAt(0)).toUpperCase(), "#25D366");
+        messagesBox.getChildren().clear();
+        msgField.setDisable(false); majEtatBoutonEnvoi();
+        btnAppelAudio.setVisible(false); btnAppelAudio.setManaged(false);
+        btnAppelVideo.setVisible(false); btnAppelVideo.setManaged(false);
+        groupMenu.setVisible(true); groupMenu.setManaged(true);
+        ClientHandlerAuth.getInstance().demanderMessagesGroupe(g.getIdGroupe());
     }
 
-    @Override
-    public void inscriptionReussie(String msg) {
-        Platform.runLater(() ->
-                showAlert(Alert.AlertType.INFORMATION, "Inscription", msg)
-        );
+    private void ouvrirConversation(int id, String num, String nom) {
+        this.idConversationActive = id; this.contactActif = normaliserNumeroContact(num);
+        this.estEnGroupe = false; this.groupeActif = null;
+        chatName.setText(nom); chatStatus.setText("en ligne");
+        mettreAJourAvatar(chatAvatar, String.valueOf(nom.charAt(0)).toUpperCase(), "#25D366");
+        messagesBox.getChildren().clear();
+        msgField.setDisable(false); majEtatBoutonEnvoi();
+        btnAppelAudio.setVisible(true); btnAppelAudio.setManaged(true);
+        btnAppelVideo.setVisible(true); btnAppelVideo.setManaged(true);
+        groupMenu.setVisible(false); groupMenu.setManaged(false);
+        if (id != -1) ClientHandlerAuth.getInstance().demanderMessages(id);
     }
 
-    @Override
-    public void erreur(String message) {
-        Platform.runLater(() ->
-                showAlert(Alert.AlertType.ERROR, "Erreur", message)
-        );
+    private void majEtatBoutonEnvoi() {
+        boolean ok = estEnGroupe ? (groupeActif != null) : numeroContactUtilisable(contactActif);
+        if (sendBtn != null) sendBtn.setDisable(!ok);
+        if (attachBtn != null) attachBtn.setDisable(estEnGroupe || !ok);
     }
 
-    @Override
-    public void messageRecu(String num, String contenu) {
+    @Override public void messageRecu(String num, String contenu) {
         Platform.runLater(() -> {
-            String time = LocalTime.now()
-                    .format(DateTimeFormatter.ofPattern("HH:mm"));
-            messagesBox.getChildren()
-                    .add(Messagefx.Messagerecu(contenu, time));
-            scrollPane.setVvalue(1.0);
-
-            if (!num.equals(contactActif)) {
-                mettreAJourBadgeNonLu(num);
-            }
-        });
-    }
-
-    @Override
-    public void deconnexion() {
-        Platform.runLater(() -> {
-            chatStatus.setText("hors ligne");
-            chatStatus.setTextFill(Color.web("#EA2424"));
-            showAlert(Alert.AlertType.INFORMATION, "Déconnexion",
-                    "Vous avez été déconnecté du serveur.");
-        });
-    }
-
-    // ── SEULS CHANGEMENTS : les 4 méthodes d'appel ───────────────────────────
-
-
-    @Override
-    public void appelEntrant(String numero, String type, String ipAppelant, String name) {
-        Platform.runLater(() -> {
-            //String nom = trouverNomContact(numero);
-
-            if ("VIDEO".equalsIgnoreCase(type)) {
-                typeAppelEnCours = "VIDEO";
-                // ← AJOUT : Appel vidéo entrant → déléguer à Appelvideo
-                Appelvideo.recevoirAppel(primaryStage, name, numero, ipAppelant);
-            } else {
-                typeAppelEnCours = "AUDIO";
-                // Appel audio entrant (existant)
-                typeAppelEnCours = "AUDIO";
-                afficherFenetreAppel(name, false, numero, ipAppelant);
-            }
-        });
-    }
-
-
-    //HADCHI
-    @Override
-    public void appelAccepte(String numero, String ip) {
-        Platform.runLater(() -> {
-            if (statutAppelLabel != null) {
-                statutAppelLabel.setText("En communication...");
-            }
-
-            if (ip != null && !ip.isBlank()) {
-                if ("VIDEO".equalsIgnoreCase(typeAppelEnCours)) {
-                    if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
-                    // ← AJOUT : Démarrer la vidéo via Appelvideo
-                    Appelvideo.demarrer(primaryStage, chatName.getText(), contactActif,
-                            idConversationActive != null ? idConversationActive : -1, ip);
-                    // Fermer la fenêtre d'appel audio si elle est ouverte
-
-                    /*if (stageAppel != null) {
-                        stageAppel.close();
-                        stageAppel = null;
-                    }*/
-                } else {
-                    // Audio existant
-                    audioUDP = new AudioUDP();
-                    audioUDP.demarrer(ip, 6000, 6001);
-
-                    System.out.println("[Audio] Démarré côté appelant → " + ip);
-                }
-            } else {
-                System.out.println("[Audio/Video] IP distante non reçue, média non démarré.");
-                showAlert(Alert.AlertType.ERROR, "Erreur média",
-                        "Impossible de démarrer : IP distante manquante.");
-            }
-        });
-    }
-    @Override
-    public void appelRefuse() {
-        Platform.runLater(() -> {
-            if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
-            showAlert(Alert.AlertType.INFORMATION,
-                    "Appel refusé", "Le contact a refusé l'appel.");
-        });
-    }
-    @Override
-    public void appelTermine(String numero) {
-        Platform.runLater(() -> {
-            if (audioUDP != null) { audioUDP.arreter(); audioUDP = null; }
-            if (videoUDP != null) { videoUDP.arreter(); videoUDP = null; }
-            if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
-            typeAppelEnCours = null;
-            showAlert(Alert.AlertType.INFORMATION,
-                    "Appel terminé", "L'appel est terminé.");
-        });
-    }
-
-    @Override
-    public void groupeCree(Groupe groupe) {
-        Platform.runLater(() -> {
-            showAlert(Alert.AlertType.INFORMATION, "Groupe", "Groupe créé : " + groupe.getNomGroupe());
-            ClientHandlerAuth.getInstance().demanderListeGroupes();
-        });
-    }
-
-    @Override
-    public void creationGroupeEchouee(String raison) {
-        Platform.runLater(() -> showAlert(Alert.AlertType.ERROR, "Groupe", "Création échouée : " + raison));
-    }
-
-    @Override
-    public void listeGroupesRecue(List<Groupe> groupes) {
-        Platform.runLater(() -> {
-            groupesList.getItems().clear();
-            if (groupes == null) return;
-            for (Groupe g : groupes) {
-                HBox row = makeConvItem(g.getNomGroupe(), "", "Groupe", "#25D366", g.getIdGroupe(), 0);
-                int nb = g.getNumerosMembres() != null ? g.getNumerosMembres().size() : 0;
-                row.setUserData(g.getIdGroupe() + ";" + g.getNomGroupe() + ";" + nb);
-                groupesList.getItems().add(row);
-            }
-        });
-    }
-
-    @Override
-    public void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {
-
-    }
-
-    @Override
-    public void messageGroupeRecu(MessageGroupe message) {
-        Platform.runLater(() -> {
-            DiscussionGroupe.afficherMessageSiOuvert(message);
-            System.out.println("Message groupe reçu: " + message.getContenu());
-        });
-    }
-
-    @Override
-    public void membreAjoute(int idGroupe, String numero) {
-        Platform.runLater(() -> {
-            showAlert(Alert.AlertType.INFORMATION, "Groupe", "Membre ajouté : " + numero);
-            ClientHandlerAuth.getInstance().demanderListeGroupes();
-        });
-    }
-
-    @Override
-    public void membreRetire(int idGroupe, String numero) {
-        Platform.runLater(() -> {
-            showAlert(Alert.AlertType.INFORMATION, "Groupe", "Membre retiré : " + numero);
-            ClientHandlerAuth.getInstance().demanderListeGroupes();
-        });
-    }
-
-    @Override
-    public void aQuitteGroupe(int idGroupe) {
-        Platform.runLater(() -> ClientHandlerAuth.getInstance().demanderListeGroupes());
-    }
-
-    @Override
-    public void groupeSupprime(int idGroupe) {
-        Platform.runLater(() -> {
-            showAlert(Alert.AlertType.INFORMATION, "Groupe", "Groupe supprimé");
-            ClientHandlerAuth.getInstance().demanderListeGroupes();
-        });
-    }
-
-    @Override
-    public void nomGroupeModifie(int idGroupe, String nouveauNom) {
-        Platform.runLater(() -> ClientHandlerAuth.getInstance().demanderListeGroupes());
-    }
-
-    //fichier
-    @Override
-    public void fichierRecu(String telephoneExp, String fileName, String base64) {
-        Platform.runLater(() -> {
-            try {
-                // Décoder et sauvegarder le fichier localement
-                byte[] data = Base64.getDecoder().decode(base64);
-                File outFile = new File("downloads/" + fileName);
-                outFile.getParentFile().mkdirs();
-                java.nio.file.Files.write(outFile.toPath(), data);
-
-                System.out.println("📥 Fichier reçu : " + outFile.getAbsolutePath());
-
-                // Afficher une bulle dans le chat (uniquement si conversation active)
-                String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-                HBox bulle = Messagefx.Messagerecu("📎 " + fileName, time);
-                messagesBox.getChildren().add(bulle);
-                scrollToBottom();
-
-                // Notifier l'utilisateur si la conversation n'est pas active
-                if (!telephoneExp.equals(contactActif)) {
-                    mettreAJourBadgeNonLu(telephoneExp);
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                showAlert(Alert.AlertType.ERROR, "Erreur fichier",
-                        "Impossible de recevoir le fichier : " + fileName);
-            }
-        });
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    @Override
-    public void conversationsRecues(List<Conversation> conversations) {
-        Platform.runLater(() -> {
-            convList.getItems().clear();
-            if (conversations == null || conversations.isEmpty()) return;
-            String[] colors = {"#25D366", "#128C7E", "#075E54", "#34B7F1"};
-            for (Conversation conv : conversations) {
-                String nom = conv.getNomContact();
-                String numero = conv.getNumeroContact();
-                String dernier = conv.getDernierMessage() != null
-                        ? conv.getDernierMessage() : "";
-                String color = colors[(int) (Math.random() * colors.length)];
-                HBox item = makeConvItem(nom, numero, dernier, color,
-                        conv.getIdConversation(), conv.getMessagesNonLus());
-                convList.getItems().add(item);
-            }
-        });
-    }
-
-    @Override
-    public void messagesRecus(List<Message> messages) {
-        Platform.runLater(() -> {
-            if (messages == null || messages.isEmpty()) {
-                Label emptyLabel = new Label("Aucun message. Commencez la conversation !");
-                emptyLabel.setTextFill(Color.web("#8696a0"));
-                emptyLabel.setFont(Font.font("Segoe UI", 13));
-                messagesBox.getChildren().add(emptyLabel);
-                majEtatBoutonEnvoi();
-                return;
-            }
-
-            for (Message msg : messages) {
-                String time = msg.getDateEnvoi() != null
-                        ? msg.getDateEnvoi().format(DateTimeFormatter.ofPattern("HH:mm"))
-                        : "";
-                HBox messageBubble;
-                if (msg.isEstMoi()) {
-                    messageBubble = Messagefx.Messageenvoyer(msg.getContenuTexte(), time);
-                } else {
-                    messageBubble = Messagefx.Messagerecu(msg.getContenuTexte(), time);
-                }
-                messagesBox.getChildren().add(messageBubble);
-            }
-            if (!numeroContactUtilisable(contactActif)) {
-                String deduit = infererNumeroInterlocuteur(messages);
-                if (deduit != null) {
-                    contactActif = deduit;
-                    chatStatus.setText("en ligne");
-                }
-            }
-            majEtatBoutonEnvoi();
+            String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+            messagesBox.getChildren().add(Messagefx.Messagerecu(contenu, time));
+            if (!num.equals(contactActif)) mettreAJourBadgeNonLu(num);
             scrollToBottom();
         });
     }
 
-    @Override
-    public void contactAjoute(Contact contact) {}
+    @Override public void messageGroupeRecu(MessageGroupe m) {
+        Platform.runLater(() -> {
+            if (estEnGroupe && groupeActif != null && m.getIdGroupe() == groupeActif.getIdGroupe()) {
+                Utilisateur moi = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
+                boolean estMoi = moi != null && m.getTelephoneExpediteur().equals(moi.getNumeroTelephone());
+                String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+                
+                if (estMoi) {
+                    messagesBox.getChildren().add(Messagefx.Messageenvoyer(m.getContenu(), time));
+                } else {
+                    messagesBox.getChildren().add(Messagefx.Messagerecu(m.getNomExpediteur() + ": " + m.getContenu(), time));
+                }
+                scrollToBottom();
+            }
+        });
+    }
 
-    @Override
-    public void listeContactsRecue(List<Contact> contacts) {}
+    @Override public void groupeCree(Groupe g) { Platform.runLater(() -> { showAlert(Alert.AlertType.INFORMATION, "Groupe", "Groupe créé"); ClientHandlerAuth.getInstance().demanderListeGroupes(); }); }
+    @Override public void creationGroupeEchouee(String r) { Platform.runLater(() -> showAlert(Alert.AlertType.ERROR, "Groupe", r)); }
+    @Override public void listeGroupesRecue(List<Groupe> gs) {
+        Platform.runLater(() -> {
+            groupesList.getItems().clear();
+            if (gs == null) return;
+            if (estEnGroupe && groupeActif != null) {
+                for (Groupe g : gs) {
+                    if (g.getIdGroupe() == groupeActif.getIdGroupe()) {
+                        groupeActif.setNumerosMembres(g.getNumerosMembres() != null ? new ArrayList<>(g.getNumerosMembres()) : new ArrayList<>());
+                        int nb = groupeActif.getNumerosMembres() != null ? groupeActif.getNumerosMembres().size() : 0;
+                        chatStatus.setText(nb + " membres");
+                        break;
+                    }
+                }
+            }
+            for (Groupe g : gs) {
+                HBox item = makeConvItem(g.getNomGroupe(), "", "Groupe", "#25D366", g.getIdGroupe(), 0);
+                item.setUserData(g);
+                groupesList.getItems().add(item);
+            }
+        });
+    }
+
+    @Override public void membreAjoute(int id, String n) { refreshGroupUI(null); }
+    @Override public void membreRetire(int id, String n) { refreshGroupUI(null); }
+    @Override public void aQuitteGroupe(int id) { refreshGroupUI(null); }
+    @Override public void groupeSupprime(int id) { refreshGroupUI("Groupe supprimé"); }
+    @Override public void nomGroupeModifie(int id, String n) { refreshGroupUI(null); }
+
+    private void refreshGroupUI(String msg) {
+        Platform.runLater(() -> {
+            if (msg != null) showAlert(Alert.AlertType.INFORMATION, "Groupe", msg);
+            ClientHandlerAuth.getInstance().demanderListeGroupes();
+        });
+    }
+
+    @Override public void conversationsRecues(List<Conversation> cs) {
+        Platform.runLater(() -> {
+            convList.getItems().clear();
+            if (cs == null) return;
+            for (Conversation c : cs) {
+                convList.getItems().add(makeConvItem(c.getNomContact(), c.getNumeroContact(), c.getDernierMessage() != null ? c.getDernierMessage() : "", "#128C7E", c.getIdConversation(), c.getMessagesNonLus()));
+            }
+        });
+    }
+
+    @Override public void messagesRecus(List<Message> ms) {
+        Platform.runLater(() -> {
+            messagesBox.getChildren().clear();
+            if (ms == null) return;
+            for (Message m : ms) {
+                String time = m.getDateEnvoi() != null ? m.getDateEnvoi().format(DateTimeFormatter.ofPattern("HH:mm")) : "";
+                messagesBox.getChildren().add(m.isEstMoi() ? Messagefx.Messageenvoyer(m.getContenuTexte(), time) : Messagefx.Messagerecu(m.getContenuTexte(), time));
+            }
+            if (!numeroContactUtilisable(contactActif)) contactActif = infererNumeroInterlocuteur(ms);
+            scrollToBottom();
+        });
+    }
+
+    @Override public void fichierRecu(String tel, String name, String b64) {
+        Platform.runLater(() -> {
+            try {
+                byte[] data = Base64.getDecoder().decode(b64);
+                File out = new File("downloads/" + name); out.getParentFile().mkdirs();
+                java.nio.file.Files.write(out.toPath(), data);
+                messagesBox.getChildren().add(Messagefx.Messagerecu("📎 " + name, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))));
+                scrollToBottom();
+            } catch (Exception e) { e.printStackTrace(); }
+        });
+    }
+
+    @Override public void appelEntrant(String num, String type, String ip, String name) {
+        Platform.runLater(() -> {
+            if ("VIDEO".equalsIgnoreCase(type)) { typeAppelEnCours = "VIDEO"; Appelvideo.recevoirAppel(primaryStage, name, num, ip); }
+            else { typeAppelEnCours = "AUDIO"; afficherFenetreAppel(name, false, num, ip); }
+        });
+    }
+
+    @Override public void appelAccepte(String num, String ip) {
+        Platform.runLater(() -> {
+            if ("VIDEO".equalsIgnoreCase(typeAppelEnCours)) {
+                if (stageAppel != null) stageAppel.close();
+                Appelvideo.demarrer(primaryStage, chatName.getText(), contactActif, idConversationActive != null ? idConversationActive : -1, ip);
+            } else {
+                audioUDP = new AudioUDP(); audioUDP.demarrer(ip, 6000, 6001);
+                if (statutAppelLabel != null) statutAppelLabel.setText("En communication...");
+            }
+        });
+    }
+
+    @Override public void appelRefuse() { Platform.runLater(() -> { if (stageAppel != null) stageAppel.close(); showAlert(Alert.AlertType.INFORMATION, "Appel", "Refusé"); }); }
+    @Override public void appelTermine(String n) { Platform.runLater(() -> { if (audioUDP != null) audioUDP.arreter(); if (stageAppel != null) stageAppel.close(); typeAppelEnCours = null; }); }
+
+    private void demarrerAppelAudio(String num, String nom) {
+        if (!numeroContactUtilisable(num)) return;
+        ClientHandlerAuth.getInstance().appeler(num, idConversationActive != null ? idConversationActive : -1, "AUDIO");
+        afficherFenetreAppel(nom, true, num, null);
+    }
+
+    private void demarrerAppelVideo(String num, String nom) {
+        if (!numeroContactUtilisable(num)) return;
+        typeAppelEnCours = "VIDEO";
+        ClientHandlerAuth.getInstance().appeler(num, idConversationActive != null ? idConversationActive : -1, "VIDEO");
+        afficherFenetreAttenteVideo(nom);
+    }
+
+    private void afficherFenetreAttenteVideo(String nom) {
+        stageAppel = new Stage();
+        VBox root = new VBox(20, makeAvatar(String.valueOf(nom.charAt(0)), "#25D366"), new Label(nom), new Label("Appel vidéo..."));
+        root.setAlignment(Pos.CENTER); root.setPadding(new Insets(20));
+        Button hangup = makeBtnAppel("📵", "#EA2424");
+        hangup.setOnAction(e -> { ClientHandlerAuth.getInstance().raccrocher(); stageAppel.close(); });
+        root.getChildren().add(hangup);
+        stageAppel.setScene(new Scene(root, 300, 350)); stageAppel.show();
+    }
+
+    private void afficherFenetreAppel(String nom, boolean sortant, String num, String ip) {
+        stageAppel = new Stage();
+        VBox root = new VBox(20, makeAvatar(String.valueOf(nom.charAt(0)), "#25D366"), new Label(nom), statutAppelLabel = new Label(sortant ? "Appel..." : "Appel entrant..."));
+        root.setAlignment(Pos.CENTER); root.setPadding(new Insets(20));
+        if (sortant) {
+            Button h = makeBtnAppel("📵", "#EA2424"); h.setOnAction(e -> { ClientHandlerAuth.getInstance().raccrocher(); stageAppel.close(); });
+            root.getChildren().add(h);
+        } else {
+            Button acc = makeBtnAppel("📞", "#25D366");
+            acc.setOnAction(e -> {
+                ClientHandlerAuth.getInstance().accepterAppel();
+                if (ip != null) { audioUDP = new AudioUDP(); audioUDP.demarrer(ip, 6001, 6000); }
+                statutAppelLabel.setText("En communication...");
+            });
+            Button ref = makeBtnAppel("📵", "#EA2424"); ref.setOnAction(e -> { ClientHandlerAuth.getInstance().refuserAppel(); stageAppel.close(); });
+            root.getChildren().add(new HBox(20, acc, ref));
+        }
+        stageAppel.setScene(new Scene(root, 300, 350)); stageAppel.show();
+    }
+
+    private Button makeBtnAppel(String icon, String color) {
+        Button b = new Button(icon);
+        b.setStyle("-fx-background-color:" + color + "; -fx-text-fill:white; -fx-background-radius:50%; -fx-min-width:60px; -fx-min-height:60px;");
+        return b;
+    }
+
+    private void afficherAccueil() {
+        messagesBox.getChildren().clear();
+        Label l = new Label("💬 Sélectionnez une discussion");
+        l.setTextFill(Color.GRAY);
+        VBox v = new VBox(l); v.setAlignment(Pos.CENTER); VBox.setVgrow(v, Priority.ALWAYS);
+        messagesBox.getChildren().add(v);
+        chatName.setText(""); chatStatus.setText("");
+        btnAppelAudio.setVisible(false); btnAppelVideo.setVisible(false); groupMenu.setVisible(false);
+        msgField.setDisable(true); attachBtn.setDisable(true); sendBtn.setDisable(true);
+    }
 
     private void mettreAJourBadgeNonLu(String expediteur) {
         for (HBox item : convList.getItems()) {
@@ -687,349 +511,105 @@ public class Discussion implements EcouteurClient {
     }
 
     private List<Contact> extraireContactsDepuisConversations() {
-        List<Contact> contacts = new ArrayList<>();
-        List<String> deja = new ArrayList<>();
+        List<Contact> res = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
         for (HBox item : convList.getItems()) {
-            Object ud = item.getUserData();
-            if (ud == null) continue;
-            String[] parts = ud.toString().split(";", 3);
-            if (parts.length < 3) continue;
-            String numero = parts[1] != null ? parts[1].trim() : "";
-            if (numero.isEmpty() || deja.contains(numero)) continue;
-            Contact c = new Contact();
-            c.setNumeroTelephone(numero);
-            c.setNomComplet(parts[2]);
-            contacts.add(c);
-            deja.add(numero);
+            if (item.getUserData() == null) continue;
+            String[] p = item.getUserData().toString().split(";");
+            if (p.length >= 3 && seen.add(p[1])) {
+                Contact c = new Contact(); c.setNumeroTelephone(p[1]); c.setNomComplet(p[2]); res.add(c);
+            }
         }
-        return contacts;
+        return res;
     }
 
-    private void afficherAccueil() {
-        Label msg = new Label("💬  Sélectionnez un contact pour commencer");
-        msg.setFont(Font.font("Segoe UI", 13));
-        msg.setTextFill(Color.web("#8696a0"));
-        msg.setPadding(new Insets(20));
-        VBox wrapper = new VBox(msg);
-        wrapper.setAlignment(Pos.CENTER);
-        VBox.setVgrow(wrapper, Priority.ALWAYS);
-        messagesBox.getChildren().add(wrapper);
-    }
-
-    private static boolean numeroContactUtilisable(String tel) {
-        if (tel == null || tel.isBlank()) return false;
-        return !"null".equalsIgnoreCase(tel.trim());
-    }
-
-    private static String normaliserNumeroContact(String tel) {
-        return numeroContactUtilisable(tel) ? tel.trim() : null;
-    }
-
-    private static String numeroPourListe(String numero) {
-        String n = normaliserNumeroContact(numero);
-        return n != null ? n : "";
-    }
-
-    private void majEtatBoutonEnvoi() {
-        if (sendBtn == null) return;
-        //sendBtn.setDisable(!numeroContactUtilisable(contactActif));
-        boolean actif = numeroContactUtilisable(contactActif);
-        sendBtn.setDisable(!actif);
-        if (attachBtn != null) attachBtn.setDisable(!actif);
-    }
-
-    private String infererNumeroInterlocuteur(List<Message> messages) {
-        if (messages == null || messages.isEmpty()) return null;
-        String moiTel = null;
-        if (utilisateurConnecte != null && utilisateurConnecte.getNumeroTelephone() != null) {
-            moiTel = utilisateurConnecte.getNumeroTelephone().trim();
-        }
-        if ((moiTel == null || moiTel.isEmpty())
-                && ClientHandlerAuth.getInstance().getUtilisateurConnecte() != null) {
-            Utilisateur u = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
-            moiTel = u.getNumeroTelephone() != null ? u.getNumeroTelephone().trim() : null;
-        }
-        if (moiTel == null || moiTel.isEmpty()) return null;
-        for (Message msg : messages) {
-            String tel = msg.getTelephoneExpediteur();
-            if (!numeroContactUtilisable(tel)) continue;
-            String t = tel.trim();
-            if (!t.equals(moiTel)) return t;
+    private String infererNumeroInterlocuteur(List<Message> ms) {
+        if (ms == null || ms.isEmpty() || utilisateurConnecte == null) return null;
+        for (Message m : ms) {
+            if (!m.getTelephoneExpediteur().equals(utilisateurConnecte.getNumeroTelephone())) return m.getTelephoneExpediteur();
         }
         return null;
     }
 
-    private void scrollToBottom() {
-        scrollPane.setVvalue(1.0);
+    private void scrollToBottom() { Platform.runLater(() -> scrollPane.setVvalue(1.0)); }
+
+    private void showAlert(Alert.AlertType t, String title, String msg) {
+        Alert a = new Alert(t); a.setTitle(title); a.setHeaderText(null); a.setContentText(msg); a.showAndWait();
     }
 
-    public static HBox makeConvItem(String name, String numero, String last,
-                                    String color, int idConve, int nbNonLus) {
-        StackPane avatar = makeAvatar(
-                String.valueOf(name.charAt(0)).toUpperCase(), color);
-        Label nameLabel = new Label(name);
-        nameLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
-        nameLabel.setTextFill(Color.web("#111b21"));
-
-        Label lastLabel = new Label(last);
-        lastLabel.setFont(Font.font("Segoe UI", 12));
-        lastLabel.setTextFill(Color.web("#667781"));
-
-        VBox info = new VBox(3, nameLabel, lastLabel);
-        HBox.setHgrow(info, Priority.ALWAYS);
-
-        HBox row = new HBox(10);
-        row.setAlignment(Pos.CENTER_LEFT);
-        row.setPadding(new Insets(10, 14, 10, 14));
-        row.setStyle("-fx-cursor: hand;");
-        row.setUserData(idConve + ";" + numero + ";" + name);
-        row.getChildren().addAll(avatar, info);
-
-        if (nbNonLus > 0) {
-            Circle badge = new Circle(10);
-            badge.setFill(Color.web("#25D366"));
-            Label badgeLabel = new Label(String.valueOf(nbNonLus));
-            badgeLabel.setTextFill(Color.WHITE);
-            badgeLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-            StackPane badgePane = new StackPane(badge, badgeLabel);
-            row.getChildren().add(badgePane);
-        }
-
-        row.setOnMouseEntered(e -> {
-            if (!row.getStyle().contains("#E8F5E9"))
-                row.setStyle("-fx-background-color: #F1F8E9; -fx-cursor: hand;");
-        });
-        row.setOnMouseExited(e -> {
-            if (!row.getStyle().contains("#E8F5E9"))
-                row.setStyle("-fx-cursor: hand;");
-        });
-
-        return row;
-    }
-
-    public static HBox makeConvItem(String name, String numero, String last, String color) {
-        return makeConvItem(name, numero, last, color, -1, 0);
+    public static HBox makeConvItem(String name, String num, String last, String color, int id, int unread) {
+        VBox v = new VBox(2, new Label(name), new Label(last));
+        HBox h = new HBox(10, makeAvatar(String.valueOf(name.charAt(0)), color), v);
+        h.setPadding(new Insets(10)); h.setUserData(id + ";" + num + ";" + name);
+        if (unread > 0) h.getChildren().add(new StackPane(new Circle(10, Color.GREEN), new Text(String.valueOf(unread))));
+        return h;
     }
 
     static StackPane makeAvatar(String letter, String color) {
-        Circle c = new Circle(20);
-        c.setFill(Color.web(color));
-        Text t = new Text(letter);
-        t.setFill(Color.WHITE);
-        t.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
+        Circle c = new Circle(20, Color.web(color));
+        Text t = new Text(letter); t.setFill(Color.WHITE);
         return new StackPane(c, t);
     }
 
-    private static void mettreAJourAvatar(StackPane avatar, String letter, String color) {
-        avatar.getChildren().forEach(n -> {
-            if (n instanceof Circle) ((Circle) n).setFill(Color.web(color));
-            if (n instanceof Text) ((Text) n).setText(letter);
+    private void mettreAJourAvatar(StackPane s, String letter, String color) {
+        ((Circle) s.getChildren().get(0)).setFill(Color.web(color));
+        ((Text) s.getChildren().get(1)).setText(letter);
+    }
+
+    private static void styleIconBtn(Button b, String base, String hover) {
+        b.setStyle("-fx-background-color:" + base + "; -fx-text-fill:white; -fx-background-radius:50%; -fx-min-width:38px; -fx-min-height:38px; -fx-cursor:hand;");
+        b.setOnMouseEntered(e -> b.setStyle("-fx-background-color:" + hover + "; -fx-text-fill:white; -fx-background-radius:50%; -fx-min-width:38px; -fx-min-height:38px; -fx-cursor:hand;"));
+        b.setOnMouseExited(e -> b.setStyle("-fx-background-color:" + base + "; -fx-text-fill:white; -fx-background-radius:50%; -fx-min-width:38px; -fx-min-height:38px; -fx-cursor:hand;"));
+    }
+
+    private static boolean numeroContactUtilisable(String t) { return t != null && !t.isBlank() && !"null".equalsIgnoreCase(t); }
+    private static String normaliserNumeroContact(String t) { return numeroContactUtilisable(t) ? t.trim() : null; }
+
+    @Override public void connexionReussie(Utilisateur u) { this.utilisateurConnecte = u; }
+    @Override public void inscriptionReussie(String m) {}
+    @Override public void erreur(String m) { Platform.runLater(() -> showAlert(Alert.AlertType.ERROR, "Erreur", m)); }
+    @Override public void deconnexion() { Platform.runLater(() -> showAlert(Alert.AlertType.WARNING, "Déconnexion", "Déconnecté")); }
+    @Override public void contactAjoute(Contact c) {
+        Platform.runLater(() -> {
+            if (c == null || !numeroContactUtilisable(c.getNumeroTelephone())) return;
+            String tel = c.getNumeroTelephone().trim();
+            String nom = c.getNomComplet() != null && !c.getNomComplet().isBlank() ? c.getNomComplet().trim() : tel;
+            for (HBox row : convList.getItems()) {
+                Object ud = row.getUserData();
+                if (ud instanceof String s) {
+                    String[] p = s.split(";", 3);
+                    if (p.length >= 2 && tel.equals(p[1])) return;
+                }
+            }
+            String[] colors = {"#25D366", "#128C7E", "#075E54", "#34B7F1"};
+            String color = colors[(int) (Math.random() * colors.length)];
+            convList.getItems().add(makeConvItem(nom, tel, "", color, -1, 0));
         });
     }
 
-    private static void styleIconBtn(Button btn, String base, String hover) {
-        String s1 = "-fx-background-color:" + base + ";-fx-text-fill:white;" +
-                "-fx-font-size:15px;-fx-background-radius:50%;" +
-                "-fx-min-width:38px;-fx-min-height:38px;-fx-cursor:hand;";
-        String s2 = "-fx-background-color:" + hover + ";-fx-text-fill:white;" +
-                "-fx-font-size:15px;-fx-background-radius:50%;" +
-                "-fx-min-width:38px;-fx-min-height:38px;-fx-cursor:hand;";
-        btn.setStyle(s1);
-        btn.setOnMouseEntered(e -> btn.setStyle(s2));
-        btn.setOnMouseExited(e -> btn.setStyle(s1));
+    @Override
+    public void demandeContactRecue(String numeroDemandeur, String nomDemandeur) {
+        Platform.runLater(() -> {
+            Alert a = new Alert(Alert.AlertType.CONFIRMATION);
+            a.setTitle("Demande de contact");
+            a.setHeaderText(null);
+            a.setContentText((nomDemandeur != null ? nomDemandeur : numeroDemandeur)
+                    + " (" + numeroDemandeur + ") souhaite être dans vos contacts.");
+            ButtonType accepter = new ButtonType("Accepter");
+            ButtonType bloquer = new ButtonType("Bloquer");
+            ButtonType plusTard = new ButtonType("Plus tard", ButtonBar.ButtonData.CANCEL_CLOSE);
+            a.getButtonTypes().setAll(accepter, bloquer, plusTard);
+            Optional<ButtonType> r = a.showAndWait();
+            if (r.isEmpty()) return;
+            if (r.get() == accepter) ClientHandlerAuth.getInstance().accepterDemandeContact(numeroDemandeur);
+            else if (r.get() == bloquer) ClientHandlerAuth.getInstance().bloquerNumeroContact(numeroDemandeur);
+        });
     }
 
-    private void showAlert(Alert.AlertType type, String titre, String msg) {
-        Alert alert = new Alert(type);
-        alert.setTitle(titre);
-        alert.setHeaderText(null);
-        alert.setContentText(msg);
-        alert.showAndWait();
+    @Override
+    public void contactAcceptationConfirmee() {
+        Platform.runLater(() -> ClientHandlerAuth.getInstance().demanderConversations());
     }
-
-    // ── Méthodes appel audio ──────────────────────────────────────────────────
-
-    private void demarrerAppelAudio(String numeroContact, String nomContact) {
-        // appeler() = méthode correcte dans ClientHandlerAuth
-        ClientHandlerAuth.getInstance().appeler(
-                numeroContact,
-                idConversationActive != null ? idConversationActive : -1,
-                "AUDIO"
-        );
-        afficherFenetreAppel(nomContact, true, numeroContact, null);
-    }
-     //pour appel video
-     private void demarrerAppelVideo(String numeroContact, String nomContact) {
-         typeAppelEnCours = "VIDEO";
-         ClientHandlerAuth.getInstance().appeler(
-                 numeroContact,
-                 idConversationActive != null ? idConversationActive : -1,
-                 "VIDEO"
-         );
-         afficherFenetreAttenteVideo(nomContact);
-     }
-     //
-     private void afficherFenetreAttenteVideo(String nomContact) {
-         if (stageAppel != null && stageAppel.isShowing()) return;
-
-         stageAppel = new Stage();
-         stageAppel.initModality(javafx.stage.Modality.WINDOW_MODAL);
-         stageAppel.initOwner(primaryStage);
-         stageAppel.setTitle("Appel vidéo — " + nomContact);
-         stageAppel.setResizable(false);
-
-         Circle cercle = new Circle(45);
-         cercle.setFill(Color.web("#25D366"));
-         Text initiale = new Text(String.valueOf(nomContact.charAt(0)).toUpperCase());
-         initiale.setFill(Color.WHITE);
-         initiale.setFont(Font.font("Segoe UI", FontWeight.BOLD, 36));
-         StackPane avatarGrand = new StackPane(cercle, initiale);
-
-         Label nomLabel = new Label(nomContact);
-         nomLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
-         nomLabel.setTextFill(Color.web("#111B21"));
-
-         statutAppelLabel = new Label("Appel vidéo en cours...");
-         statutAppelLabel.setFont(Font.font("Segoe UI", 14));
-         statutAppelLabel.setTextFill(Color.web("#667781"));
-
-         VBox infoBox = new VBox(16, avatarGrand, nomLabel, statutAppelLabel);
-         infoBox.setAlignment(Pos.CENTER);
-         infoBox.setPadding(new Insets(20, 0, 10, 0));
-
-         Button btnRaccrocher = makeBtnAppel("📵", "#EA2424");
-         btnRaccrocher.setOnAction(e -> {
-             ClientHandlerAuth.getInstance().raccrocher();
-             typeAppelEnCours = null;
-             if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
-         });
-
-         HBox boutonsBox = new HBox(btnRaccrocher);
-         boutonsBox.setAlignment(Pos.CENTER);
-         boutonsBox.setPadding(new Insets(20));
-
-         VBox root = new VBox(infoBox, boutonsBox);
-         root.setAlignment(Pos.CENTER);
-         root.setPadding(new Insets(20));
-         root.setStyle("-fx-background-color: #F0F2F5;");
-
-         stageAppel.setScene(new javafx.scene.Scene(root, 320, 320));
-         stageAppel.show();
-     }
-    private void afficherFenetreAppel(String nomContact, boolean estSortant,
-                                      String numeroContact, String ipDistant) {
-        if (stageAppel != null && stageAppel.isShowing()) return;
-
-        stageAppel = new Stage();
-        stageAppel.initModality(javafx.stage.Modality.WINDOW_MODAL);
-        stageAppel.initOwner(primaryStage);
-        stageAppel.setTitle(estSortant ? "Appel audio — " + nomContact : "Appel entrant");
-        stageAppel.setResizable(false);
-        // PAR
-        Circle cercle = new Circle(45);
-        cercle.setFill(Color.web("#25D366"));
-        Text initiale = new Text(String.valueOf(nomContact.charAt(0)).toUpperCase());
-        initiale.setFill(Color.WHITE);
-        initiale.setFont(Font.font("Segoe UI", FontWeight.BOLD, 36));
-        StackPane avatarGrand = new StackPane(cercle, initiale);
-
-        Label nomLabel = new Label(nomContact);
-        nomLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
-        nomLabel.setTextFill(Color.web("#111B21"));
-
-        statutAppelLabel = new Label(estSortant ? "Appel en cours..." : "Appel entrant...");
-        statutAppelLabel.setFont(Font.font("Segoe UI", 14));
-        statutAppelLabel.setTextFill(Color.web("#667781"));
-
-        VBox infoBox = new VBox(16, avatarGrand, nomLabel, statutAppelLabel);
-        infoBox.setAlignment(Pos.CENTER);
-        infoBox.setPadding(new Insets(20, 0, 10, 0));
-        HBox boutonsBox;
-
-        if (estSortant) {
-            Button btnRaccrocher = makeBtnAppel("📵", "#EA2424");
-            btnRaccrocher.setOnAction(e -> terminerAppel(numeroContact));
-            boutonsBox = new HBox(btnRaccrocher);
-            boutonsBox.setAlignment(Pos.CENTER);
-        } else {
-            Button btnAccepter = makeBtnAppel("📞", "#25D366");
-            btnAccepter.setOnAction(e -> {
-                // accepterAppel() sans paramètre = méthode correcte
-                ClientHandlerAuth.getInstance().accepterAppel();
-                statutAppelLabel.setText("Appel en cours...");
-               // audioUDP = new AudioUDP();
-                //audioUDP.demarrer(
-                        //ipDistant != null ? ipDistant : numeroContact, 6000, 6001);
-                if (ipDistant != null && !ipDistant.isBlank()) {
-                            audioUDP = new AudioUDP();
-                            audioUDP.demarrer(ipDistant, 6001, 6000); // ✅ MODIFIÉ — ports inversés par rapport à l'appelant
-                            System.out.println("[Audio] Démarré côté appelé → " + ipDistant);
-                        } else {
-                    showAlert(Alert.AlertType.ERROR, "Erreur audio",
-                            "IP de l'appelant non reçue. Audio impossible.");
-                    ClientHandlerAuth.getInstance().refuserAppel();
-                    stageAppel.close();
-                    stageAppel = null;
-                    return;
-                }
-                VBox root = (VBox) stageAppel.getScene().getRoot();
-                Button btnRacc = makeBtnAppel("📵", "#EA2424");
-                btnRacc.setOnAction(ev -> terminerAppel(numeroContact));
-                HBox newBoutons = new HBox(btnRacc);
-                newBoutons.setAlignment(Pos.CENTER);
-                newBoutons.setPadding(new Insets(20));
-                root.getChildren().set(root.getChildren().size() - 1, newBoutons);
-            });
-
-            Button btnRefuser = makeBtnAppel("📵", "#EA2424");
-            btnRefuser.setOnAction(e -> {
-                // refuserAppel() sans paramètre = méthode correcte
-                ClientHandlerAuth.getInstance().refuserAppel();
-                stageAppel.close();
-                stageAppel = null;
-            });
-
-            boutonsBox = new HBox(30, btnAccepter, btnRefuser);
-            boutonsBox.setAlignment(Pos.CENTER);
-        }
-
-        boutonsBox.setPadding(new Insets(20));
-        VBox root = new VBox(infoBox, boutonsBox);
-        root.setAlignment(Pos.CENTER);
-        root.setPadding(new Insets(20));
-        root.setStyle("-fx-background-color: #F0F2F5;");
-
-        stageAppel.setScene(new javafx.scene.Scene(root, 320, 320));
-        stageAppel.show();
-    }
-    private void terminerAppel(String numeroContact) {
-        // raccrocher() = méthode correcte dans ClientHandlerAuth
-        ClientHandlerAuth.getInstance().raccrocher();
-        if (audioUDP != null) { audioUDP.arreter(); audioUDP = null; }
-        if (stageAppel != null) { stageAppel.close(); stageAppel = null; }
-    }
-    private Button makeBtnAppel(String icone, String couleur) {
-        Button btn = new Button(icone);
-        btn.setFont(Font.font("Segoe UI", 20));
-        btn.setStyle(
-                "-fx-background-color: " + couleur + ";" +
-                        "-fx-text-fill: white;" +
-                        "-fx-background-radius: 50%;" +
-                        "-fx-min-width: 60px;" +
-                        "-fx-min-height: 60px;" +
-                        "-fx-cursor: hand;"
-        );
-        return btn;
-    }
-    private String trouverNomContact(String numero) {
-        for (HBox item : convList.getItems()) {
-            Object ud = item.getUserData();
-            if (ud == null) continue;
-            String[] parts = ((String) ud).split(";", 3);
-            if (parts.length >= 3 && parts[1].trim().equals(numero))
-                return parts[2];
-        }
-        return numero;
-    }
-
+    @Override public void listeContactsRecue(List<Contact> cs) {}
+    @Override public void membresGroupeRecus(int id, List<Utilisateur> ms) {}
 }

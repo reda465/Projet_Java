@@ -216,12 +216,29 @@ public class ClientReseau {
                     traiterMessagesRecus(data);
                     break;
                 case ADD_CONTACT_OK:
-                    if (parts.length >= 3 && ecouteur != null) {
+                    // Données serveur : numéro|nomComplet
+                    if (parts.length >= 1 && ecouteur != null) {
                         Contact contactAjoute = new Contact();
-                        contactAjoute.setNomComplet(parts[1]);
-                        contactAjoute.setNumeroTelephone(parts[0]);
+                        contactAjoute.setNumeroTelephone(parts[0].trim());
+                        contactAjoute.setNomComplet(parts.length >= 2 ? parts[1].trim() : parts[0].trim());
                         System.out.println("✅ Contact ajouté: " + contactAjoute.getNomComplet());
                         ecouteur.contactAjoute(contactAjoute);
+                    }
+                    break;
+                case CONTACT_REQUEST:
+                    if (parts.length >= 2 && ecouteur != null) {
+                        ecouteur.demandeContactRecue(parts[0].trim(), parts[1].trim());
+                    }
+                    break;
+                case CONTACT_ACCEPTED:
+                    if (ecouteur == null) break;
+                    if ("OK".equalsIgnoreCase(data != null ? data.trim() : "")) {
+                        ecouteur.contactAcceptationConfirmee();
+                    } else if (parts.length >= 2) {
+                        Contact c = new Contact();
+                        c.setNumeroTelephone(parts[0].trim());
+                        c.setNomComplet(parts[1].trim());
+                        ecouteur.contactAjoute(c);
                     }
                     break;
                 case ADD_CONTACT_FAIL:
@@ -397,7 +414,13 @@ public class ClientReseau {
                 List<String> membres = new ArrayList<>();
                 int nb = 0;
                 try { nb = Integer.parseInt(champs[3]); } catch (Exception ignored) {}
-                for (int i = 0; i < nb; i++) membres.add("");
+                if (champs.length > 4) {
+                    for (int i = 4; i < champs.length; i++) {
+                        if (!champs[i].isEmpty()) membres.add(champs[i]);
+                    }
+                } else {
+                    for (int i = 0; i < nb; i++) membres.add("");
+                }
                 g.setNumerosMembres(membres);
                 groupes.add(g);
             }
