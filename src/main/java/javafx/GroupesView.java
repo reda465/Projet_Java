@@ -40,7 +40,6 @@ public class GroupesView extends VBox {
         Label titre = new Label("Groupes");
         titre.setFont(Font.font("Segoe UI", 15));
         titre.setTextFill(Color.WHITE);
-
         Button btnCreer = new Button("+");
         btnCreer.setStyle("-fx-background-color:#128C7E;-fx-text-fill:white;-fx-background-radius:50%;-fx-min-width:34px;-fx-min-height:34px;");
         btnCreer.setOnAction(e -> {
