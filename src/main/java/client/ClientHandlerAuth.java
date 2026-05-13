@@ -88,6 +88,16 @@ public class ClientHandlerAuth {
     public void ajouterContact(String numeroTelephone) {
         ajouterContact(numeroTelephone, numeroTelephone);
     }
+
+    public void accepterDemandeContact(String numeroDemandeur) {
+        if (!verifierConnexion() || contactService == null) return;
+        contactService.accepterDemandeContact(numeroDemandeur);
+    }
+
+    public void bloquerNumeroContact(String numero) {
+        if (!verifierConnexion() || contactService == null) return;
+        contactService.bloquerNumero(numero);
+    }
     //gestion des groupes
     public void creerGroupe(String nomGroupe, String... numerosMembres) {
         if (!verifierConnexion()) return;
