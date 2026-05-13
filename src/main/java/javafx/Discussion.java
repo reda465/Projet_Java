@@ -55,6 +55,7 @@ public class Discussion implements EcouteurClient {
         this.primaryStage = stage;
         //fichier
         this.fileService = new Fileservice(ClientHandlerAuth.getInstance().getClientReseau());
+        ClientHandlerAuth.getInstance().demanderConversations();//pour faire liaison
         VBox sidebar = new VBox(0);
         sidebar.setPrefWidth(300);
         sidebar.setStyle(
@@ -134,7 +135,7 @@ public class Discussion implements EcouteurClient {
                 ArrayList<String> membres = new ArrayList<>();
                 for (int i = 0; i < nb; i++) membres.add("");
                 g.setNumerosMembres(membres);
-                new DiscussionGroupe(g).ouvrir(primaryStage);
+                //new DiscussionGroupe(g).ouvrir(primaryStage);
             } catch (Exception ex) {
                 ex.printStackTrace();
                 showAlert(Alert.AlertType.ERROR, "Groupe", "Impossible d'ouvrir ce groupe.");
@@ -351,7 +352,8 @@ public class Discussion implements EcouteurClient {
 
         HBox root = new HBox(0, sidebar, chatPanel);
         HBox.setHgrow(chatPanel, Priority.ALWAYS);
-
+        //pour lier
+        ClientHandlerAuth.getInstance().demanderConversations();
         return new Scene(root, 900, 620);
     }
 
@@ -530,7 +532,7 @@ public class Discussion implements EcouteurClient {
     @Override
     public void messageGroupeRecu(MessageGroupe message) {
         Platform.runLater(() -> {
-            DiscussionGroupe.afficherMessageSiOuvert(message);
+            //DiscussionGroupeFX.configurerMenu();
             System.out.println("Message groupe reçu: " + message.getContenu());
         });
     }
