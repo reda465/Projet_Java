@@ -447,19 +447,20 @@ public class ClientHandler extends Thread {
                     + "|" + contact.getNumeroTelephone()
                     + "|" + contact.getNomComplet());
 
-            // Notifier Bob si en ligne
+            // Ligne PENDING côté destinataire (Bob) : nécessaire pour CONTACT_ACCEPTED, en ligne comme hors ligne
+            if (!contactDAO.contactExiste(contact.getIdUtilisateur(), moi.getIdUtilisateur())) {
+                contactDAO.ajouterDemandeEnAttente(
+                        contact.getIdUtilisateur(),
+                        moi.getIdUtilisateur());
+            }
+
+            // Notifier Bob s'il est connecté
             ClientHandler contactHandler = userManager.getHandler(telephoneContact);
             if (contactHandler != null) {
                 contactHandler.sendMessage(
                         Protocol.CONTACT_REQUEST.name()
                                 + "|" + moi.getNumeroTelephone()
                                 + "|" + moi.getNomComplet()
-                );
-            } else {
-                // ← CORRECTION : inverser les paramètres !
-                contactDAO.ajouterDemandeEnAttente(
-                        contact.getIdUtilisateur(),  // destinataire = Bob
-                        moi.getIdUtilisateur()       // demandeur = Alice
                 );
             }
 
@@ -573,6 +574,11 @@ public class ClientHandler extends Thread {
                         .append(g.getNomGroupe()).append(";")
                         .append(g.getNumeroCreateur()).append(";")
                         .append(g.getNumerosMembres() != null ? g.getNumerosMembres().size() : 0);
+                if (g.getNumerosMembres() != null) {
+                    for (String m : g.getNumerosMembres()) {
+                        if (m != null && !m.isBlank()) sb.append(";").append(m.trim());
+                    }
+                }
             }
             pw.println(Protocol.GROUPS_LIST.name() + "|" + sb);
         } catch (Exception e) {
@@ -647,7 +653,16 @@ public class ClientHandler extends Thread {
                 return;
             }
             groupeDAO.ajouterMembre(idGroupe, numNew);
-            pw.println(Protocol.ADD_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numNew);
+            Groupe g = groupeDAO.getById(idGroupe);
+            String payload = Protocol.ADD_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numNew;
+            if (g != null && g.getNumerosMembres() != null) {
+                for (String membre : g.getNumerosMembres()) {
+                    ClientHandler h = userManager.getHandler(membre);
+                    if (h != null) h.sendMessage(payload);
+                }
+            } else {
+                pw.println(payload);
+            }
         } catch (Exception e) {
             e.printStackTrace();
             pw.println(Protocol.ADD_GROUP_MEMBER_FAIL.name() + "|Erreur serveur");
@@ -664,8 +679,16 @@ public class ClientHandler extends Thread {
                 pw.println(Protocol.REMOVE_GROUP_MEMBER_FAIL.name() + "|Permission refusée");
                 return;
             }
+            Groupe avant = groupeDAO.getById(idGroupe);
+            List<String> notif = avant != null && avant.getNumerosMembres() != null
+                    ? new ArrayList<>(avant.getNumerosMembres()) : new ArrayList<>();
             groupeDAO.retirerMembre(idGroupe, numMembre);
-            pw.println(Protocol.REMOVE_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numMembre);
+            if (!notif.contains(numMembre)) notif.add(numMembre);
+            String payload = Protocol.REMOVE_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numMembre;
+            for (String tel : notif) {
+                ClientHandler h = userManager.getHandler(tel);
+                if (h != null) h.sendMessage(payload);
+            }
         } catch (Exception e) {
             e.printStackTrace();
             pw.println(Protocol.REMOVE_GROUP_MEMBER_FAIL.name() + "|Erreur serveur");
