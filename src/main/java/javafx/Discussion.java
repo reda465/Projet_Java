@@ -658,7 +658,19 @@ public class Discussion implements EcouteurClient {
     }
 
     @Override
-    public void contactAjoute(Contact contact) {}
+    public void contactAjoute(Contact contact) {
+        Platform.runLater(() -> {
+            String[] colors = {"#25D366", "#128C7E", "#075E54", "#34B7F1"};
+            String color = colors[(int)(Math.random() * colors.length)];
+
+            HBox item = makeConvItem(
+                    contact.getNomComplet(),
+                    contact.getNumeroTelephone(), "maintenant",
+                    color, -1, 0
+            );
+            convList.getItems().add(item);
+        });
+    }
 
     @Override
     public void listeContactsRecue(List<Contact> contacts) {}
