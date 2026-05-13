@@ -142,7 +142,6 @@ public class Ajouter_contacte {
                 "-fx-padding:10px;" +
                 "-fx-cursor:hand;";
     }
-
     static String cardStyle() {
         return "-fx-background-color:white;" +
                 "-fx-background-radius:20px;" +

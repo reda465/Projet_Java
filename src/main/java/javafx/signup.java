@@ -14,7 +14,6 @@ import javafx.stage.Stage;
 import model.*;
 
 import java.util.List;
-
 import static javafx.application.Application.launch;
 public class signup implements EcouteurClient {
     private Label messageLabel;
@@ -128,8 +127,8 @@ public class signup implements EcouteurClient {
     }
     // ===== CALLBACKS EcouteurClient =====
 
-    @Override
-    public void inscriptionReussie(String msg) {
+
+    /*public void inscriptionReussie(String msg) {
         Platform.runLater(() -> {
             messageLabel.setTextFill(Color.web("#25D366"));
             messageLabel.setText("Compte créé avec succès ! Connectez-vous.");
@@ -139,6 +138,22 @@ public class signup implements EcouteurClient {
                 try { Thread.sleep(1500); } catch (InterruptedException ignored) {}
                 Platform.runLater(() -> stage.setScene(new login().creerScene(stage)));
             }).start();
+        });
+    }*/
+    @Override
+    public void inscriptionReussie(String msg) {
+        Platform.runLater(() -> {
+            messageLabel.setTextFill(Color.web("#25D366"));
+            messageLabel.setText("Compte créé avec succès !");
+            btn.setDisable(false);
+
+            // Récupérer l'utilisateur connecté
+            Utilisateur utilisateur = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
+
+            // Ouvrir Discussion directement
+            Discussion discussion = new Discussion(utilisateur);
+            ClientHandlerAuth.getInstance().setEcouteur(discussion);
+            stage.setScene(discussion.creerScene(stage));
         });
     }
     @Override

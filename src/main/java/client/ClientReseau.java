@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+
 //import Serveur.*;
 @Setter
 @Getter
@@ -242,7 +243,6 @@ public class ClientReseau {
                     }
                     break;
 
-                    break;
                 case CREATE_GROUP_OK:
                     traiterCreateGroupOk(data);
                     break;
@@ -450,4 +450,7 @@ public class ClientReseau {
         Packet p = new Packet(Protocol.FILE_SEND, contenu);
         envoyer(p);
     }
+
+
+
 }
