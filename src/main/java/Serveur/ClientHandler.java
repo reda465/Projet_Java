@@ -188,11 +188,14 @@ public class ClientHandler extends Thread {
         private void handleMessage(String[] parts) {
             if (parts.length < 3) return;
 
-            String telephoneDest = parts[1];
-            String contenu = parts[2];
+            String telephoneDest = normaliserNumeroPourRecherche(parts[1]);
+            StringBuilder contenu = new StringBuilder(parts[2] != null ? parts[2] : "");
+            for (int i = 3; i < parts.length; i++) {
+                contenu.append('|').append(parts[i] != null ? parts[i] : "");
+            }
 
             try {
-                messageRouter.envoyerMessage(telephoneConnecte, telephoneDest, contenu);
+                messageRouter.envoyerMessage(telephoneConnecte, telephoneDest, contenu.toString());
             } catch (SQLException e) {
                 e.printStackTrace();
                 pw.println("MSG_FAIL|Erreur_Envoi");

@@ -211,6 +211,17 @@ public class ClientHandlerAuth {
         clientReseau.demanderMessages(idConversation);
     }
 
+    public void demanderContacts() {
+        if (!verifierConnexion()) {
+            System.out.println("❌ Pas connecté au serveur !");
+            return;
+        }
+        if (clientReseau == null) {
+            System.out.println("❌ Client réseau non initialisé !");
+            return;
+        }
+        clientReseau.demanderContacts();
+    }
     public void demanderConversations() {
         if (!verifierConnexion()) {
             System.out.println("❌ Pas connecté au serveur !");

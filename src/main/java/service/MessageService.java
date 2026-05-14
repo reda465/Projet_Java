@@ -23,12 +23,10 @@ public class MessageService {
             System.out.println("Message vide !");
             return;
         }
-        String monNumero = "";
-        if (client.getMoi() != null) {
-            monNumero = client.getMoi().getNumeroTelephone();
-        }
-        // data = numeroExp|numeroDest|contenu
-        String data = numeroDestinataire + "|" + contenu;
+        String dest = numeroDestinataire != null
+                ? numeroDestinataire.trim().replaceAll("\\s+", "").replace("-", "")
+                : "";
+        String data = dest + "|" + contenu;
         Packet p = new Packet(Protocol.MSG_SEND, data);
         client.envoyer(p);
     }

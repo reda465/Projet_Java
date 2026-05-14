@@ -181,6 +181,7 @@ public class login extends Application implements EcouteurClient {
                     });
                     discussionStage.show();
                     ClientHandlerAuth.getInstance().demanderConversations();
+                    ClientHandlerAuth.getInstance().demanderContacts();
                 });
             }).start();
         });

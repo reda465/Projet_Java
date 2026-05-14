@@ -54,6 +54,9 @@ public class Discussion implements EcouteurClient {
     private Button btnAppelAudio;
     private Button btnAppelVideo;
 
+    /** Contacts issus du serveur (GET_CONTACTS) — utilisé pour les groupes et cohérent avec la BDD */
+    private final List<Contact> mesContacts = new ArrayList<>();
+
     public Discussion(Utilisateur utilisateur) {
         this.utilisateurConnecte = utilisateur;
     }
@@ -131,6 +134,7 @@ public class Discussion implements EcouteurClient {
             tabConv.setStyle("-fx-background-color:#25D366; -fx-text-fill:white;");
             tabGroup.setStyle("-fx-background-color:#f0f0f0;");
             actionBtn.setText("👤+");
+            ClientHandlerAuth.getInstance().demanderConversations();
         });
         tabGroup.setOnAction(e -> {
             ongletGroupesActif = true;
@@ -140,12 +144,14 @@ public class Discussion implements EcouteurClient {
             tabGroup.setStyle("-fx-background-color:#25D366; -fx-text-fill:white;");
             actionBtn.setText("👥+");
             ClientHandlerAuth.getInstance().demanderListeGroupes();
+            ClientHandlerAuth.getInstance().demanderContacts();
         });
 
         actionBtn.setOnAction(e -> {
             if (!ongletGroupesActif) {
                 Ajouter_contacte.show(stage, convList, ClientHandlerAuth.getInstance());
             } else {
+                ClientHandlerAuth.getInstance().demanderContacts();
                 List<Contact> contacts = extraireContactsDepuisConversations();
                 if (contacts.isEmpty()) { showAlert(Alert.AlertType.WARNING, "Groupe", "Aucun contact disponible."); return; }
                 CreerGroupeDialog dialog = new CreerGroupeDialog(contacts);
@@ -240,11 +246,13 @@ public class Discussion implements EcouteurClient {
             if (txt.isEmpty()) return;
             String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
             if (estEnGroupe && groupeActif != null) {
-                // On n'ajoute pas localement pour les groupes, on attend l'écho du serveur pour éviter les doublons avec l'historique
                 ClientHandlerAuth.getInstance().envoyerMessageGroupe(groupeActif.getIdGroupe(), txt);
+                ClientHandlerAuth.getInstance().demanderListeGroupes();
+                ClientHandlerAuth.getInstance().demanderConversations();
             } else if (numeroContactUtilisable(contactActif)) {
                 messagesBox.getChildren().add(Messagefx.Messageenvoyer(txt, time));
                 ClientHandlerAuth.getInstance().envoyerMessage(contactActif, txt);
+                ClientHandlerAuth.getInstance().demanderConversations();
             }
             msgField.clear();
             scrollToBottom();
@@ -313,6 +321,8 @@ public class Discussion implements EcouteurClient {
             messagesBox.getChildren().add(Messagefx.Messagerecu(contenu, time));
             if (!num.equals(contactActif)) mettreAJourBadgeNonLu(num);
             scrollToBottom();
+            ClientHandlerAuth.getInstance().demanderConversations();
+            ClientHandlerAuth.getInstance().demanderContacts();
         });
     }
 
@@ -330,6 +340,8 @@ public class Discussion implements EcouteurClient {
                 }
                 scrollToBottom();
             }
+            ClientHandlerAuth.getInstance().demanderConversations();
+            ClientHandlerAuth.getInstance().demanderListeGroupes();
         });
     }
 
@@ -401,6 +413,7 @@ public class Discussion implements EcouteurClient {
                 java.nio.file.Files.write(out.toPath(), data);
                 messagesBox.getChildren().add(Messagefx.Messagerecu("📎 " + name, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))));
                 scrollToBottom();
+                ClientHandlerAuth.getInstance().demanderConversations();
             } catch (Exception e) { e.printStackTrace(); }
         });
     }
@@ -511,6 +524,9 @@ public class Discussion implements EcouteurClient {
     }
 
     private List<Contact> extraireContactsDepuisConversations() {
+        if (!mesContacts.isEmpty()) {
+            return new ArrayList<>(mesContacts);
+        }
         List<Contact> res = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (HBox item : convList.getItems()) {
@@ -578,13 +594,27 @@ public class Discussion implements EcouteurClient {
                 Object ud = row.getUserData();
                 if (ud instanceof String s) {
                     String[] p = s.split(";", 3);
-                    if (p.length >= 2 && tel.equals(p[1])) return;
+                    if (p.length >= 2 && tel.equals(p[1])) {
+                        assurerContactDansMesContacts(c, tel);
+                        return;
+                    }
                 }
             }
             String[] colors = {"#25D366", "#128C7E", "#075E54", "#34B7F1"};
             String color = colors[(int) (Math.random() * colors.length)];
             convList.getItems().add(makeConvItem(nom, tel, "", color, -1, 0));
+            assurerContactDansMesContacts(c, tel);
         });
+    }
+
+    private void assurerContactDansMesContacts(Contact c, String tel) {
+        if (c == null || tel == null) return;
+        for (Contact mc : mesContacts) {
+            if (mc != null && mc.getNumeroTelephone() != null && tel.equals(mc.getNumeroTelephone().trim())) {
+                return;
+            }
+        }
+        mesContacts.add(c);
     }
 
     @Override
@@ -608,8 +638,18 @@ public class Discussion implements EcouteurClient {
 
     @Override
     public void contactAcceptationConfirmee() {
-        Platform.runLater(() -> ClientHandlerAuth.getInstance().demanderConversations());
+        Platform.runLater(() -> {
+            ClientHandlerAuth.getInstance().demanderConversations();
+            ClientHandlerAuth.getInstance().demanderContacts();
+        });
     }
-    @Override public void listeContactsRecue(List<Contact> cs) {}
+    @Override public void listeContactsRecue(List<Contact> cs) {
+        Platform.runLater(() -> {
+            mesContacts.clear();
+            if (cs != null) {
+                mesContacts.addAll(cs);
+            }
+        });
+    }
     @Override public void membresGroupeRecus(int id, List<Utilisateur> ms) {}
 }
