@@ -70,12 +70,24 @@ public class Ajouter_contacte {
                 return;
             }
 
+            // ── 1. Choisir une couleur aléatoire pour l'avatar ──
+            String[] colors = {"#25D366", "#128C7E", "#075E54", "#34B7F1"};
+            String color = colors[(int)(Math.random() * colors.length)];
+
+            // ── 2. Créer l'item et l'ajouter dans convList de Discussion ──
+           // HBox item = Discussion.makeConvItem(name, phone, "maintenant", color,-1,0);
+            //convList.getItems().add(item);
+            //Envoyer au serveur et attendre sa réponse
+            addBtn.setDisable(true);
+            message.setTextFill(Color.web("#128C7E"));
+            message.setText("Recherche en cours...");
+            // 3. Envoyer la requête au serveur pour enregistrer en base de données ──
             if (client != null) {
                 client.ajouterContact(phone, name);
             }
-
-            message.setTextFill(Color.web("#128C7E"));
-            message.setText("Demande envoyée au serveur. Le contact apparaîtra dans la liste après confirmation.");
+            //hadi ma3rftch
+            message.setTextFill(Color.web("#25D366"));
+            message.setText("✓ Contact \"" + name + "\" ajouté !");
             nameField.clear();
             phoneField.clear();
         });

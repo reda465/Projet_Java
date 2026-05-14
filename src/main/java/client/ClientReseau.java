@@ -13,12 +13,10 @@ import java.net.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
 //import Serveur.*;
 @Setter
 @Getter
 public class ClientReseau {
-
     private Socket tuyau;
     private PrintWriter stylo;
     private BufferedReader yeux;
@@ -226,29 +224,12 @@ public class ClientReseau {
                     traiterMessagesRecus(data);
                     break;
                 case ADD_CONTACT_OK:
-                    // Données serveur : numéro|nomComplet
-                    if (parts.length >= 1 && ecouteur != null) {
+                    if (parts.length >= 3 && ecouteur != null) {
                         Contact contactAjoute = new Contact();
-                        contactAjoute.setNumeroTelephone(parts[0].trim());
-                        contactAjoute.setNomComplet(parts.length >= 2 ? parts[1].trim() : parts[0].trim());
+                        contactAjoute.setNomComplet(parts[1]);
+                        contactAjoute.setNumeroTelephone(parts[0]);
                         System.out.println("✅ Contact ajouté: " + contactAjoute.getNomComplet());
                         ecouteur.contactAjoute(contactAjoute);
-                    }
-                    break;
-                case CONTACT_REQUEST:
-                    if (parts.length >= 2 && ecouteur != null) {
-                        ecouteur.demandeContactRecue(parts[0].trim(), parts[1].trim());
-                    }
-                    break;
-                case CONTACT_ACCEPTED:
-                    if (ecouteur == null) break;
-                    if ("OK".equalsIgnoreCase(data != null ? data.trim() : "")) {
-                        ecouteur.contactAcceptationConfirmee();
-                    } else if (parts.length >= 2) {
-                        Contact c = new Contact();
-                        c.setNumeroTelephone(parts[0].trim());
-                        c.setNomComplet(parts[1].trim());
-                        ecouteur.contactAjoute(c);
                     }
                     break;
                 case ADD_CONTACT_FAIL:
@@ -311,6 +292,9 @@ public class ClientReseau {
                     break;
                 case RENAME_GROUP_OK:
                     if (parts.length >= 2 && ecouteur != null) ecouteur.nomGroupeModifie(Integer.parseInt(parts[0]), parts[1]);
+                    break;
+                case USERS_LIST:
+                    // Optionnel : gérer la liste des utilisateurs connectés
                     break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
@@ -455,13 +439,7 @@ public class ClientReseau {
                 List<String> membres = new ArrayList<>();
                 int nb = 0;
                 try { nb = Integer.parseInt(champs[3]); } catch (Exception ignored) {}
-                if (champs.length > 4) {
-                    for (int i = 4; i < champs.length; i++) {
-                        if (!champs[i].isEmpty()) membres.add(champs[i]);
-                    }
-                } else {
-                    for (int i = 0; i < nb; i++) membres.add("");
-                }
+                for (int i = 0; i < nb; i++) membres.add("");
                 g.setNumerosMembres(membres);
                 groupes.add(g);
             }
@@ -514,7 +492,6 @@ public class ClientReseau {
             if (ecouteur != null) ecouteur.messageGroupeRecu(msg);
         }
     }
-
     //fichiers
     public void envoyerFichier(String telDest, String fileName, byte[] dataBase64) {
         String contenu = telDest + "|" + fileName + "|" + new String(dataBase64);

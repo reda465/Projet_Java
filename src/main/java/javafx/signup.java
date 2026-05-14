@@ -14,17 +14,20 @@ import javafx.stage.Stage;
 import model.*;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static javafx.application.Application.launch;
 public class signup implements EcouteurClient {
     private Label messageLabel;
     private Button btn;
     private Stage stage;
+    private boolean inscriptionEnCours = false;
     // ===== CRÉER LA SCÈNE =====
     public  Scene creerScene(Stage stage) {
         this.stage = stage;
         String chams = login.fieldStyle();
         String btst = login.btnStyle();
+
         // Logo
         Circle circle = new Circle(30);
         circle.setFill(Color.web("#25D366"));
@@ -68,6 +71,12 @@ public class signup implements EcouteurClient {
 
         // ===== ACTION BOUTON =====
         btn.setOnAction(e -> {
+            //ajouter pout liaison
+            if (inscriptionEnCours) {
+                messageLabel.setTextFill(Color.ORANGE);
+                messageLabel.setText("Inscription déjà en cours...");
+                return;
+            }
             String nomComplet = nom.getText().trim();
             String numero = tel.getText().trim();
             String pw = pass1.getText();
@@ -93,27 +102,46 @@ public class signup implements EcouteurClient {
             }
 
             // 2. Désactiver le bouton
+            inscriptionEnCours=true;//liaison
             btn.setDisable(true);
             messageLabel.setTextFill(Color.web("#128C7E"));
             messageLabel.setText("Inscription en cours...");
 
             // 3. Envoyer au serveur
-            String resultat = ClientHandlerAuth.getInstance().sInscrire(nomComplet, numero, pw);
+            /*String resultat = ClientHandlerAuth.getInstance().sInscrire(nomComplet, numero, pw);
             // 4. Erreur locale
             if (!resultat.equals("OK")) {
                 messageLabel.setTextFill(Color.RED);
                 messageLabel.setText(resultat);
                 btn.setDisable(false);
-            }
+            }*/
+            new Thread(() -> {
+                String resultat = ClientHandlerAuth.getInstance().sInscrire(nomComplet, numero, pw);
+
+                Platform.runLater(() -> {
+                    if (!resultat.equals("OK")) {
+                        // Erreur : réactiver le bouton
+                        inscriptionEnCours=false;
+                        messageLabel.setTextFill(Color.RED);
+                        messageLabel.setText(resultat);
+                        btn.setDisable(false);
+                    }
+                    // Si OK : ne rien faire ici, attendre le callback inscriptionReussie()
+                });
+            }).start();
         });
+
         // Lien vers login
         Hyperlink loginLink = new Hyperlink("Se connecter");
         loginLink.setTextFill(Color.web("#25D366"));
-        loginLink.setOnAction(e -> stage.setScene(new login().creerScene(stage)));
+        loginLink.setOnAction(e -> {
+            login l = new login();
+            ClientHandlerAuth.getInstance().setEcouteur(l);
+            stage.setScene(l.creerScene(stage));
+        });
 
         HBox linkBox = new HBox(5, new Label("Déjà un compte ?"), loginLink);
         linkBox.setAlignment(Pos.CENTER);
-
         // Card
         VBox card = new VBox(10, header, nom, tel, pass1, pass2, btn, messageLabel, linkBox);
         card.setPadding(new Insets(30));
@@ -128,8 +156,8 @@ public class signup implements EcouteurClient {
     }
     // ===== CALLBACKS EcouteurClient =====
 
-    @Override
-    public void inscriptionReussie(String msg) {
+
+    /*public void inscriptionReussie(String msg) {
         Platform.runLater(() -> {
             messageLabel.setTextFill(Color.web("#25D366"));
             messageLabel.setText("Compte créé avec succès ! Connectez-vous.");
@@ -140,7 +168,65 @@ public class signup implements EcouteurClient {
                 Platform.runLater(() -> stage.setScene(new login().creerScene(stage)));
             }).start();
         });
+    }*/
+   /*@Override
+    public void inscriptionReussie(String msg) {
+        Platform.runLater(() -> {
+            messageLabel.setTextFill(Color.web("#25D366"));
+            messageLabel.setText("Compte créé avec succès !");
+            btn.setDisable(false);
+
+            // Récupérer l'utilisateur connecté
+            Utilisateur utilisateur = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
+
+            // Ouvrir Discussion directement
+            Discussion discussion = new Discussion(utilisateur);
+            ClientHandlerAuth.getInstance().setEcouteur(discussion);
+            stage.setScene(discussion.creerScene(stage));
+        });
+    }*/
+
+    @Override
+    public void inscriptionReussie(String msg) {
+        Platform.runLater(() -> {
+            // 1. Récupérer l'utilisateur
+            Utilisateur utilisateur = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
+
+            if (utilisateur == null) {
+                messageLabel.setTextFill(Color.RED);
+                messageLabel.setText("Erreur: Impossible de récupérer l'utilisateur");
+                inscriptionEnCours = false;
+                btn.setDisable(false);
+                return;
+            }
+
+            // 2. Initialiser CallService
+            ClientHandlerAuth.getInstance().onConnexionReussie(utilisateur);
+
+            // 3. Créer Discussion
+            Discussion discussion = new Discussion(utilisateur);
+
+            // 4. Changer l'écouteur vers Discussion
+            if (ClientHandlerAuth.getInstance().getClientReseau() != null) {
+                ClientHandlerAuth.getInstance().getClientReseau().setEcouteur(discussion);
+            }
+
+            // 5. Afficher d'abord la fenêtre discussions (évite implicit exit si le stage principal se ferme avant)
+            Stage discussionStage = new Stage();
+            discussionStage.setScene(discussion.creerScene(discussionStage));
+            discussionStage.setTitle("WhatsApp – Discussions");
+            discussionStage.setOnCloseRequest(e -> {
+                ClientHandlerAuth.getInstance().seDeconnecter();
+            });
+            discussionStage.show();
+            inscriptionEnCours = false;
+            stage.close();
+
+            // 6. Demander les conversations
+            ClientHandlerAuth.getInstance().demanderConversations();
+        });
     }
+
     @Override
     public void erreur(String message) {
         Platform.runLater(() -> {
