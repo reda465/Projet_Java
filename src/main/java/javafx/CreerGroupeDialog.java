@@ -69,7 +69,6 @@ public class CreerGroupeDialog extends Dialog<CreerGroupeDialog.ResultatCreation
     public CreerGroupeDialog() {
 
     }
-
     public static class ResultatCreation {
         public final String nomGroupe;
         public final String[] numeros;
