@@ -135,8 +135,9 @@ public class signup implements EcouteurClient {
         Hyperlink loginLink = new Hyperlink("Se connecter");
         loginLink.setTextFill(Color.web("#25D366"));
         loginLink.setOnAction(e -> {
-            ClientHandlerAuth.getInstance().setEcouteur(new login());
-            stage.setScene(new login().creerScene(stage));
+            login l = new login();
+            ClientHandlerAuth.getInstance().setEcouteur(l);
+            stage.setScene(l.creerScene(stage));
         });
 
         HBox linkBox = new HBox(5, new Label("Déjà un compte ?"), loginLink);
@@ -188,21 +189,16 @@ public class signup implements EcouteurClient {
     @Override
     public void inscriptionReussie(String msg) {
         Platform.runLater(() -> {
-            System.out.println("[SIGNUP] inscriptionReussie appelée avec: " + msg);
-
             // 1. Récupérer l'utilisateur
             Utilisateur utilisateur = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
 
             if (utilisateur == null) {
-                System.err.println("[SIGNUP] ERREUR: utilisateur est null !");
                 messageLabel.setTextFill(Color.RED);
                 messageLabel.setText("Erreur: Impossible de récupérer l'utilisateur");
                 inscriptionEnCours = false;
                 btn.setDisable(false);
                 return;
             }
-
-            System.out.println("[SIGNUP] Utilisateur récupéré: " + utilisateur.getNomComplet());
 
             // 2. Initialiser CallService
             ClientHandlerAuth.getInstance().onConnexionReussie(utilisateur);
@@ -215,9 +211,7 @@ public class signup implements EcouteurClient {
                 ClientHandlerAuth.getInstance().getClientReseau().setEcouteur(discussion);
             }
 
-            // 5. Fermer signup et ouvrir Discussion dans un nouveau Stage
-            stage.close();
-
+            // 5. Afficher d'abord la fenêtre discussions (évite implicit exit si le stage principal se ferme avant)
             Stage discussionStage = new Stage();
             discussionStage.setScene(discussion.creerScene(discussionStage));
             discussionStage.setTitle("WhatsApp – Discussions");
@@ -225,6 +219,8 @@ public class signup implements EcouteurClient {
                 ClientHandlerAuth.getInstance().seDeconnecter();
             });
             discussionStage.show();
+            inscriptionEnCours = false;
+            stage.close();
 
             // 6. Demander les conversations
             ClientHandlerAuth.getInstance().demanderConversations();

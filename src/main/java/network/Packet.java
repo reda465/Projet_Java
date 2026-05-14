@@ -21,11 +21,17 @@ public class Packet {
     }
 
     public static Packet fromString(String ligne) {
-        String[] parts = ligne.split("\\|", 2);
-
-        Protocol prot = Protocol.valueOf(parts[0]);
-        String cont = parts[1];
-
+        if (ligne == null) {
+            throw new IllegalArgumentException("ligne null");
+        }
+        ligne = ligne.trim();
+        if (ligne.isEmpty()) {
+            throw new IllegalArgumentException("ligne vide");
+        }
+        int sep = ligne.indexOf('|');
+        String head = (sep < 0 ? ligne : ligne.substring(0, sep)).trim();
+        String cont = sep < 0 ? "" : ligne.substring(sep + 1);
+        Protocol prot = Protocol.valueOf(head);
         return new Packet(prot, cont);
     }
 

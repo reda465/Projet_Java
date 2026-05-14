@@ -13,12 +13,10 @@ import java.net.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
 //import Serveur.*;
 @Setter
 @Getter
 public class ClientReseau {
-
     private Socket tuyau;
     private PrintWriter stylo;
     private BufferedReader yeux;
@@ -275,6 +273,9 @@ public class ClientReseau {
                 case RENAME_GROUP_OK:
                     if (parts.length >= 2 && ecouteur != null) ecouteur.nomGroupeModifie(Integer.parseInt(parts[0]), parts[1]);
                     break;
+                case USERS_LIST:
+                    // Optionnel : gérer la liste des utilisateurs connectés
+                    break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
                     break;
@@ -441,7 +442,6 @@ public class ClientReseau {
             if (ecouteur != null) ecouteur.messageGroupeRecu(msg);
         }
     }
-
     //fichiers
     public void envoyerFichier(String telDest, String fileName, byte[] dataBase64) {
         String contenu = telDest + "|" + fileName + "|" + new String(dataBase64);
