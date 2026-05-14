@@ -126,6 +126,8 @@ public class login extends Application implements EcouteurClient {
 
         signupLink.setOnAction(e -> {
             signup s = new signup();
+            //pour lier avec disscusion
+            ClientHandlerAuth.getInstance().setEcouteur(s);
             stage.setScene(s.creerScene(stage));
         });
 

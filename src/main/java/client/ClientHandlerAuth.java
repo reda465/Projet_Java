@@ -253,4 +253,10 @@ public class ClientHandlerAuth {
         }
         return true;
     }
+    //pour effectuer la liaisoon entre disscusion et sign up
+    public void setEcouteur(EcouteurClient ecouteur) {
+        if (clientReseau != null) {
+            clientReseau.setEcouteur(ecouteur);
+        }
+    }
 }

@@ -96,7 +96,10 @@ public class ClientHandler extends Thread {
 
     // ── LOGIN|numero_telephone|mot_de_passe ──────────────────────────────────
     private void handleLogin(String[] parts) {
-        if (parts.length < 3) { pw.println(Protocol.LOGIN_FAIL); return; }
+        if (parts.length < 3) {
+            pw.println(Protocol.LOGIN_FAIL + "|Format_invalide");
+            return;
+        }
 
         String tel      = parts[1];
         String password = parts[2];
@@ -123,7 +126,7 @@ public class ClientHandler extends Thread {
             }
         } catch (SQLException e) {
             e.printStackTrace();
-            pw.println(Protocol.LOGIN_FAIL);
+            pw.println(Protocol.LOGIN_FAIL + "|ErreurServeur");
         }
     }
 
@@ -166,7 +169,19 @@ public class ClientHandler extends Thread {
                 return;
             }
             userDAO.Add(u);
-            pw.println("REGISTER_OK|Inscription_Avec_Succes");
+            
+            // Auto-login après inscription
+            Utilisateur newUser = userDAO.findByTelephone(u.getNumeroTelephone());
+            if (newUser != null) {
+                telephoneConnecte = newUser.getNumeroTelephone();
+                userManager.addUser(telephoneConnecte, this);
+                userDAO.updateDerniereConnexion(newUser.getIdUtilisateur());
+                
+                pw.println(Protocol.REGISTER_OK + "|" + newUser.getNomComplet() + "|" + newUser.getNumeroTelephone());
+                broadcastUsersList();
+            } else {
+                pw.println(Protocol.REGISTER_OK + "|" + u.getNomComplet() + "|" + u.getNumeroTelephone());
+            }
         } catch (SQLException e) {
             e.printStackTrace();
             pw.println("REGISTER_FAIL|Erreur_Inscription");

@@ -144,22 +144,45 @@ public class Discussion implements EcouteurClient {
             tabGroup.setStyle("-fx-background-color:#25D366; -fx-text-fill:white;");
             actionBtn.setText("👥+");
             ClientHandlerAuth.getInstance().demanderListeGroupes();
-            ClientHandlerAuth.getInstance().demanderContacts();
         });
 
         actionBtn.setOnAction(e -> {
             if (!ongletGroupesActif) {
                 Ajouter_contacte.show(stage, convList, ClientHandlerAuth.getInstance());
-            } else {
-                ClientHandlerAuth.getInstance().demanderContacts();
-                List<Contact> contacts = extraireContactsDepuisConversations();
-                if (contacts.isEmpty()) { showAlert(Alert.AlertType.WARNING, "Groupe", "Aucun contact disponible."); return; }
-                CreerGroupeDialog dialog = new CreerGroupeDialog(contacts);
-                dialog.showAndWait().ifPresent(res -> {
-                    if (res.nomGroupe != null && !res.nomGroupe.isBlank() && res.numeros.length >= 2) {
-                        ClientHandlerAuth.getInstance().creerGroupe(res.nomGroupe.trim(), res.numeros);
-                    }
-                });
+                return;
+            }
+            List<Contact> contacts = extraireContactsDepuisConversations();
+            if (contacts.isEmpty()) {
+                showAlert(Alert.AlertType.WARNING, "Groupe", "Aucun contact disponible pour créer un groupe.");
+                return;
+            }
+            CreerGroupeDialog dialog = new CreerGroupeDialog(contacts);
+            dialog.showAndWait().ifPresent(res -> {
+                if (res.nomGroupe == null || res.nomGroupe.trim().isEmpty()) {
+                    showAlert(Alert.AlertType.WARNING, "Groupe", "Nom du groupe requis.");
+                    return;
+                }
+                if (res.numeros == null || res.numeros.length < 2) {
+                    showAlert(Alert.AlertType.WARNING, "Groupe", "Choisissez au moins 2 membres.");
+                    return;
+                }
+                ClientHandlerAuth.getInstance().creerGroupe(res.nomGroupe.trim(), res.numeros);
+            });
+        });
+
+        convList.setOnMouseClicked(e -> {
+            HBox selected = convList.getSelectionModel().getSelectedItem();
+            if (selected == null) return;
+            Object ud = selected.getUserData();
+            if (ud == null) return;
+            String[] parts = ((String) ud).split(";", 3);
+            try {
+                int idConv = Integer.parseInt(parts[0]);
+                String numero = parts[1];
+                String nom = parts[2];
+                ouvrirConversation(idConv, numero, nom);
+            } catch (NumberFormatException ex) {
+                System.out.println(" ID conversation invalide");
             }
         });
 
@@ -413,8 +436,17 @@ public class Discussion implements EcouteurClient {
                 java.nio.file.Files.write(out.toPath(), data);
                 messagesBox.getChildren().add(Messagefx.Messagerecu("📎 " + name, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))));
                 scrollToBottom();
-                ClientHandlerAuth.getInstance().demanderConversations();
-            } catch (Exception e) { e.printStackTrace(); }
+
+                // Notifier l'utilisateur si la conversation n'est pas active
+                if (!tel.equals(contactActif)) {
+                    mettreAJourBadgeNonLu(tel);
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                showAlert(Alert.AlertType.ERROR, "Erreur fichier",
+                        "Impossible de recevoir le fichier : " + name);
+            }
         });
     }
 
@@ -524,9 +556,6 @@ public class Discussion implements EcouteurClient {
     }
 
     private List<Contact> extraireContactsDepuisConversations() {
-        if (!mesContacts.isEmpty()) {
-            return new ArrayList<>(mesContacts);
-        }
         List<Contact> res = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (HBox item : convList.getItems()) {
@@ -549,8 +578,12 @@ public class Discussion implements EcouteurClient {
 
     private void scrollToBottom() { Platform.runLater(() -> scrollPane.setVvalue(1.0)); }
 
-    private void showAlert(Alert.AlertType t, String title, String msg) {
-        Alert a = new Alert(t); a.setTitle(title); a.setHeaderText(null); a.setContentText(msg); a.showAndWait();
+    private void showAlert(Alert.AlertType type, String titre, String msg) {
+        Alert alert = new Alert(type);
+        alert.setTitle(titre);
+        alert.setHeaderText(null);
+        alert.setContentText(msg);
+        alert.showAndWait();
     }
 
     public static HBox makeConvItem(String name, String num, String last, String color, int id, int unread) {
@@ -571,6 +604,7 @@ public class Discussion implements EcouteurClient {
         ((Circle) s.getChildren().get(0)).setFill(Color.web(color));
         ((Text) s.getChildren().get(1)).setText(letter);
     }
+
 
     private static void styleIconBtn(Button b, String base, String hover) {
         b.setStyle("-fx-background-color:" + base + "; -fx-text-fill:white; -fx-background-radius:50%; -fx-min-width:38px; -fx-min-height:38px; -fx-cursor:hand;");
