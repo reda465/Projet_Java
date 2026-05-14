@@ -259,4 +259,5 @@ public class ClientHandlerAuth {
             clientReseau.setEcouteur(ecouteur);
         }
     }
+
 }

@@ -14,6 +14,7 @@ import javafx.stage.Stage;
 import client.EcouteurClient;
 import model.*;
 
+import javax.swing.text.html.ImageView;
 import java.util.List;
 public class login extends Application implements EcouteurClient {
     private Label message;
@@ -212,6 +213,11 @@ public class login extends Application implements EcouteurClient {
     }
 
     @Override
+    public void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, javafx.scene.image.ImageView videoNode) {
+
+    }
+
+    @Override
     public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
 
     }
@@ -287,6 +293,46 @@ public class login extends Application implements EcouteurClient {
 
     }
 
+    @Override
+    public void appelGroupeEntrant(int idGroupe, String nomGroupe, String type, String initiateurNom) {
+
+    }
+
+    @Override
+    public void appelGroupeDemarre(int idGroupe, String type) {
+
+    }
+
+    @Override
+    public void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre) {
+
+    }
+
+    @Override
+    public void membreQuitteAppelGroupe(int idGroupe, String numeroMembre) {
+
+    }
+
+    @Override
+    public void appelGroupeTermine(int idGroupe) {
+
+    }
+
+    @Override
+    public void signalisationAppelGroupe(int idGroupe, String numeroSource, String typeSignal, String payload) {
+
+    }
+
+    @Override
+    public void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, ImageView videoNode) {
+
+    }
+
+    @Override
+    public void fluxVideoGroupeArrete(int idGroupe, String numeroExpediteur) {
+
+    }
+
 
     @Override
     public void conversationsRecues(List<Conversation> conversations) {
@@ -301,6 +347,16 @@ public class login extends Application implements EcouteurClient {
     @Override
     public void contactAjoute(Contact contact) {
 
+    }
+
+    @Override
+    public void demandeContactRecue(String numeroDemandeur, String nomDemandeur) {
+        EcouteurClient.super.demandeContactRecue(numeroDemandeur, nomDemandeur);
+    }
+
+    @Override
+    public void contactAcceptationConfirmee() {
+        EcouteurClient.super.contactAcceptationConfirmee();
     }
 
     @Override
