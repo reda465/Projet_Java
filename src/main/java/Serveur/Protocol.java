@@ -41,7 +41,8 @@ public enum Protocol {
     ADD_CONTACT,
     ADD_CONTACT_OK,
     ADD_CONTACT_FAIL,
-
+    CONTACTS_LIST,
+    GET_CONTACTS,
     // Groupes V2
     CREATE_GROUP,
     CREATE_GROUP_OK,

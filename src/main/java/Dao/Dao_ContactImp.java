@@ -174,4 +174,19 @@ public class Dao_ContactImp implements DAO_Contact {
         }
         return liste;
     }
+    public List<Contact> getContactsByUtilisateur(int idUtilisateur) throws SQLException {
+        List<Contact> liste = new ArrayList<>();
+        String sql = "SELECT * FROM contacts WHERE id_utilisateur = ?";
+        try (Connection con = DataBase.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, idUtilisateur);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) liste.add(mapResultSet(rs));
+
+        }catch (SQLException e) {
+            System.err.println("[ERROR] getContactsByUtilisateur: " + e.getMessage());
+            throw e;
+        }
+        return liste;
+    }
 }
