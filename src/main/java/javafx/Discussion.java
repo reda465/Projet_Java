@@ -388,7 +388,7 @@ public class Discussion implements EcouteurClient {
                 Utilisateur moi = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
                 boolean estMoi = moi != null && m.getTelephoneExpediteur().equals(moi.getNumeroTelephone());
                 String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-                
+
                 if (estMoi) {
                     messagesBox.getChildren().add(Messagefx.Messageenvoyer(m.getContenu(), time));
                 } else {
@@ -442,8 +442,32 @@ public class Discussion implements EcouteurClient {
         Platform.runLater(() -> {
             convList.getItems().clear();
             if (cs == null) return;
-            for (Conversation c : cs) {
-                convList.getItems().add(makeConvItem(c.getNomContact(), c.getNumeroContact(), c.getDernierMessage() != null ? c.getDernierMessage() : "", "#128C7E", c.getIdConversation(), c.getMessagesNonLus()));
+            for (Conversation nouvelle : cs) {
+                boolean existe = false;
+                for (int i = 0; i < convList.getItems().size(); i++) {
+                    HBox existing = convList.getItems().get(i);
+                    Object ud = existing.getUserData();
+                    if (ud instanceof String s) {
+                        String[] p = s.split(";", 3);
+                        if (p.length >= 2 && p[1].equals(nouvelle.getNumeroContact())) {
+                            // Mettre à jour l'existant
+                            existe = true;
+                            break;
+                        }
+                    }
+                }
+                if (!existe) {
+                    // Ajouter la nouvelle conversation
+                    String color = "#128C7E";
+                    convList.getItems().add(makeConvItem(
+                            nouvelle.getNomContact(),
+                            nouvelle.getNumeroContact(),
+                            nouvelle.getDernierMessage() != null ? nouvelle.getDernierMessage() : "",
+                            color,
+                            nouvelle.getIdConversation(),
+                            nouvelle.getMessagesNonLus()
+                    ));
+                }
             }
         });
     }
@@ -657,20 +681,30 @@ public class Discussion implements EcouteurClient {
             if (c == null || !numeroContactUtilisable(c.getNumeroTelephone())) return;
             String tel = c.getNumeroTelephone().trim();
             String nom = c.getNomComplet() != null && !c.getNomComplet().isBlank() ? c.getNomComplet().trim() : tel;
+            boolean existe = false;
             for (HBox row : convList.getItems()) {
                 Object ud = row.getUserData();
                 if (ud instanceof String s) {
                     String[] p = s.split(";", 3);
                     if (p.length >= 2 && tel.equals(p[1])) {
-                        assurerContactDansMesContacts(c, tel);
-                        return;
+                        existe = true;
+                        break;
                     }
                 }
             }
-            String[] colors = {"#25D366", "#128C7E", "#075E54", "#34B7F1"};
-            String color = colors[(int) (Math.random() * colors.length)];
-            convList.getItems().add(makeConvItem(nom, tel, "", color, -1, 0));
+            if (!existe) {
+                String[] colors = {"#25D366", "#128C7E", "#075E54", "#34B7F1"};
+                String color = colors[(int) (Math.random() * colors.length)];
+                convList.getItems().add(makeConvItem(nom, tel, "Nouveau contact", color, -1, 0));
+            }
             assurerContactDansMesContacts(c, tel);
+            new Thread(() -> {
+                try { Thread.sleep(300); } catch (InterruptedException ignored) {}
+                Platform.runLater(() -> {
+                    ClientHandlerAuth.getInstance().demanderConversations();
+                    ClientHandlerAuth.getInstance().demanderContacts();
+                });
+            }).start();
         });
     }
 
@@ -698,7 +732,10 @@ public class Discussion implements EcouteurClient {
             a.getButtonTypes().setAll(accepter, bloquer, plusTard);
             Optional<ButtonType> r = a.showAndWait();
             if (r.isEmpty()) return;
-            if (r.get() == accepter) ClientHandlerAuth.getInstance().accepterDemandeContact(numeroDemandeur);
+            if (r.get() == accepter)  {
+                ClientHandlerAuth.getInstance().accepterDemandeContact(numeroDemandeur);
+                ClientHandlerAuth.getInstance().demanderConversations();
+            }
             else if (r.get() == bloquer) ClientHandlerAuth.getInstance().bloquerNumeroContact(numeroDemandeur);
         });
     }
