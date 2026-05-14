@@ -248,15 +248,48 @@ public class Discussion implements EcouteurClient {
         VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
         HBox inputBar = new HBox(8);
-        inputBar.setPadding(new Insets(10));
+        inputBar.setPadding(new Insets(10,12,10,12));
         inputBar.setAlignment(Pos.CENTER);
+        inputBar.setStyle("-fx-background-color: #f0f0f0;");
         attachBtn = new Button("📎");
         styleIconBtn(attachBtn, "#25D366", "#128C7E");
+        attachBtn.setTooltip(new Tooltip("Envoyer un fichier"));
         attachBtn.setDisable(true);
-        attachBtn.setOnAction(e -> handleAttachFile());
+        attachBtn.setOnAction(e -> {
+            if (!numeroContactUtilisable(contactActif)) return;
+
+            // Ouvre l'explorateur de fichiers natif
+            javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+            chooser.setTitle("Choisir un fichier à envoyer");
+            chooser.getExtensionFilters().addAll(
+                    new javafx.stage.FileChooser.ExtensionFilter("Tous les fichiers", "*.*"),
+                    new javafx.stage.FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"),
+                    new javafx.stage.FileChooser.ExtensionFilter("Documents", "*.pdf", "*.docx", "*.txt", "*.xlsx")
+            );
+
+            File fichier = chooser.showOpenDialog(primaryStage);
+            if (fichier != null) {
+                // Envoyer le fichier via le service
+                fileService.envoyerFichier(contactActif, fichier);
+
+                // Afficher une bulle de confirmation dans le chat
+                String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+                HBox bulle = Messagefx.Messageenvoyer("📎 " + fichier.getName(), time);
+                messagesBox.getChildren().add(bulle);
+                scrollToBottom();
+            }
+        });
 
         msgField = new TextField();
         msgField.setPromptText("Tapez un message");
+        msgField.setStyle(
+                "-fx-background-color: white;" +
+                        "-fx-border-color: transparent;" +
+                        "-fx-border-radius: 21px;" +
+                        "-fx-background-radius: 21px;" +
+                        "-fx-padding: 10px 14px;" +
+                        "-fx-font-size: 14px;"
+        );
         msgField.setDisable(true);
         HBox.setHgrow(msgField, Priority.ALWAYS);
 
