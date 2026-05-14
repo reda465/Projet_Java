@@ -237,6 +237,13 @@ public class ClientReseau {
                         ecouteur.erreur("Échec ajout contact: " + p.getData());
                     }
                     break;
+                case CONTACT_REQUEST:
+                    if (parts.length >= 2 && ecouteur != null) {
+                        String numDemandeur = parts[0];
+                        String nomDemandeur = parts.length >= 2 ? parts[1] : "";                        System.out.println("[CONTACT] Demande reçue de " + nomDemandeur + " (" + numDemandeur + ")");
+                        System.out.println("[CONTACT] Demande reçue de " + nomDemandeur + " (" + numDemandeur + ")");
+                        ecouteur.demandeContactRecue(numDemandeur, nomDemandeur);                    }
+                    break;
                     //fichier
                 case FILE_RECEIVE:
                     if (parts.length >= 3) {
@@ -437,9 +444,9 @@ public class ClientReseau {
                 g.setNomGroupe(champs[1]);
                 g.setNumeroCreateur(champs[2]);
                 List<String> membres = new ArrayList<>();
-                int nb = 0;
-                try { nb = Integer.parseInt(champs[3]); } catch (Exception ignored) {}
-                for (int i = 0; i < nb; i++) membres.add("");
+                for (int i = 4; i < champs.length; i++) {
+                    if (!champs[i].isEmpty()) membres.add(champs[i].trim());
+                }
                 g.setNumerosMembres(membres);
                 groupes.add(g);
             }
