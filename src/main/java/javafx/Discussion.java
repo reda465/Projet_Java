@@ -1045,5 +1045,4 @@ public class Discussion implements EcouteurClient {
         }
         return numero;
     }
-
 }
