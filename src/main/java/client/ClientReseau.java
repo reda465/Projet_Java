@@ -84,6 +84,16 @@ public class ClientReseau {
             System.out.println(" Envoyé : " + packet.getProtocol());
         }
     }
+
+    public void demanderContacts() {
+        if (!connecte || stylo == null) {
+            System.out.println("❌ Pas connecté au serveur");
+            return;
+        }
+        Packet p = new Packet(Protocol.GET_CONTACTS, "");
+        envoyer(p);
+    }
+
     public void demanderConversations() {
         if (!connecte || stylo == null) {
             System.out.println("❌ Pas connecté au serveur");
