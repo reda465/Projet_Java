@@ -278,9 +278,19 @@ public class ClientReseau {
                         ecouteur.membreAjoute(Integer.parseInt(parts[0]), parts[1]);
                     }
                     break;
+                case ADD_GROUP_MEMBER_FAIL:
+                    if (ecouteur != null) {
+                        ecouteur.erreur("Ajout membre au groupe : " + (data != null ? data : ""));
+                    }
+                    break;
                 case REMOVE_GROUP_MEMBER_OK:
                     if (parts.length >= 2 && ecouteur != null) {
                         ecouteur.membreRetire(Integer.parseInt(parts[0]), parts[1]);
+                    }
+                    break;
+                case REMOVE_GROUP_MEMBER_FAIL:
+                    if (ecouteur != null) {
+                        ecouteur.erreur("Retrait membre du groupe : " + (data != null ? data : ""));
                     }
                     break;
                 case QUIT_GROUP_OK:
@@ -302,28 +312,49 @@ public class ClientReseau {
         private void traiterConversationsRecues(String data) {
             List<Conversation> conversations = new ArrayList<>();
 
-            if (data.isEmpty()) {
+            if (data == null || data.isEmpty()) {
                 if (ecouteur != null) ecouteur.conversationsRecues(conversations);
                 return;
             }
-            // Format : id;type;nomExp;datedernierMsg;nonLus;contenuDerniermsg|id;nom;...
+            // Format v2 : id;type;nom;numeroTel;date;nonLus;dernierMsg|
+            // Ancien : id;type;nom;date;nonLus;dernierMsg|
             String[] convs = data.split("\\|");
             for (String c : convs) {
                 if (c.isEmpty()) continue;
-                String[] parts = c.split(";", 6);
-                if (parts.length < 5) continue;
+                String[] parts = c.split(";", -1);
+                if (parts.length < 6) continue;
 
                 Conversation conv = new Conversation();
-                conv.setIdConversation(Integer.parseInt(parts[0]));
-                conv.setTypeConversation(parts[1]);
-                conv.setNomContact(parts[2]);
-                try {
-                    conv.setDateDernierMessage(java.time.LocalDateTime.parse(parts[3]));
-                } catch (Exception e) {
-                    conv.setDateDernierMessage(null);
+                conv.setIdConversation(Integer.parseInt(parts[0].trim()));
+                conv.setTypeConversation(parts[1].trim());
+                conv.setNomContact(parts[2].trim());
+
+                if (parts.length >= 7) {
+                    conv.setNumeroContact(parts[3].trim());
+                    try {
+                        conv.setDateDernierMessage(java.time.LocalDateTime.parse(parts[4]));
+                    } catch (Exception e) {
+                        conv.setDateDernierMessage(null);
+                    }
+                    conv.setMessagesNonLus(Integer.parseInt(parts[5].trim()));
+                    if (parts.length > 7) {
+                        StringBuilder dm = new StringBuilder(parts[6] != null ? parts[6] : "");
+                        for (int pi = 7; pi < parts.length; pi++) {
+                            dm.append(';').append(parts[pi] != null ? parts[pi] : "");
+                        }
+                        conv.setDernierMessage(dm.toString());
+                    } else {
+                        conv.setDernierMessage(parts[6] != null ? parts[6] : "");
+                    }
+                } else {
+                    try {
+                        conv.setDateDernierMessage(java.time.LocalDateTime.parse(parts[3]));
+                    } catch (Exception e) {
+                        conv.setDateDernierMessage(null);
+                    }
+                    conv.setMessagesNonLus(Integer.parseInt(parts[4].trim()));
+                    conv.setDernierMessage(parts.length >= 6 ? parts[5] : "");
                 }
-                conv.setMessagesNonLus(Integer.parseInt(parts[4]));
-                conv.setDernierMessage(parts.length >= 6 ? parts[5] : "");
                 conversations.add(conv);
             }
             System.out.println("Conversations reçues : " + conversations.size());
@@ -459,8 +490,17 @@ public class ClientReseau {
             msg.setIdGroupe(Integer.parseInt(parts[0]));
             msg.setTelephoneExpediteur(parts[1]);
             msg.setNomExpediteur(parts[2]);
-            msg.setContenu(parts[3]);
-            try { msg.setDateEnvoi(LocalDateTime.parse(parts[4])); } catch (Exception e) { msg.setDateEnvoi(null); }
+            if (parts.length == 5) {
+                msg.setContenu(parts[3]);
+                try { msg.setDateEnvoi(LocalDateTime.parse(parts[4])); } catch (Exception e) { msg.setDateEnvoi(null); }
+            } else {
+                StringBuilder c = new StringBuilder(parts[3] != null ? parts[3] : "");
+                for (int i = 4; i < parts.length - 1; i++) {
+                    c.append('|').append(parts[i] != null ? parts[i] : "");
+                }
+                msg.setContenu(c.toString());
+                try { msg.setDateEnvoi(LocalDateTime.parse(parts[parts.length - 1])); } catch (Exception e) { msg.setDateEnvoi(null); }
+            }
             if (ecouteur != null) ecouteur.messageGroupeRecu(msg);
         }
     }
