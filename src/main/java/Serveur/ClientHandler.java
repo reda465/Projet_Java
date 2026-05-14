@@ -516,7 +516,42 @@ public class ClientHandler extends Thread {
                 c.setEstBloque(false);
                 contactDAO.Add(c);
             }
+            int idConv = -1;
+            try {
+                Conversation conv = convDAO.findIndividuelle(moi.getIdUtilisateur(), contact.getIdUtilisateur());
+                if (conv == null) {
+                    conv = new Conversation();
+                    conv.setTypeConversation("individuelle");
+                    conv.setNomGroupe(null);
+                    conv.setIdCreateur(null);
+                    idConv = convDAO.Add(conv);
+                    conv.setIdConversation(idConv);
+                    convDAO.ajouterParticipant(idConv, moi.getIdUtilisateur());
+                    convDAO.ajouterParticipant(idConv, contact.getIdUtilisateur());
+                    System.out.println("[CONTACT] Conversation créée : " + idConv);
+                } else {
+                    idConv = conv.getIdConversation();
+                }
+            } catch (SQLException convEx) {
+                convEx.printStackTrace();
+            }
+            // Format : CONVERSATIONS_LIST|id;type;nom;numero;date;0;|
+            StringBuilder convData = new StringBuilder();
+            convData.append(idConv).append(";")
+                    .append("individuelle").append(";")
+                    .append(contact.getNomComplet()).append(";")
+                    .append(contact.getNumeroTelephone()).append(";")
+                    .append(";") // date vide
+                    .append("0").append(";") // 0 non lus
+                    .append("|");
 
+            // Envoyer d'abord la confirmation d'ajout
+            pw.println(Protocol.ADD_CONTACT_OK.name()
+                    + "|" + contact.getNumeroTelephone()
+                    + "|" + contact.getNomComplet());
+
+            // envoyer la nouvelle conversation pour mise à jour temps réel
+            pw.println(Protocol.CONVERSATIONS_LIST.name() + "|" + convData);
             pw.println(Protocol.ADD_CONTACT_OK.name()
                     + "|" + contact.getNumeroTelephone()
                     + "|" + contact.getNomComplet());
@@ -586,7 +621,17 @@ public class ClientHandler extends Thread {
                     ps.executeUpdate();
                 }
             }
-
+            try {
+                Conversation conv = convDAO.findIndividuelle(moi.getIdUtilisateur(), alice.getIdUtilisateur());
+                if (conv == null) {
+                    conv = new Conversation();
+                    conv.setTypeConversation("individuelle");
+                    int idConv = convDAO.Add(conv);
+                    convDAO.ajouterParticipant(idConv, moi.getIdUtilisateur());
+                    convDAO.ajouterParticipant(idConv, alice.getIdUtilisateur());
+                    System.out.println("[CONTACT] Conversation créée côté accepteur : " + idConv);
+                }
+            } catch (SQLException e) { e.printStackTrace(); }
             // 2. Confirmer à Bob
             pw.println(Protocol.CONTACT_ACCEPTED.name() + "|OK");
 
@@ -607,6 +652,7 @@ public class ClientHandler extends Thread {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
     }
 
     // ── BLOCK_CONTACT|telephoneContact ───────────────────────────────────────
@@ -672,6 +718,8 @@ public class ClientHandler extends Thread {
                         .append(g.getNomGroupe()).append(";")
                         .append(g.getNumeroCreateur()).append(";")
                         .append(g.getNumerosMembres() != null ? g.getNumerosMembres().size() : 0);
+
+                // Envoyer les vrais numéros
                 if (g.getNumerosMembres() != null) {
                     for (String m : g.getNumerosMembres()) {
                         if (m != null && !m.isBlank()) sb.append(";").append(m.trim());
