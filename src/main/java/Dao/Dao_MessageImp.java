@@ -131,7 +131,9 @@ public class Dao_MessageImp implements DAO_Message {
         m.setContenuTexte(rs.getString("contenu_texte"));
         m.setUrlFichier(rs.getString("url_fichier"));
         m.setNomFichier(rs.getString("nom_fichier"));
-        m.setTailleFichier(rs.getLong("taille_fichier"));
+        long tf = rs.getLong("taille_fichier");
+        if (rs.wasNull()) m.setTailleFichier(null);
+        else m.setTailleFichier(tf);
 
         Timestamp dateEnvoi = rs.getTimestamp("date_envoi");
         if (dateEnvoi != null)

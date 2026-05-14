@@ -41,4 +41,16 @@ public interface EcouteurClient {
 
     //fichier
     void fichierRecu(String telephoneExp, String fileName, String base64);
+
+    /** Message individuel avec pièce jointe enregistrée côté serveur (temps réel ou attente). */
+    default void messageFichierNotifie(String telephoneExpediteur, int idMessage, String nomFichier,
+                                       String typeMessage, long tailleOctets, String legende) {}
+
+    /** Téléchargement terminé (fichier sauvé localement). */
+    default void fichierTelecharge(int messageId, java.io.File fichierLocal, String typeMessage) {}
+
+    default void fichierTelechargeErreur(int messageId, String raison) {}
+
+    /** Réponse à l'envoi par morceaux (UI : progression / retry). */
+    default void uploadFichierResultat(String sessionId, boolean succes, String mode, int idMessage, String erreur) {}
 }

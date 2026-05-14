@@ -72,6 +72,22 @@ public enum Protocol {
     //fichier
     FILE_SEND,
     FILE_RECEIVE,
-    FILE_FAIL
+    FILE_FAIL,
+    /** Upload par morceaux (1-à-1 ou groupe) — voir ClientHandler */
+    FILE_UPLOAD_BEGIN,
+    FILE_UPLOAD_CHUNK,
+    FILE_UPLOAD_END,
+    FILE_UPLOAD_OK,
+    FILE_UPLOAD_FAIL,
+    /** Téléchargement d'un fichier lié à un message individuel (DB messages) */
+    GET_MESSAGE_FILE,
+    /** Téléchargement d'un fichier message groupe (contenu __FILE__...) */
+    GET_GROUP_FILE,
+    FILE_TRANSFER_BEGIN,
+    FILE_TRANSFER_PART,
+    FILE_TRANSFER_END,
+    FILE_TRANSFER_FAIL,
+    /** Notification temps réel : fichier enregistré en base (1-à-1) */
+    MSG_FILE_NOTIFY
 
 }

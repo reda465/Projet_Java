@@ -117,6 +117,18 @@ public class Dao_GroupeImp {
         }
     }
 
+    public boolean estMembre(int idGroupe, String numero) throws Exception {
+        String sql = "SELECT 1 FROM groupes_membres WHERE id_groupe=? AND numero_membre=?";
+        try (Connection c = DataBase.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idGroupe);
+            ps.setString(2, numero);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
     public boolean estAdmin(int idGroupe, String numero) throws Exception {
         String sql = "SELECT 1 FROM groupes WHERE id_groupe=? AND numero_createur=?";
         try (Connection c = DataBase.getConnection();

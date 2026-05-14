@@ -48,6 +48,30 @@ public class Dao_MessageGroupeImp {
         return -1;
     }
 
+    public MessageGroupe getById(int idMessage) throws Exception {
+        String sql = "SELECT * FROM messages_groupes WHERE id_message=?";
+        try (Connection c = DataBase.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idMessage);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                return mapRow(rs);
+            }
+        }
+    }
+
+    private MessageGroupe mapRow(ResultSet rs) throws Exception {
+        MessageGroupe m = new MessageGroupe();
+        m.setIdMessage(rs.getInt("id_message"));
+        m.setIdGroupe(rs.getInt("id_groupe"));
+        m.setTelephoneExpediteur(rs.getString("telephone_expediteur"));
+        m.setNomExpediteur(rs.getString("nom_expediteur"));
+        m.setContenu(rs.getString("contenu"));
+        Timestamp t = rs.getTimestamp("date_envoi");
+        m.setDateEnvoi(t != null ? t.toLocalDateTime() : null);
+        return m;
+    }
+
     public List<MessageGroupe> getByGroupe(int idGroupe) throws Exception {
         List<MessageGroupe> list = new ArrayList<>();
         String sql = "SELECT * FROM messages_groupes WHERE id_groupe=? ORDER BY date_envoi ASC";
@@ -56,15 +80,7 @@ public class Dao_MessageGroupeImp {
             ps.setInt(1, idGroupe);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                MessageGroupe m = new MessageGroupe();
-                m.setIdMessage(rs.getInt("id_message"));
-                m.setIdGroupe(rs.getInt("id_groupe"));
-                m.setTelephoneExpediteur(rs.getString("telephone_expediteur"));
-                m.setNomExpediteur(rs.getString("nom_expediteur"));
-                m.setContenu(rs.getString("contenu"));
-                Timestamp t = rs.getTimestamp("date_envoi");
-                m.setDateEnvoi(t != null ? t.toLocalDateTime() : null);
-                list.add(m);
+                list.add(mapRow(rs));
             }
         }
         return list;

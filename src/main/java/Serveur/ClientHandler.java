@@ -11,14 +11,21 @@ import model.Utilisateur;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.LocalDateTime;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import Dao.*;
+import util.GroupeFichierPayload;
+import util.SqlMessageTypeUtil;
 @Getter
 @Setter
 
@@ -72,6 +79,11 @@ public class ClientHandler extends Thread {
                     //case CALL_CANCEL  -> handleCallCancel(parts);
                    //fichier
                     case FILE_SEND -> handleFileSend(parts);
+                    case FILE_UPLOAD_BEGIN -> handleFileUploadBegin(parts);
+                    case FILE_UPLOAD_CHUNK -> handleFileUploadChunk(parts);
+                    case FILE_UPLOAD_END -> handleFileUploadEnd(parts);
+                    case GET_MESSAGE_FILE -> handleGetMessageFile(parts);
+                    case GET_GROUP_FILE -> handleGetGroupFile(parts);
                     case CREATE_GROUP -> handleCreateGroup(parts);
                     case GET_GROUPS -> handleGetGroups(parts);
                     case SEND_GROUP_MESSAGE -> handleSendGroupMessage(parts);
@@ -312,8 +324,13 @@ public class ClientHandler extends Thread {
                 String dernierMsgContenu = "";
                 Message dernierMsg = dernierMsgMap.get(c.getIdConversation());
                 if (dernierMsg != null) {
-                    dernierMsgContenu = dernierMsg.getContenuTexte() != null
-                            ? dernierMsg.getContenuTexte() : "";
+                    if ("texte".equals(dernierMsg.getTypeMessage())) {
+                        dernierMsgContenu = dernierMsg.getContenuTexte() != null
+                                ? dernierMsg.getContenuTexte() : "";
+                    } else {
+                        String nomF = dernierMsg.getNomFichier() != null ? dernierMsg.getNomFichier() : "fichier";
+                        dernierMsgContenu = "\ud83d\udcce " + nomF;
+                    }
                 }
 
                 // id;type;nom;numeroTel;date;nonLus;dernierMsg
@@ -399,11 +416,18 @@ public class ClientHandler extends Thread {
                 String telExp = exp != null ? exp.getNumeroTelephone() : "?";
                 String nomExp = exp != null ? exp.getNomComplet() : "?";
 
+                String type = m.getTypeMessage() != null ? m.getTypeMessage() : "texte";
+                String nomFich = m.getNomFichier() != null ? m.getNomFichier() : "";
+                String tailleStr = m.getTailleFichier() != null ? String.valueOf(m.getTailleFichier()) : "";
+
                 sb.append(m.getIdMessage()).append(";")
                         .append(telExp).append(";")
                         .append(nomExp).append(";")
                         .append(m.getContenuTexte() != null ? m.getContenuTexte() : "").append(";")
-                        .append(m.getDateEnvoi() != null ? m.getDateEnvoi().toString() : "").append("|");
+                        .append(m.getDateEnvoi() != null ? m.getDateEnvoi().toString() : "").append(";")
+                        .append(type).append(";")
+                        .append(nomFich).append(";")
+                        .append(tailleStr).append("|");
             }
 
             pw.println(sb.toString());
@@ -420,6 +444,194 @@ public class ClientHandler extends Thread {
         }
     }
     //fichier
+
+    private static final int FILE_TRANSFER_CHUNK = 48 * 1024;
+
+    private void handleFileUploadBegin(String[] parts) {
+        if (telephoneConnecte == null || parts.length < 8) {
+            if (pw != null && parts.length > 1)
+                pw.println(Protocol.FILE_UPLOAD_FAIL.name() + "|" + parts[1] + "|PARAM");
+            return;
+        }
+        String sessionId = parts[1];
+        String modeS = parts[2];
+        String captionPlain = "";
+        try {
+            captionPlain = new String(Base64.getDecoder().decode(parts[7]), StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+        }
+        try {
+            if ("IND".equalsIgnoreCase(modeS)) {
+                String dest = normaliserNumeroPourRecherche(parts[3]);
+                String name = parts[4] != null ? parts[4] : "fichier";
+                long size = Long.parseLong(parts[5].trim());
+                String type = parts[6] != null && !parts[6].isBlank() ? parts[6] : "document";
+                ChunkedUploadBuffer.begin(sessionId, ChunkedUploadBuffer.Mode.IND, dest, 0, size, name, type, captionPlain);
+            } else if ("GRP".equalsIgnoreCase(modeS)) {
+                int idGroupe = Integer.parseInt(parts[3].trim());
+                if (!groupeDAO.estMembre(idGroupe, telephoneConnecte)) {
+                    pw.println(Protocol.FILE_UPLOAD_FAIL.name() + "|" + sessionId + "|NOT_MEMBER");
+                    return;
+                }
+                String name = parts[4] != null ? parts[4] : "fichier";
+                long size = Long.parseLong(parts[5].trim());
+                String type = parts[6] != null && !parts[6].isBlank() ? parts[6] : "document";
+                ChunkedUploadBuffer.begin(sessionId, ChunkedUploadBuffer.Mode.GRP, "", idGroupe, size, name, type, captionPlain);
+            } else {
+                pw.println(Protocol.FILE_UPLOAD_FAIL.name() + "|" + sessionId + "|MODE");
+            }
+        } catch (Exception e) {
+            ChunkedUploadBuffer.cancel(sessionId);
+            if (pw != null)
+                pw.println(Protocol.FILE_UPLOAD_FAIL.name() + "|" + sessionId + "|" + e.getMessage());
+        }
+    }
+
+    private void handleFileUploadChunk(String[] parts) {
+        if (parts.length < 3) return;
+        String sessionId = parts[1];
+        StringBuilder b64 = new StringBuilder(parts[2] != null ? parts[2] : "");
+        for (int i = 3; i < parts.length; i++) {
+            b64.append('|').append(parts[i] != null ? parts[i] : "");
+        }
+        try {
+            ChunkedUploadBuffer.appendChunk(sessionId, b64.toString());
+        } catch (Exception e) {
+            ChunkedUploadBuffer.cancel(sessionId);
+            if (pw != null)
+                pw.println(Protocol.FILE_UPLOAD_FAIL.name() + "|" + sessionId + "|CHUNK");
+        }
+    }
+
+    private void handleFileUploadEnd(String[] parts) {
+        if (telephoneConnecte == null || parts.length < 2) return;
+        String sessionId = parts[1];
+        try {
+            ChunkedUploadBuffer.ResolvedUpload r = ChunkedUploadBuffer.endSession(sessionId);
+            Path mediaPath = MediaPaths.mediaRoot().resolve(r.storedFilename());
+            long sz = Files.size(mediaPath);
+
+            if (r.mode() == ChunkedUploadBuffer.Mode.IND) {
+                int id = messageRouter.enregistrerMessageFichier(telephoneConnecte, r.destTel(),
+                        r.storedFilename(), r.originalName(), sz, r.typeMessage(), r.captionPlain());
+                if (id < 0) {
+                    Files.deleteIfExists(mediaPath);
+                    pw.println(Protocol.FILE_UPLOAD_FAIL.name() + "|" + sessionId + "|SEND");
+                    return;
+                }
+                pw.println(Protocol.FILE_UPLOAD_OK.name() + "|" + sessionId + "|IND|" + id);
+            } else {
+                Groupe g = groupeDAO.getById(r.idGroupe());
+                if (g == null) {
+                    Files.deleteIfExists(mediaPath);
+                    pw.println(Protocol.FILE_UPLOAD_FAIL.name() + "|" + sessionId + "|GROUP");
+                    return;
+                }
+                Utilisateur exp = userDAO.findByTelephone(telephoneConnecte);
+                MessageGroupe msg = new MessageGroupe();
+                msg.setIdGroupe(r.idGroupe());
+                msg.setTelephoneExpediteur(normaliserNumeroPourRecherche(telephoneConnecte));
+                msg.setNomExpediteur(exp != null ? exp.getNomComplet() : telephoneConnecte);
+                msg.setContenu(GroupeFichierPayload.creer(r.typeMessage(), r.originalName(), r.storedFilename(), sz, r.captionPlain()));
+                msg.setDateEnvoi(LocalDateTime.now());
+                int idMsg = messageGroupeDAO.ajouter(msg);
+
+                String payload = Protocol.GROUP_MESSAGE_RECEIVE.name() + "|"
+                        + r.idGroupe() + "|"
+                        + msg.getTelephoneExpediteur() + "|"
+                        + msg.getNomExpediteur() + "|"
+                        + msg.getContenu() + "|"
+                        + msg.getDateEnvoi();
+                if (g.getNumerosMembres() != null) {
+                    for (String membre : g.getNumerosMembres()) {
+                        ClientHandler h = userManager.getHandler(membre);
+                        if (h != null) h.sendMessage(payload);
+                    }
+                }
+                pw.println(Protocol.FILE_UPLOAD_OK.name() + "|" + sessionId + "|GRP|" + idMsg);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            ChunkedUploadBuffer.cancel(sessionId);
+            if (pw != null)
+                pw.println(Protocol.FILE_UPLOAD_FAIL.name() + "|" + sessionId + "|" + e.getMessage());
+        }
+    }
+
+    private void handleGetMessageFile(String[] parts) {
+        if (telephoneConnecte == null || parts.length < 2) return;
+        try {
+            int idMessage = Integer.parseInt(parts[1].trim());
+            Utilisateur u = userDAO.findByTelephone(telephoneConnecte);
+            if (u == null) return;
+            Message m = messageDAO.getByID(idMessage);
+            if (m == null || m.getUrlFichier() == null || m.getUrlFichier().isBlank()) {
+                pw.println(Protocol.FILE_TRANSFER_FAIL.name() + "|" + idMessage + "|NO_FILE");
+                return;
+            }
+            if (!convDAO.estParticipant(m.getIdConversation(), u.getIdUtilisateur())) {
+                pw.println(Protocol.FILE_TRANSFER_FAIL.name() + "|" + idMessage + "|FORBIDDEN");
+                return;
+            }
+            Path f = MediaPaths.mediaRoot().resolve(m.getUrlFichier());
+            if (!Files.isRegularFile(f)) {
+                pw.println(Protocol.FILE_TRANSFER_FAIL.name() + "|" + idMessage + "|MISSING");
+                return;
+            }
+            byte[] data = Files.readAllBytes(f);
+            String nom = m.getNomFichier() != null ? m.getNomFichier() : "fichier";
+            envoyerTransfertFichier(idMessage, nom, m.getTypeMessage(), data);
+        } catch (Exception e) {
+            e.printStackTrace();
+            if (pw != null) pw.println(Protocol.FILE_TRANSFER_FAIL.name() + "|0|ERROR");
+        }
+    }
+
+    private void handleGetGroupFile(String[] parts) {
+        if (telephoneConnecte == null || parts.length < 2) return;
+        try {
+            int idMessage = Integer.parseInt(parts[1].trim());
+            MessageGroupe mg = messageGroupeDAO.getById(idMessage);
+            if (mg == null || !GroupeFichierPayload.estFichier(mg.getContenu())) {
+                pw.println(Protocol.FILE_TRANSFER_FAIL.name() + "|" + idMessage + "|NO_FILE");
+                return;
+            }
+            if (!groupeDAO.estMembre(mg.getIdGroupe(), telephoneConnecte)) {
+                pw.println(Protocol.FILE_TRANSFER_FAIL.name() + "|" + idMessage + "|FORBIDDEN");
+                return;
+            }
+            GroupeFichierPayload.Meta meta = GroupeFichierPayload.parser(mg.getContenu());
+            if (meta == null || meta.storageKey() == null || meta.storageKey().isBlank()) {
+                pw.println(Protocol.FILE_TRANSFER_FAIL.name() + "|" + idMessage + "|META");
+                return;
+            }
+            Path f = MediaPaths.mediaRoot().resolve(meta.storageKey());
+            if (!Files.isRegularFile(f)) {
+                pw.println(Protocol.FILE_TRANSFER_FAIL.name() + "|" + idMessage + "|MISSING");
+                return;
+            }
+            byte[] data = Files.readAllBytes(f);
+            envoyerTransfertFichier(idMessage, meta.nomFichier(), meta.typeMessage(), data);
+        } catch (Exception e) {
+            e.printStackTrace();
+            if (pw != null) pw.println(Protocol.FILE_TRANSFER_FAIL.name() + "|0|ERROR");
+        }
+    }
+
+    private void envoyerTransfertFichier(int messageId, String nomAffiche, String typeMessage, byte[] data) {
+        String nomB64 = Base64.getEncoder().encodeToString(nomAffiche.getBytes(StandardCharsets.UTF_8));
+        int total = Math.max(1, (data.length + FILE_TRANSFER_CHUNK - 1) / FILE_TRANSFER_CHUNK);
+        String affType = SqlMessageTypeUtil.pourAffichage(typeMessage, nomAffiche);
+        pw.println(Protocol.FILE_TRANSFER_BEGIN.name() + "|" + messageId + "|" + nomB64 + "|"
+                + data.length + "|" + total + "|" + affType);
+        for (int i = 0; i < total; i++) {
+            int from = i * FILE_TRANSFER_CHUNK;
+            int to = Math.min(from + FILE_TRANSFER_CHUNK, data.length);
+            String b64 = Base64.getEncoder().encodeToString(Arrays.copyOfRange(data, from, to));
+            pw.println(Protocol.FILE_TRANSFER_PART.name() + "|" + messageId + "|" + i + "|" + b64);
+        }
+        pw.println(Protocol.FILE_TRANSFER_END.name() + "|" + messageId);
+    }
 
     private void handleFileSend(String[] parts) {
         if (parts.length < 4) return;

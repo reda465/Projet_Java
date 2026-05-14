@@ -174,6 +174,19 @@ public class DaoConversationImp implements DAO_Conversation {
 
         return conv;
     }
+    /** Indique si l'utilisateur participe à la conversation. */
+    public boolean estParticipant(int idConversation, int idUtilisateur) throws SQLException {
+        String sql = "SELECT 1 FROM participants_conversation WHERE id_conversation=? AND id_utilisateur=? LIMIT 1";
+        try (Connection c = DataBase.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idConversation);
+            ps.setInt(2, idUtilisateur);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
     public Utilisateur getAutreParticipant(int idConversation, int monId) throws SQLException {
         String sql = "SELECT u.* FROM utilisateurs u " +
                 "JOIN participants_conversation pc ON u.id_utilisateur = pc.id_utilisateur " +

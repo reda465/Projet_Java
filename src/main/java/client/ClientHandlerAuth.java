@@ -23,6 +23,7 @@ public class ClientHandlerAuth {
     private ContactService contactService;
     private GroupeService groupeService;
     private CallService callService;
+    private FileTransferService fileTransferService;
 
     // Constructeur privé (personne ne peut créer directement)
     private ClientHandlerAuth() {}
@@ -232,6 +233,20 @@ public class ClientHandlerAuth {
             return;
         }
         clientReseau.demanderConversations();
+    }
+
+    public FileTransferService getFileTransferService() {
+        if (clientReseau == null) return null;
+        if (fileTransferService == null) fileTransferService = new FileTransferService(clientReseau);
+        return fileTransferService;
+    }
+
+    public void demanderFichierMessage(int idMessage) {
+        if (clientReseau != null) clientReseau.demanderFichierMessage(idMessage);
+    }
+
+    public void demanderFichierGroupe(int idMessage) {
+        if (clientReseau != null) clientReseau.demanderFichierGroupe(idMessage);
     }
     // Dans ClientHandlerAuth.java
     public boolean connecterAuServeurTest(String ip, int port, EcouteurClient ecouteur) {

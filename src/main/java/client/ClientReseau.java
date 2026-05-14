@@ -10,9 +10,14 @@ import service.CallService;
 import service.MessageService;
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 //import Serveur.*;
 @Setter
@@ -30,7 +35,17 @@ public class ClientReseau {
     private CallService callService;
     private int dernierIdGroupeDemande = -1;
 
+    private final ConcurrentHashMap<String, CompletableFuture<FileUploadResult>> uploadAttentes = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, DownloadAssembler> telechargements = new ConcurrentHashMap<>();
 
+    private static final class DownloadAssembler {
+        int messageId;
+        String nomFichier;
+        long totalSize;
+        int totalParts;
+        String typeMessage;
+        final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+    }
     public ClientReseau(EcouteurClient ecouteur){//lier a l'interface graphique pour les signales
         this.ecouteur = ecouteur;
     }
@@ -70,6 +85,20 @@ public class ClientReseau {
         }
         Packet p = new Packet(Protocol.GET_MESSAGES, String.valueOf(idConversation));
         envoyer(p);
+    }
+
+    public void enregistrerAttenteUpload(String sessionId, CompletableFuture<FileUploadResult> futur) {
+        if (sessionId != null && futur != null) uploadAttentes.put(sessionId, futur);
+    }
+
+    public void demanderFichierMessage(int idMessage) {
+        if (!connecte || stylo == null) return;
+        envoyer(new Packet(Protocol.GET_MESSAGE_FILE, String.valueOf(idMessage)));
+    }
+
+    public void demanderFichierGroupe(int idMessage) {
+        if (!connecte || stylo == null) return;
+        envoyer(new Packet(Protocol.GET_GROUP_FILE, String.valueOf(idMessage)));
     }
     // ===== ENVOYER =====
     public void envoyer(Packet packet) {
@@ -312,6 +341,69 @@ public class ClientReseau {
                 case RENAME_GROUP_OK:
                     if (parts.length >= 2 && ecouteur != null) ecouteur.nomGroupeModifie(Integer.parseInt(parts[0]), parts[1]);
                     break;
+                case FILE_UPLOAD_OK:
+                    if (parts.length >= 3) {
+                        String sid = parts[0];
+                        String mode = parts[1];
+                        try {
+                            int idMsg = Integer.parseInt(parts[2].trim());
+                            CompletableFuture<FileUploadResult> f = uploadAttentes.remove(sid);
+                            if (f != null) f.complete(FileUploadResult.ok(mode, idMsg));
+                        } catch (Exception e) {
+                            CompletableFuture<FileUploadResult> f = uploadAttentes.remove(parts[0]);
+                            if (f != null) f.complete(FileUploadResult.fail("PARSE"));
+                        }
+                    }
+                    break;
+                case FILE_UPLOAD_FAIL:
+                    if (parts.length >= 1) {
+                        String sid = parts[0];
+                        String err = parts.length >= 2 ? parts[1] : "FAIL";
+                        CompletableFuture<FileUploadResult> f = uploadAttentes.remove(sid);
+                        if (f != null) f.complete(FileUploadResult.fail(err));
+                    }
+                    break;
+                case MSG_FILE_NOTIFY:
+                    if (parts.length >= 6 && ecouteur != null) {
+                        try {
+                            String tel = parts[0];
+                            int idMsg = Integer.parseInt(parts[1].trim());
+                            String nom = new String(Base64.getDecoder().decode(parts[2]), StandardCharsets.UTF_8);
+                            String type = parts[3];
+                            long taille = Long.parseLong(parts[4].trim());
+                            String legende = "";
+                            if (parts.length >= 6) {
+                                try {
+                                    legende = new String(Base64.getDecoder().decode(parts[5]), StandardCharsets.UTF_8);
+                                } catch (Exception ignored) {
+                                }
+                            }
+                            ecouteur.messageFichierNotifie(tel, idMsg, nom, type, taille, legende);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    break;
+                case FILE_TRANSFER_BEGIN:
+                    traiterTransferBegin(parts);
+                    break;
+                case FILE_TRANSFER_PART:
+                    traiterTransferPart(parts);
+                    break;
+                case FILE_TRANSFER_END:
+                    traiterTransferEnd(parts);
+                    break;
+                case FILE_TRANSFER_FAIL:
+                    if (parts.length >= 1 && ecouteur != null) {
+                        try {
+                            int mid = Integer.parseInt(parts[0].trim());
+                            String raison = parts.length >= 2 ? parts[1] : "";
+                            telechargements.remove(mid);
+                            ecouteur.fichierTelechargeErreur(mid, raison);
+                        } catch (Exception ignored) {
+                        }
+                    }
+                    break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
                     break;
@@ -404,6 +496,22 @@ public class ClientReseau {
                         msg.setDateEnvoi(LocalDateTime.parse(champs[4]));
                     } catch (Exception e) {
                         msg.setDateEnvoi(null);
+                    }
+                    if (champs.length >= 9) {
+                        msg.setTypeMessage(champs[5] != null && !champs[5].isBlank() ? champs[5] : "texte");
+                        msg.setNomFichier(champs[6] != null && !champs[6].isBlank() ? champs[6] : null);
+                        try {
+                            msg.setTailleFichier(champs[7] != null && !champs[7].isBlank()
+                                    ? Long.parseLong(champs[7].trim()) : null);
+                        } catch (NumberFormatException nfe) {
+                            msg.setTailleFichier(null);
+                        }
+                        msg.setUrlFichier("texte".equals(msg.getTypeMessage()) ? null : "stored");
+                    } else {
+                        msg.setTypeMessage("texte");
+                        msg.setNomFichier(null);
+                        msg.setTailleFichier(null);
+                        msg.setUrlFichier(null);
                     }
                     // Déterminer si c'est un message envoyé ou reçu
                     msg.setEstMoi(moi != null && champs[1].equals(moi.getNumeroTelephone()));
@@ -512,6 +620,69 @@ public class ClientReseau {
                 try { msg.setDateEnvoi(LocalDateTime.parse(parts[parts.length - 1])); } catch (Exception e) { msg.setDateEnvoi(null); }
             }
             if (ecouteur != null) ecouteur.messageGroupeRecu(msg);
+        }
+
+        private void traiterTransferBegin(String[] parts) {
+            if (parts.length < 5) return;
+            try {
+                int messageId = Integer.parseInt(parts[0].trim());
+                String nom = new String(Base64.getDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+                long size = Long.parseLong(parts[2].trim());
+                int total = Integer.parseInt(parts[3].trim());
+                String type = parts.length >= 5 ? parts[4] : "document";
+                DownloadAssembler da = new DownloadAssembler();
+                da.messageId = messageId;
+                da.nomFichier = nom;
+                da.totalSize = size;
+                da.totalParts = total;
+                da.typeMessage = type;
+                telechargements.put(messageId, da);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void traiterTransferPart(String[] parts) {
+            if (parts.length < 3) return;
+            try {
+                int messageId = Integer.parseInt(parts[0].trim());
+                DownloadAssembler da = telechargements.get(messageId);
+                if (da == null) return;
+                StringBuilder b64 = new StringBuilder(parts[2] != null ? parts[2] : "");
+                for (int i = 3; i < parts.length; i++) {
+                    b64.append('|').append(parts[i] != null ? parts[i] : "");
+                }
+                byte[] chunk = Base64.getDecoder().decode(b64.toString());
+                da.buffer.write(chunk);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void traiterTransferEnd(String[] parts) {
+            if (parts.length < 1 || ecouteur == null) return;
+            try {
+                int messageId = Integer.parseInt(parts[0].trim());
+                DownloadAssembler da = telechargements.remove(messageId);
+                if (da == null) return;
+                da.buffer.flush();
+                byte[] all = da.buffer.toByteArray();
+                if (da.totalSize > 0 && all.length != da.totalSize) {
+                    ecouteur.fichierTelechargeErreur(messageId, "SIZE");
+                    return;
+                }
+                File outDir = new File("downloads");
+                outDir.mkdirs();
+                String safe = da.nomFichier.replaceAll("[\\\\/:*?\"<>|]", "_");
+                File out = new File(outDir, "msg_" + messageId + "_" + safe);
+                try (FileOutputStream fos = new FileOutputStream(out)) {
+                    fos.write(all);
+                }
+                ecouteur.fichierTelecharge(messageId, out, da.typeMessage);
+            } catch (Exception e) {
+                e.printStackTrace();
+                if (ecouteur != null) ecouteur.fichierTelechargeErreur(Integer.parseInt(parts[0].trim()), e.getMessage());
+            }
         }
     }
 

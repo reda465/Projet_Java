@@ -5,8 +5,11 @@ import model.Conversation;
 import model.Message;
 import model.MessageFileAttente;
 import model.Utilisateur;
+import util.SqlMessageTypeUtil;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
+import java.util.Base64;
 import java.util.List;
 
 public class MessageRouter {
@@ -110,6 +113,101 @@ public class MessageRouter {
         }
     }
 
+    /**
+     * Enregistre un message avec pièce jointe (conversation individuelle) et notifie le destinataire.
+     *
+     * @param fichierStocke nom du fichier dans le répertoire server_media (ex. uuid_nom.pdf)
+     * @return id du message créé, ou -1 si échec (utilisateurs introuvables, etc.)
+     */
+    public int enregistrerMessageFichier(String telephoneExpediteur,
+                                          String telephoneDest,
+                                          String fichierStocke,
+                                          String nomFichierOriginal,
+                                          long tailleOctets,
+                                          String typeMessage,
+                                          String legende) throws SQLException {
+
+        Utilisateur expediteur = utilisateurDAO.findByTelephone(telephoneExpediteur);
+        Utilisateur destinataire = utilisateurDAO.findByTelephone(telephoneDest);
+        if (expediteur == null || destinataire == null) {
+            System.out.println("[FILE] Utilisateur introuvable : "
+                    + telephoneExpediteur + " → " + telephoneDest);
+            return -1;
+        }
+        Dao_ContactImp contactDAO = new Dao_ContactImp();
+        if (contactDAO.estBloque(destinataire.getIdUtilisateur(),
+                expediteur.getIdUtilisateur())) {
+            System.out.println("[FILE] Bloqué — " + telephoneExpediteur
+                    + " est bloqué par " + telephoneDest);
+            ClientHandler expHandler = userManager.getHandler(telephoneExpediteur);
+            if (expHandler != null)
+                expHandler.sendMessage("MSG_FAIL|BLOQUE");
+            return -1;
+        }
+
+        Conversation conv = convDAO.findIndividuelle(
+                expediteur.getIdUtilisateur(),
+                destinataire.getIdUtilisateur());
+
+        if (conv == null) {
+            conv = new Conversation();
+            conv.setTypeConversation("individuelle");
+            conv.setNomGroupe(null);
+            conv.setIdCreateur(null);
+
+            int idConv = convDAO.Add(conv);
+            conv.setIdConversation(idConv);
+
+            convDAO.ajouterParticipant(conv.getIdConversation(),
+                    expediteur.getIdUtilisateur());
+            convDAO.ajouterParticipant(conv.getIdConversation(),
+                    destinataire.getIdUtilisateur());
+        }
+
+        Message msg = new Message() {
+            @Override
+            public String toNetworkString() {
+                return "";
+            }
+        };
+        msg.setIdConversation(conv.getIdConversation());
+        msg.setIdExpediteur(expediteur.getIdUtilisateur());
+        msg.setTypeMessage(SqlMessageTypeUtil.pourStockageIndividuel(
+                typeMessage != null ? typeMessage : "fichier"));
+        msg.setContenuTexte(legende != null ? legende : "");
+        msg.setUrlFichier(fichierStocke);
+        msg.setNomFichier(nomFichierOriginal);
+        msg.setTailleFichier(tailleOctets);
+        messageDAO.Add(msg);
+
+        convDAO.updateDateDernierMessage(conv.getIdConversation());
+
+        String nomWire = Base64.getEncoder().encodeToString(
+                (nomFichierOriginal != null ? nomFichierOriginal : "fichier").getBytes(StandardCharsets.UTF_8));
+        String capWire = Base64.getEncoder().encodeToString(
+                (legende != null ? legende : "").getBytes(StandardCharsets.UTF_8));
+
+        String typeNotify = SqlMessageTypeUtil.pourAffichage(msg.getTypeMessage(), nomFichierOriginal);
+        String ligne = Protocol.MSG_FILE_NOTIFY.name() + "|"
+                + expediteur.getNumeroTelephone() + "|"
+                + msg.getIdMessage() + "|"
+                + nomWire + "|"
+                + typeNotify + "|"
+                + tailleOctets + "|"
+                + capWire;
+
+        ClientHandler destHandler = userManager.getHandler(telephoneDest);
+        if (destHandler != null) {
+            destHandler.sendMessage(ligne);
+            System.out.println("[FILE] Notifié à " + telephoneDest + " message " + msg.getIdMessage());
+        } else {
+            fileDAO.ajouterEnAttente(msg.getIdMessage(),
+                    destinataire.getIdUtilisateur());
+            System.out.println("[FILE] Mis en attente pour " + telephoneDest);
+        }
+        return msg.getIdMessage();
+    }
+
     // ── DÉLIVRER LES MESSAGES EN ATTENTE ─────────────────────────────────────
     // Appelé dans ClientHandler.handleLogin() après un login réussi
     public void delivrerMessagesEnAttente(String telephone) throws SQLException {
@@ -139,9 +237,27 @@ public class MessageRouter {
             Utilisateur expediteur = utilisateurDAO.getByID(msg.getIdExpediteur());
             if (expediteur == null) continue;
 
-            String ligne = Protocol.MSG_RECEIVE.name()        + "|"
-                    + expediteur.getNumeroTelephone()    + "|"
-                    + msg.getContenuTexte()             ;
+            String ligne;
+            if ("texte".equals(msg.getTypeMessage())) {
+                ligne = Protocol.MSG_RECEIVE.name() + "|"
+                        + expediteur.getNumeroTelephone() + "|"
+                        + (msg.getContenuTexte() != null ? msg.getContenuTexte() : "");
+            } else {
+                String nomWire = Base64.getEncoder().encodeToString(
+                        (msg.getNomFichier() != null ? msg.getNomFichier() : "fichier")
+                                .getBytes(StandardCharsets.UTF_8));
+                String capWire = Base64.getEncoder().encodeToString(
+                        (msg.getContenuTexte() != null ? msg.getContenuTexte() : "")
+                                .getBytes(StandardCharsets.UTF_8));
+                String typeN = SqlMessageTypeUtil.pourAffichage(msg.getTypeMessage(), msg.getNomFichier());
+                ligne = Protocol.MSG_FILE_NOTIFY.name() + "|"
+                        + expediteur.getNumeroTelephone() + "|"
+                        + msg.getIdMessage() + "|"
+                        + nomWire + "|"
+                        + typeN + "|"
+                        + (msg.getTailleFichier() != null ? msg.getTailleFichier() : 0L) + "|"
+                        + capWire;
+            }
 
             handler.sendMessage(ligne);
         }
