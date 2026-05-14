@@ -13,8 +13,8 @@ import javafx.scene.text.*;
 import javafx.stage.Stage;
 import model.*;
 
+import javax.swing.text.html.ImageView;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static javafx.application.Application.launch;
 public class signup implements EcouteurClient {
@@ -256,6 +256,16 @@ public class signup implements EcouteurClient {
     }
 
     @Override
+    public void demandeContactRecue(String numeroDemandeur, String nomDemandeur) {
+        EcouteurClient.super.demandeContactRecue(numeroDemandeur, nomDemandeur);
+    }
+
+    @Override
+    public void contactAcceptationConfirmee() {
+        EcouteurClient.super.contactAcceptationConfirmee();
+    }
+
+    @Override
     public void listeContactsRecue(List<Contact> contacts) {
 
     }
@@ -268,6 +278,11 @@ public class signup implements EcouteurClient {
             messageLabel.setText("Déconnecté du serveur");
             btn.setDisable(false);
         });
+    }
+
+    @Override
+    public void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, javafx.scene.image.ImageView videoNode) {
+
     }
 
     @Override
@@ -342,6 +357,46 @@ public class signup implements EcouteurClient {
 
     @Override
     public void fichierRecu(String telephoneExp, String fileName, String base64) {
+
+    }
+
+    @Override
+    public void appelGroupeEntrant(int idGroupe, String nomGroupe, String type, String initiateurNom) {
+
+    }
+
+    @Override
+    public void appelGroupeDemarre(int idGroupe, String type) {
+
+    }
+
+    @Override
+    public void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre) {
+
+    }
+
+    @Override
+    public void membreQuitteAppelGroupe(int idGroupe, String numeroMembre) {
+
+    }
+
+    @Override
+    public void appelGroupeTermine(int idGroupe) {
+
+    }
+
+    @Override
+    public void signalisationAppelGroupe(int idGroupe, String numeroSource, String typeSignal, String payload) {
+
+    }
+
+    @Override
+    public void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, ImageView videoNode) {
+
+    }
+
+    @Override
+    public void fluxVideoGroupeArrete(int idGroupe, String numeroExpediteur) {
 
     }
 

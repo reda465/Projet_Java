@@ -14,8 +14,9 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
-import javafx.collections.*;
 import service.Fileservice;
+import javafx.scene.image.ImageView;
+
 import java.io.File;
 import java.util.Base64;
 import java.time.LocalTime;
@@ -53,6 +54,8 @@ public class Discussion implements EcouteurClient {
     private MenuButton groupMenu;
     private Button btnAppelAudio;
     private Button btnAppelVideo;
+    private AppelAudioGroupe appelAudioGroupeActif;
+    private AppelVideoGroupe appelVideoGroupeActif;
 
     /** Contacts issus du serveur (GET_CONTACTS) — utilisé pour les groupes et cohérent avec la BDD */
     private final List<Contact> mesContacts = new ArrayList<>();
@@ -346,8 +349,11 @@ public class Discussion implements EcouteurClient {
         mettreAJourAvatar(chatAvatar, String.valueOf(g.getNomGroupe().charAt(0)).toUpperCase(), "#25D366");
         messagesBox.getChildren().clear();
         msgField.setDisable(false); majEtatBoutonEnvoi();
-        btnAppelAudio.setVisible(false); btnAppelAudio.setManaged(false);
-        btnAppelVideo.setVisible(false); btnAppelVideo.setManaged(false);
+        btnAppelAudio.setVisible(true); btnAppelAudio.setManaged(true);
+        btnAppelVideo.setVisible(true); btnAppelVideo.setManaged(true);
+        // [NOUVEAU] Lier les boutons aux méthodes d'appel groupe
+        btnAppelAudio.setOnAction(e -> demarrerAppelAudioGroupe(g));
+        btnAppelVideo.setOnAction(e -> demarrerAppelVideoGroupe(g));
         groupMenu.setVisible(true); groupMenu.setManaged(true);
         ClientHandlerAuth.getInstance().demanderMessagesGroupe(g.getIdGroupe());
     }
@@ -361,6 +367,10 @@ public class Discussion implements EcouteurClient {
         msgField.setDisable(false); majEtatBoutonEnvoi();
         btnAppelAudio.setVisible(true); btnAppelAudio.setManaged(true);
         btnAppelVideo.setVisible(true); btnAppelVideo.setManaged(true);
+
+        // [NOUVEAU] Réinitialiser les actions pour les appels individuels
+        btnAppelAudio.setOnAction(e -> demarrerAppelAudio(contactActif, chatName.getText()));
+        btnAppelVideo.setOnAction(e -> demarrerAppelVideo(contactActif, chatName.getText()));
         groupMenu.setVisible(false); groupMenu.setManaged(false);
         if (id != -1) ClientHandlerAuth.getInstance().demanderMessages(id);
     }
@@ -483,6 +493,107 @@ public class Discussion implements EcouteurClient {
         });
     }
 
+    @Override
+    public void appelGroupeEntrant(int idGroupe, String nomGroupe, String type, String initiateurNom) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Appel " + ("VIDEO".equalsIgnoreCase(type) ? "vidéo" : "audio") + " groupe");
+            alert.setHeaderText(null);
+            alert.setContentText(initiateurNom + " démarre un appel " +
+                    ("VIDEO".equalsIgnoreCase(type) ? "vidéo" : "audio") +
+                    " dans \"" + nomGroupe + "\"");
+
+            ButtonType accepter = new ButtonType("Rejoindre");
+            ButtonType refuser = new ButtonType("Refuser", ButtonBar.ButtonData.CANCEL_CLOSE);
+            alert.getButtonTypes().setAll(accepter, refuser);
+
+            Optional<ButtonType> result = alert.showAndWait();
+            if (result.isPresent() && result.get() == accepter) {
+                // Trouver le groupe et rejoindre
+                for (HBox item : groupesList.getItems()) {
+                    if (item.getUserData() instanceof Groupe g && g.getIdGroupe() == idGroupe) {
+                        ouvrirGroupe(g);
+                        if ("VIDEO".equalsIgnoreCase(type)) {
+                            demarrerAppelVideoGroupe(g);
+                        } else {
+                            demarrerAppelAudioGroupe(g);
+                        }
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    @Override
+    public void appelGroupeDemarre(int idGroupe, String type) {
+        Platform.runLater(() -> {
+            System.out.println("Appel groupe démarré: " + idGroupe + " type: " + type);
+        });
+    }
+
+
+    @Override
+    public void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre) {
+        Platform.runLater(() -> {
+            System.out.println(nomMembre + " (" + numeroMembre + ") a rejoint l'appel groupe " + idGroupe);
+            // Notifier l'interface d'appel audio si active
+            if (appelAudioGroupeActif != null) {
+                appelAudioGroupeActif.notifierMembreRejoint(numeroMembre, nomMembre);
+            }
+        });
+    }
+
+    @Override
+    public void membreQuitteAppelGroupe(int idGroupe, String numeroMembre) {
+        Platform.runLater(() -> {
+            System.out.println(numeroMembre + " a quitté l'appel groupe " + idGroupe);
+            if (appelAudioGroupeActif != null) {
+                appelAudioGroupeActif.notifierMembreParti(numeroMembre);
+            }
+            if (appelVideoGroupeActif != null) {
+                appelVideoGroupeActif.surParticipantParti(numeroMembre);
+            }
+        });
+    }
+
+    @Override
+    public void appelGroupeTermine(int idGroupe) {
+        Platform.runLater(() -> {
+            showAlert(Alert.AlertType.INFORMATION, "Appel groupe", "L'appel est terminé.");
+            appelAudioGroupeActif = null;
+            appelVideoGroupeActif = null;
+        });
+    }
+    @Override
+    public void signalisationAppelGroupe(int idGroupe, String numeroSource, String typeSignal, String payload) {
+        Platform.runLater(() -> {
+            System.out.println("Signalisation appel groupe: " + idGroupe + " type: " + typeSignal);
+        });
+    }
+
+    @Override
+    public void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, javax.swing.text.html.ImageView videoNode) {
+
+    }
+
+    @Override
+    public void fluxVideoGroupeArrete(int idGroupe, String numeroExpediteur) {
+        Platform.runLater(() -> {
+            if (appelVideoGroupeActif != null) {
+                appelVideoGroupeActif.surParticipantParti(numeroExpediteur);
+            }
+        });
+    }
+    @Override
+    public void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, ImageView videoNode) {
+        Platform.runLater(() -> {
+            if (appelVideoGroupeActif != null) {
+                appelVideoGroupeActif.surFluxVideoRecu(numeroExpediteur, videoNode);
+            }
+        });
+    }
+
     @Override public void appelEntrant(String num, String type, String ip, String name) {
         Platform.runLater(() -> {
             if ("VIDEO".equalsIgnoreCase(type)) { typeAppelEnCours = "VIDEO"; Appelvideo.recevoirAppel(primaryStage, name, num, ip); }
@@ -516,6 +627,28 @@ public class Discussion implements EcouteurClient {
         typeAppelEnCours = "VIDEO";
         ClientHandlerAuth.getInstance().appeler(num, idConversationActive != null ? idConversationActive : -1, "VIDEO");
         afficherFenetreAttenteVideo(nom);
+    }
+
+    // [MODIFICATION 6] Méthode complète pour démarrer appel audio groupe
+    private void demarrerAppelAudioGroupe(Groupe groupe) {
+        if (groupe == null) return;
+
+        if (appelAudioGroupeActif != null || appelVideoGroupeActif != null) {
+            showAlert(Alert.AlertType.WARNING, "Appel", "Vous êtes déjà dans un appel.");
+            return;
+        }
+        // Démarrer l'interface d'appel audio groupe
+        AppelAudioGroupe.demarrer(primaryStage, groupe, groupe.getIdGroupe());}
+
+    private void demarrerAppelVideoGroupe(Groupe groupe) {
+        if (groupe == null) return;
+
+        if (appelAudioGroupeActif != null || appelVideoGroupeActif != null) {
+            showAlert(Alert.AlertType.WARNING, "Appel", "Vous êtes déjà dans un appel.");
+            return;
+        }
+
+        AppelVideoGroupe.demarrer(primaryStage, groupe, groupe.getIdGroupe());
     }
 
     private void afficherFenetreAttenteVideo(String nom) {
@@ -719,4 +852,6 @@ public class Discussion implements EcouteurClient {
         });
     }
     @Override public void membresGroupeRecus(int id, List<Utilisateur> ms) {}
+
+
 }

@@ -1,6 +1,8 @@
 package client;
 
 import model.*;
+
+import javax.swing.text.html.ImageView;
 import java.util.List;
 public interface EcouteurClient {
     // Quand la connexion réussit
@@ -22,7 +24,10 @@ public interface EcouteurClient {
 
     // Quand on se déconnecte
     void deconnexion();
-    void appelEntrant(String numero,String type, String ipAppelant, String name);
+
+    void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, javafx.scene.image.ImageView videoNode);
+
+    void appelEntrant(String numero, String type, String ipAppelant, String name);
     void appelAccepte(String numero, String ip);
      void appelRefuse();
      void appelTermine(String numero);
@@ -41,4 +46,14 @@ public interface EcouteurClient {
 
     //fichier
     void fichierRecu(String telephoneExp, String fileName, String base64);
+    void appelGroupeEntrant(int idGroupe, String nomGroupe, String type, String initiateurNom);
+    void appelGroupeDemarre(int idGroupe, String type);
+    void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre);
+    void membreQuitteAppelGroupe(int idGroupe, String numeroMembre);
+    void appelGroupeTermine(int idGroupe);
+    void signalisationAppelGroupe(int idGroupe, String numeroSource, String typeSignal, String payload);
+    void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, ImageView videoNode);
+    void fluxVideoGroupeArrete(int idGroupe, String numeroExpediteur);
+    //pour les ppels audio et video
+
 }

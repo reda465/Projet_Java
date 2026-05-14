@@ -82,6 +82,8 @@ public class ClientHandler extends Thread {
                     case DELETE_GROUP -> handleDeleteGroup(parts);
                     case RENAME_GROUP -> handleRenameGroup(parts);
 
+                    case JOIN_GROUP_CALL -> handleJoinGroupCall(parts);
+                    case LEAVE_GROUP_CALL -> handleLeaveGroupCall(parts);
                     default                -> pw.println("UNKNOWN_COMMAND");
                 }
             }
@@ -864,4 +866,46 @@ public class ClientHandler extends Thread {
         }
     }
 
+    private void handleJoinGroupCall(String[] parts) {
+        try {
+            if (parts.length < 3) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String type = parts[2];
+            Groupe g = groupeDAO.getById(idGroupe);
+            if (g == null) return;
+            
+            Utilisateur moi = userDAO.findByTelephone(telephoneConnecte);
+            String nom = moi != null ? moi.getNomComplet() : telephoneConnecte;
+            String ip = socket != null && socket.getInetAddress() != null ? socket.getInetAddress().getHostAddress() : "";
+            
+            String payload = Protocol.JOIN_GROUP_CALL.name() + "|" + idGroupe + "|" + telephoneConnecte + "|" + nom + "|" + ip;
+            if (g.getNumerosMembres() != null) {
+                for (String membre : g.getNumerosMembres()) {
+                    if (!membre.equals(telephoneConnecte)) {
+                        ClientHandler h = userManager.getHandler(membre);
+                        if (h != null) h.sendMessage(payload);
+                    }
+                }
+            }
+        } catch(Exception e) { e.printStackTrace(); }
+    }
+
+    private void handleLeaveGroupCall(String[] parts) {
+        try {
+            if (parts.length < 2) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            Groupe g = groupeDAO.getById(idGroupe);
+            if (g == null) return;
+            
+            String payload = Protocol.LEAVE_GROUP_CALL.name() + "|" + idGroupe + "|" + telephoneConnecte;
+            if (g.getNumerosMembres() != null) {
+                for (String membre : g.getNumerosMembres()) {
+                    if (!membre.equals(telephoneConnecte)) {
+                        ClientHandler h = userManager.getHandler(membre);
+                        if (h != null) h.sendMessage(payload);
+                    }
+                }
+            }
+        } catch(Exception e) { e.printStackTrace(); }
+    }
 }
