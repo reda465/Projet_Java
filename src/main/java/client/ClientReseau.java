@@ -300,6 +300,25 @@ public class ClientReseau {
                 case RENAME_GROUP_OK:
                     if (parts.length >= 2 && ecouteur != null) ecouteur.nomGroupeModifie(Integer.parseInt(parts[0]), parts[1]);
                     break;
+                case JOIN_GROUP_CALL:
+                    if (parts.length >= 7 && ecouteur != null) {
+                        int idGroupe = Integer.parseInt(parts[0]);
+                        String numeroMembre = parts[1];
+                        String nomMembre = parts[2];
+                        String ip = parts[3];
+                        String type = parts[4];
+                        int port = Integer.parseInt(parts[5]);
+                        boolean isReply = "1".equals(parts[6]);
+                        ecouteur.membreRejointAppelGroupe(idGroupe, numeroMembre, nomMembre, ip, type, port, isReply);
+                    }
+                    break;
+                case LEAVE_GROUP_CALL:
+                    if (parts.length >= 2 && ecouteur != null) {
+                        int idGroupe = Integer.parseInt(parts[0]);
+                        String numeroMembre = parts[1];
+                        ecouteur.membreQuitteAppelGroupe(idGroupe, numeroMembre);
+                    }
+                    break;
                 case USERS_LIST:
                     // Optionnel : gérer la liste des utilisateurs connectés
                     break;

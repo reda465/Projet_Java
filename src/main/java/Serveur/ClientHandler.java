@@ -916,9 +916,12 @@ public class ClientHandler extends Thread {
 
     private void handleJoinGroupCall(String[] parts) {
         try {
-            if (parts.length < 3) return;
+            if (parts.length < 5) return;
             int idGroupe = Integer.parseInt(parts[1]);
             String type = parts[2];
+            String port = parts[3];
+            String isReply = parts[4];
+
             Groupe g = groupeDAO.getById(idGroupe);
             if (g == null) return;
             
@@ -926,7 +929,7 @@ public class ClientHandler extends Thread {
             String nom = moi != null ? moi.getNomComplet() : telephoneConnecte;
             String ip = socket != null && socket.getInetAddress() != null ? socket.getInetAddress().getHostAddress() : "";
             
-            String payload = Protocol.JOIN_GROUP_CALL.name() + "|" + idGroupe + "|" + telephoneConnecte + "|" + nom + "|" + ip;
+            String payload = Protocol.JOIN_GROUP_CALL.name() + "|" + idGroupe + "|" + telephoneConnecte + "|" + nom + "|" + ip + "|" + type + "|" + port + "|" + isReply;
             if (g.getNumerosMembres() != null) {
                 for (String membre : g.getNumerosMembres()) {
                     if (!membre.equals(telephoneConnecte)) {

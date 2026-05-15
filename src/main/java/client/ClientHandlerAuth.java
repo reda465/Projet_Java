@@ -193,6 +193,18 @@ public class ClientHandlerAuth {
         return callService != null && callService.isEnAppel();
     }
 
+    // ===== APPELS DE GROUPE =====
+    public void demarrerAppelGroupe(int idGroupe, String typeAppel, int localPort, boolean isReply) {
+        if (!verifierConnexion()) return;
+        String isRepStr = isReply ? "1" : "0";
+        clientReseau.envoyer(new Packet(Protocol.JOIN_GROUP_CALL, idGroupe + "|" + typeAppel + "|" + localPort + "|" + isRepStr));
+    }
+
+    public void quitterAppelGroupe(int idGroupe) {
+        if (!verifierConnexion()) return;
+        clientReseau.envoyer(new Packet(Protocol.LEAVE_GROUP_CALL, String.valueOf(idGroupe)));
+    }
+
     // ===== 7. LISTE UTILISATEURS (NOUVEAU) =====
     public void demanderListeUtilisateurs() {
         if (!verifierConnexion()) return;
