@@ -21,16 +21,26 @@ import model.Utilisateur;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import client.GroupAudioUDP;
+
 public class AppelAudioGroupe {
 
     // Participants connectés (numero -> nom)
     private final Set<String> participantsConnectes = ConcurrentHashMap.newKeySet();
     private Label statutLabel;
     private ListView<String> participantsList;
-    private Stage stage;  // [NOUVEAU] Référence au stage pour fermeture externe
+    private Stage stage;
+    private GroupAudioUDP audioUDP;
+    private int idGroupe;
 
-    public static void demarrer(Stage parent, Groupe groupe, int idConversationGroupe) {
-        new AppelAudioGroupe().afficherFenetre(parent, groupe, idConversationGroupe);
+    public int getIdGroupe() { return idGroupe; }
+    public int getLocalPort() { return audioUDP != null ? audioUDP.getLocalPort() : -1; }
+
+    public static AppelAudioGroupe demarrer(Stage parent, Groupe groupe, int idConversationGroupe) {
+        AppelAudioGroupe instance = new AppelAudioGroupe();
+        instance.idGroupe = groupe.getIdGroupe();
+        instance.afficherFenetre(parent, groupe, idConversationGroupe);
+        return instance;
     }
 
     private void afficherFenetre(Stage parent, Groupe groupe, int idConversationGroupe) {
@@ -73,10 +83,12 @@ public class AppelAudioGroupe {
         stage.setScene(new Scene(root, 350, 500));
         stage.show();
 
-        // [NOUVEAU] Notifier le serveur que l'appel est démarré
-        // ClientHandlerAuth.getInstance().demarrerAppelGroupe(groupe.getIdGroupe(), "AUDIO");
+        // Démarrer UDP
+        audioUDP = new GroupAudioUDP();
+        int localPort = audioUDP.demarrer();
+        
+        ClientHandlerAuth.getInstance().demarrerAppelGroupe(groupe.getIdGroupe(), "AUDIO", localPort, false);
 
-        // [NOUVEAU] Ajouter l'utilisateur local comme participant
         Utilisateur moi = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
         if (moi != null) {
             participantsConnectes.add(moi.getNumeroTelephone());
@@ -85,17 +97,18 @@ public class AppelAudioGroupe {
         statutLabel.setText("Appel en cours • " + participantsConnectes.size() + " participants");
     }
 
-    /** Appelé par EcouteurClient quand un membre rejoint l'appel */
-    public void notifierMembreRejoint(String numero, String nom) {
+    public void notifierMembreRejoint(String numero, String nom, String ip, int port) {
+        if (audioUDP != null) audioUDP.addDestination(numero, ip, port);
         participantsConnectes.add(numero);
         Platform.runLater(() -> {
-            majListeParticipants(null); // Rafraîchir
+            majListeParticipants(null);
             if (statutLabel != null) statutLabel.setText("Appel en cours • " + participantsConnectes.size() + " participants");
         });
     }
 
     /** Appelé par EcouteurClient quand un membre quitte */
     public void notifierMembreParti(String numero) {
+        if (audioUDP != null) audioUDP.removeDestination(numero);
         participantsConnectes.remove(numero);
         Platform.runLater(() -> {
             majListeParticipants(null);
@@ -123,9 +136,8 @@ public class AppelAudioGroupe {
     }
 
     private void raccrocherTout(Stage stage) {
-        // [NOUVEAU] Notifier le serveur que l'on quitte l'appel
-        // ClientHandlerAuth.getInstance().quitterAppelGroupe();
-
+        ClientHandlerAuth.getInstance().quitterAppelGroupe(idGroupe);
+        if (audioUDP != null) audioUDP.arreter();
         participantsConnectes.clear();
         stage.close();
     }

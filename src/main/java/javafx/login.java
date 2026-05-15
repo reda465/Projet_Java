@@ -14,7 +14,7 @@ import javafx.stage.Stage;
 import client.EcouteurClient;
 import model.*;
 
-import javax.swing.text.html.ImageView;
+import javafx.scene.image.ImageView;
 import java.util.List;
 public class login extends Application implements EcouteurClient {
     private Label message;
@@ -212,10 +212,7 @@ public class login extends Application implements EcouteurClient {
         });
     }
 
-    @Override
-    public void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, javafx.scene.image.ImageView videoNode) {
-
-    }
+    // removed duplicate fluxVideoGroupeRecu
 
     @Override
     public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
@@ -304,7 +301,7 @@ public class login extends Application implements EcouteurClient {
     }
 
     @Override
-    public void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre) {
+    public void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre, String ip, String type, int port, boolean isReply) {
 
     }
 

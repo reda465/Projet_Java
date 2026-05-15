@@ -18,6 +18,8 @@ import javafx.stage.Stage;
 import model.Groupe;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import client.GroupVideoUDP;
+import javafx.scene.image.Image;
 
 public class AppelVideoGroupe {
 
@@ -28,9 +30,18 @@ public class AppelVideoGroupe {
     private Stage stageFenetre;
     private boolean cameraActive = true;
     private boolean micActive = true;
+    
+    private GroupVideoUDP videoUDP;
+    private int idGroupe;
 
-    public static void demarrer(Stage parent, Groupe groupe, int idConversationGroupe) {
-        new AppelVideoGroupe().afficherFenetre(parent, groupe, idConversationGroupe);
+    public int getIdGroupe() { return idGroupe; }
+    public int getLocalPort() { return videoUDP != null ? videoUDP.getLocalPort() : -1; }
+
+    public static AppelVideoGroupe demarrer(Stage parent, Groupe groupe, int idConversationGroupe) {
+        AppelVideoGroupe instance = new AppelVideoGroupe();
+        instance.idGroupe = groupe.getIdGroupe();
+        instance.afficherFenetre(parent, groupe, idConversationGroupe);
+        return instance;
     }
 
     private void afficherFenetre(Stage parent, Groupe groupe, int idConversationGroupe) {
@@ -108,6 +119,14 @@ public class AppelVideoGroupe {
         Scene scene = new Scene(root, 900, 600);
         stageFenetre.setScene(scene);
         stageFenetre.show();
+        
+        // Start UDP
+        videoUDP = new GroupVideoUDP(
+            (numeroDistant, image) -> surFluxVideoRecu(numeroDistant, image),
+            (imageLocale) -> surFluxVideoLocalRecu(imageLocale)
+        );
+        int localPort = videoUDP.demarrer();
+        ClientHandlerAuth.getInstance().demarrerAppelGroupe(groupe.getIdGroupe(), "VIDEO", localPort, false);
 
         statutLabel.setText("Connecté • " + videoFeeds.size() + " participant(s)");
     }
@@ -119,39 +138,40 @@ public class AppelVideoGroupe {
         repositionnerGrille();
     }
 
-    /**
-     * [MODIF] Callback quand on reçoit un flux distant
-     * AVANT: public void surFluxVideoRecu(String numeroDistant, ImageView videoNode)
-     * PROBLÈME: On recevait un ImageView brut, mais la grille attend des StackPane
-     *
-     * SOLUTION: On reçoit l'ImageView et on le WRAP dans un StackPane avec label
-     */
-    public void surFluxVideoRecu(String numeroDistant, ImageView videoNode) {
+    public void surParticipantRejoint(String numero, String nom, String ip, int port) {
+        if (videoUDP != null) videoUDP.addDestination(numero, ip, port);
         Platform.runLater(() -> {
-            // Créer un wrapper pour le flux distant (même style que le local)
-            StackPane wrapper = new StackPane();
-            wrapper.setStyle("-fx-background-color: #333; -fx-border-radius: 8px; -fx-border-color: #555;");
+            if (!videoFeeds.containsKey(numero)) {
+                StackPane wrapper = creerVideoWrapper(nom);
+                videoFeeds.put(numero, wrapper);
+                repositionnerGrille();
+                majStatut();
+            }
+        });
+    }
 
-            // Configurer l'ImageView reçu
-            videoNode.setFitWidth(280);
-            videoNode.setFitHeight(200);
-            videoNode.setPreserveRatio(true);
-
-            // Label avec le numéro
-            Label lbl = new Label(numeroDistant);
-            lbl.setStyle("-fx-text-fill: white; -fx-background-color: rgba(0,0,0,0.5); -fx-padding: 4px 8px; -fx-background-radius: 4px;");
-            StackPane.setAlignment(lbl, Pos.BOTTOM_LEFT);
-
-            wrapper.getChildren().addAll(videoNode, lbl);
-
-            // Stocker et afficher
-            videoFeeds.put(numeroDistant, wrapper);
-            repositionnerGrille();
-            majStatut();
+    private void surFluxVideoRecu(String numeroDistant, Image image) {
+        Platform.runLater(() -> {
+            StackPane wrapper = videoFeeds.get(numeroDistant);
+            if (wrapper != null) {
+                ImageView iv = (ImageView) wrapper.getChildren().get(0);
+                iv.setImage(image);
+            }
+        });
+    }
+    
+    private void surFluxVideoLocalRecu(Image image) {
+        Platform.runLater(() -> {
+            StackPane wrapper = videoFeeds.get("local");
+            if (wrapper != null) {
+                ImageView iv = (ImageView) wrapper.getChildren().get(0);
+                iv.setImage(image);
+            }
         });
     }
 
     public void surParticipantParti(String numero) {
+        if (videoUDP != null) videoUDP.removeDestination(numero);
         Platform.runLater(() -> {
             videoFeeds.remove(numero);
             repositionnerGrille();
@@ -199,6 +219,8 @@ public class AppelVideoGroupe {
     }
 
     private void quitterAppel() {
+        ClientHandlerAuth.getInstance().quitterAppelGroupe(idGroupe);
+        if (videoUDP != null) videoUDP.arreter();
         videoFeeds.clear();
         if (stageFenetre != null) stageFenetre.close();
     }

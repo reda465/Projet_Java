@@ -558,12 +558,26 @@ public class Discussion implements EcouteurClient {
 
 
     @Override
-    public void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre) {
+    public void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre, String ip, String type, int port, boolean isReply) {
         Platform.runLater(() -> {
-            System.out.println(nomMembre + " (" + numeroMembre + ") a rejoint l'appel groupe " + idGroupe);
-            // Notifier l'interface d'appel audio si active
-            if (appelAudioGroupeActif != null) {
-                appelAudioGroupeActif.notifierMembreRejoint(numeroMembre, nomMembre);
+            boolean inCall = false;
+            if (appelAudioGroupeActif != null && appelAudioGroupeActif.getIdGroupe() == idGroupe) {
+                inCall = true;
+                appelAudioGroupeActif.notifierMembreRejoint(numeroMembre, nomMembre, ip, port);
+                if (!isReply) {
+                    ClientHandlerAuth.getInstance().demarrerAppelGroupe(idGroupe, "AUDIO", appelAudioGroupeActif.getLocalPort(), true);
+                }
+            }
+            if (appelVideoGroupeActif != null && appelVideoGroupeActif.getIdGroupe() == idGroupe) {
+                inCall = true;
+                appelVideoGroupeActif.surParticipantRejoint(numeroMembre, nomMembre, ip, port);
+                if (!isReply) {
+                    ClientHandlerAuth.getInstance().demarrerAppelGroupe(idGroupe, "VIDEO", appelVideoGroupeActif.getLocalPort(), true);
+                }
+            }
+            
+            if (!inCall && !isReply) {
+                appelGroupeEntrant(idGroupe, "Groupe", type, nomMembre);
             }
         });
     }
@@ -596,10 +610,7 @@ public class Discussion implements EcouteurClient {
         });
     }
 
-    @Override
-    public void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, javax.swing.text.html.ImageView videoNode) {
-
-    }
+    // removed duplicate fluxVideoGroupeRecu with javax.swing.text.html.ImageView
 
     @Override
     public void fluxVideoGroupeArrete(int idGroupe, String numeroExpediteur) {
@@ -611,11 +622,7 @@ public class Discussion implements EcouteurClient {
     }
     @Override
     public void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, ImageView videoNode) {
-        Platform.runLater(() -> {
-            if (appelVideoGroupeActif != null) {
-                appelVideoGroupeActif.surFluxVideoRecu(numeroExpediteur, videoNode);
-            }
-        });
+        // Not used anymore. GroupVideoUDP uses a direct callback to AppelVideoGroupe
     }
 
     @Override public void appelEntrant(String num, String type, String ip, String name) {
@@ -653,7 +660,6 @@ public class Discussion implements EcouteurClient {
         afficherFenetreAttenteVideo(nom);
     }
 
-    // [MODIFICATION 6] Méthode complète pour démarrer appel audio groupe
     private void demarrerAppelAudioGroupe(Groupe groupe) {
         if (groupe == null) return;
 
@@ -662,7 +668,7 @@ public class Discussion implements EcouteurClient {
             return;
         }
         // Démarrer l'interface d'appel audio groupe
-        AppelAudioGroupe.demarrer(primaryStage, groupe, groupe.getIdGroupe());}
+        appelAudioGroupeActif = AppelAudioGroupe.demarrer(primaryStage, groupe, groupe.getIdGroupe());}
 
     private void demarrerAppelVideoGroupe(Groupe groupe) {
         if (groupe == null) return;
@@ -672,7 +678,7 @@ public class Discussion implements EcouteurClient {
             return;
         }
 
-        AppelVideoGroupe.demarrer(primaryStage, groupe, groupe.getIdGroupe());
+        appelVideoGroupeActif = AppelVideoGroupe.demarrer(primaryStage, groupe, groupe.getIdGroupe());
     }
 
     private void afficherFenetreAttenteVideo(String nom) {

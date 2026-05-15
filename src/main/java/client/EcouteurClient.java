@@ -2,7 +2,7 @@ package client;
 
 import model.*;
 
-import javax.swing.text.html.ImageView;
+import javafx.scene.image.ImageView;
 import java.util.List;
 public interface EcouteurClient {
     // Quand la connexion réussit
@@ -25,8 +25,7 @@ public interface EcouteurClient {
     // Quand on se déconnecte
     void deconnexion();
 
-    void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, javafx.scene.image.ImageView videoNode);
-
+    // (Methode fluxVideoGroupeRecu deplacee plus bas)
     void appelEntrant(String numero, String type, String ipAppelant, String name);
     void appelAccepte(String numero, String ip);
      void appelRefuse();
@@ -48,7 +47,7 @@ public interface EcouteurClient {
     void fichierRecu(String telephoneExp, String fileName, String base64);
     void appelGroupeEntrant(int idGroupe, String nomGroupe, String type, String initiateurNom);
     void appelGroupeDemarre(int idGroupe, String type);
-    void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre);
+    void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre, String ip, String type, int port, boolean isReply);
     void membreQuitteAppelGroupe(int idGroupe, String numeroMembre);
     void appelGroupeTermine(int idGroupe);
     void signalisationAppelGroupe(int idGroupe, String numeroSource, String typeSignal, String payload);
