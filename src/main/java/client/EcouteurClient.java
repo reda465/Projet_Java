@@ -44,7 +44,18 @@ public interface EcouteurClient {
     void nomGroupeModifie(int idGroupe, String nouveauNom);
 
     //fichier
-    void fichierRecu(String telephoneExp, String fileName, String base64);
+    void fichierRecu(String telephoneExp, String type, String fileName, String base64);
+    default void fichierGroupeRecu(int idGroupe, String telephoneExp, String nomExp,
+                                   String type, String fileName, String base64) {
+        fichierGroupeRecu(idGroupe, telephoneExp, nomExp, type, fileName, base64, null);
+    }
+    default void fichierGroupeRecu(int idGroupe, String telephoneExp, String nomExp,
+                                   String type, String fileName, String base64, String dateEnvoi) {}
+    default void fichierProgress(int percent) {}
+    default void fichierEnvoiEchoue(String raison) {}
+    default void fichierEnvoiReussi(String fileName) {}
+    default void debutHistoriqueGroupe(int idGroupe) {}
+    default void finHistoriqueGroupe(int idGroupe) {}
     void appelGroupeEntrant(int idGroupe, String nomGroupe, String type, String initiateurNom);
     void appelGroupeDemarre(int idGroupe, String type);
     void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre, String ip, String type, int port, int portAudio, boolean isReply);

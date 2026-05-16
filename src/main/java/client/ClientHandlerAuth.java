@@ -23,6 +23,7 @@ public class ClientHandlerAuth {
     private ContactService contactService;
     private GroupeService groupeService;
     private CallService callService;
+    private Fileservice fileService;
 
     // Constructeur privé (personne ne peut créer directement)
     private ClientHandlerAuth() {}
@@ -47,6 +48,7 @@ public class ClientHandlerAuth {
             messageService = new MessageService(clientReseau);
             groupeService = new GroupeService(clientReseau);
             contactService = new ContactService(clientReseau);
+            fileService = new Fileservice(clientReseau);
             connecteAuServeur = true;
             return true;
         }
@@ -276,6 +278,29 @@ public class ClientHandlerAuth {
         if (clientReseau != null) {
             clientReseau.setEcouteur(ecouteur);
         }
+    }
+
+    public Fileservice getFileService() {
+        if (fileService == null && clientReseau != null) {
+            fileService = new Fileservice(clientReseau);
+        }
+        return fileService;
+    }
+
+    public void envoyerFichier(String numeroDest, java.io.File file,
+                               java.util.function.Consumer<Integer> onProgress) {
+        if (!verifierConnexion() || getFileService() == null) return;
+        getFileService().envoyerFichier(numeroDest, file, onProgress);
+    }
+
+    public void envoyerFichierGroupe(int idGroupe, java.io.File file,
+                                     java.util.function.Consumer<Integer> onProgress) {
+        if (!verifierConnexion() || getFileService() == null) return;
+        getFileService().envoyerFichierGroupe(idGroupe, file, onProgress);
+    }
+
+    public void retryEnvoiFichier() {
+        if (getFileService() != null) getFileService().retryDernierEnvoi();
     }
 
 }

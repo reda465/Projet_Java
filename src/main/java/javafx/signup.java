@@ -353,7 +353,7 @@ public class signup implements EcouteurClient {
     }
 
     @Override
-    public void fichierRecu(String telephoneExp, String fileName, String base64) {
+    public void fichierRecu(String telephoneExp, String type, String fileName, String base64) {
 
     }
 

@@ -16,9 +16,12 @@ import java.sql.PreparedStatement;
 import java.time.LocalDateTime;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import Dao.*;
+import util.FileMediaUtil;
 @Getter
 @Setter
 
@@ -37,6 +40,17 @@ public class ClientHandler extends Thread {
     private final Dao_MessageFileAttenteImp fileDAO = new Dao_MessageFileAttenteImp();
     private final Dao_GroupeImp groupeDAO = new Dao_GroupeImp();
     private final Dao_MessageGroupeImp messageGroupeDAO = new Dao_MessageGroupeImp();
+    private static final Map<String, ChunkBuffer> uploadsEnCours = new ConcurrentHashMap<>();
+
+    private static final class ChunkBuffer {
+        String destOrGroupe;
+        boolean groupe;
+        String type;
+        String fileName;
+        int totalChunks;
+        final List<byte[]> chunks = new ArrayList<>();
+    }
+
     public ClientHandler(Socket s) {
         this.socket = s;
     }
@@ -72,6 +86,7 @@ public class ClientHandler extends Thread {
                     //case CALL_CANCEL  -> handleCallCancel(parts);
                    //fichier
                     case FILE_SEND -> handleFileSend(parts);
+                    case FILE_GROUP_SEND -> handleFileGroupSend(parts);
                     case CREATE_GROUP -> handleCreateGroup(parts);
                     case GET_GROUPS -> handleGetGroups(parts);
                     case SEND_GROUP_MESSAGE -> handleSendGroupMessage(parts);
@@ -111,6 +126,7 @@ public class ClientHandler extends Thread {
             if (u != null) {
                 telephoneConnecte = u.getNumeroTelephone();
                 userManager.addUser(telephoneConnecte, this);
+                java.time.LocalDateTime connexionPrecedente = u.getDerniereConnexion();
                 userDAO.updateDerniereConnexion(u.getIdUtilisateur());
 
                 pw.println(Protocol.LOGIN_OK + "|"
@@ -119,6 +135,7 @@ public class ClientHandler extends Thread {
 
                 broadcastUsersList();
                 messageRouter.delivrerMessagesEnAttente(telephoneConnecte);
+                messageRouter.delivrerFichiersGroupeEnAttente(telephoneConnecte, connexionPrecedente);
 
                 // ← NOUVEAU : délivrer les demandes de contact en attente
                 delivrerDemandesContactEnAttente(u);
@@ -129,6 +146,8 @@ public class ClientHandler extends Thread {
         } catch (SQLException e) {
             e.printStackTrace();
             pw.println(Protocol.LOGIN_FAIL + "|ErreurServeur");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -416,11 +435,22 @@ public class ClientHandler extends Thread {
                 String telExp = exp != null ? exp.getNumeroTelephone() : "?";
                 String nomExp = exp != null ? exp.getNomComplet() : "?";
 
+                String type = m.getTypeMessage() != null ? m.getTypeMessage() : "texte";
                 sb.append(m.getIdMessage()).append(";")
                         .append(telExp).append(";")
                         .append(nomExp).append(";")
                         .append(m.getContenuTexte() != null ? m.getContenuTexte() : "").append(";")
-                        .append(m.getDateEnvoi() != null ? m.getDateEnvoi().toString() : "").append("|");
+                        .append(m.getDateEnvoi() != null ? m.getDateEnvoi().toString() : "").append(";")
+                        .append(type).append(";")
+                        .append(m.getNomFichier() != null ? m.getNomFichier() : "");
+                if (!"texte".equals(type) && m.getUrlFichier() != null) {
+                    try {
+                        sb.append(";").append(FileStorage.toBase64(FileStorage.read(m.getUrlFichier())));
+                    } catch (IOException ignored) {
+                        sb.append(";");
+                    }
+                }
+                sb.append("|");
             }
 
             pw.println(sb.toString());
@@ -439,27 +469,136 @@ public class ClientHandler extends Thread {
     //fichier
 
     private void handleFileSend(String[] parts) {
-        if (parts.length < 4) return;
+        if (telephoneConnecte == null || parts.length < 4) return;
+        try {
+            if (parts.length >= 7) {
+                traiterChunkFichier(false, parts);
+                return;
+            }
+            String telDest = normaliserNumeroPourRecherche(parts[1]);
+            String type;
+            String fileName;
+            String base64;
+            if (isTypeMessage(parts[2])) {
+                type = parts[2];
+                fileName = parts[3];
+                base64 = parts[4];
+                for (int i = 5; i < parts.length; i++) base64 += "|" + parts[i];
+            } else {
+                type = FileMediaUtil.detectType(parts[2]);
+                fileName = parts[2];
+                base64 = parts[3];
+                for (int i = 4; i < parts.length; i++) base64 += "|" + parts[i];
+            }
+            byte[] bytes = Base64.getDecoder().decode(base64);
+            messageRouter.envoyerFichier(
+                    normaliserNumeroPourRecherche(telephoneConnecte), telDest, type, fileName, bytes, this);
+        } catch (Exception e) {
+            e.printStackTrace();
+            String msg = e.getMessage() != null ? e.getMessage() : "ERREUR";
+            pw.println(Protocol.FILE_FAIL.name() + "|" + msg);
+        }
+    }
 
-        String telDest = parts[1];
-        String fileName = parts[2];
-        String base64 = parts[3];
-
-        ClientHandler destHandler = userManager.getHandler(telDest);
-
-        if (destHandler == null) {
-            pw.println(Protocol.FILE_FAIL.name() + "|DEST_OFFLINE");
+    private void handleFileGroupSend(String[] parts) {
+        if (telephoneConnecte == null || parts.length < 5) {
+            if (pw != null) pw.println(Protocol.FILE_FAIL.name() + "|FORMAT_INVALIDE");
             return;
         }
+        try {
+            if (parts.length >= 7) {
+                traiterChunkFichier(true, parts);
+                return;
+            }
+            int idGroupe = Integer.parseInt(parts[1].trim());
+            String type = parts[2];
+            String fileName = parts[3];
+            StringBuilder b64 = new StringBuilder(parts[4] != null ? parts[4] : "");
+            for (int i = 5; i < parts.length; i++) {
+                b64.append('|').append(parts[i] != null ? parts[i] : "");
+            }
+            byte[] bytes = Base64.getDecoder().decode(b64.toString());
+            messageRouter.envoyerFichierGroupe(
+                    normaliserNumeroPourRecherche(telephoneConnecte),
+                    idGroupe, type, fileName, bytes, this);
+        } catch (Exception e) {
+            e.printStackTrace();
+            String msg = e.getMessage() != null ? e.getMessage() : "ERREUR";
+            pw.println(Protocol.FILE_FAIL.name() + "|" + msg);
+        }
+    }
 
-        destHandler.sendMessage(
-                Protocol.FILE_RECEIVE.name() + "|" +
-                        telephoneConnecte + "|" +
-                        fileName + "|" +
-                        base64
-        );
+    private void traiterChunkFichier(boolean groupe, String[] parts) throws Exception {
+        String key;
+        String destOrGroupe;
+        String type;
+        String fileName;
+        int total;
+        int index;
+        String b64;
+        if (groupe) {
+            if (parts.length < 7) return;
+            destOrGroupe = parts[1];
+            type = parts[2];
+            fileName = parts[3];
+            total = Integer.parseInt(parts[4]);
+            index = Integer.parseInt(parts[5]);
+            b64 = parts[6];
+            for (int i = 7; i < parts.length; i++) b64 += "|" + parts[i];
+            key = telephoneConnecte + "|G|" + destOrGroupe + "|" + fileName;
+        } else {
+            if (parts.length < 7) return;
+            destOrGroupe = normaliserNumeroPourRecherche(parts[1]);
+            type = parts[2];
+            fileName = parts[3];
+            total = Integer.parseInt(parts[4]);
+            index = Integer.parseInt(parts[5]);
+            b64 = parts[6];
+            for (int i = 7; i < parts.length; i++) b64 += "|" + parts[i];
+            key = telephoneConnecte + "|" + destOrGroupe + "|" + fileName;
+        }
 
-        System.out.println("[FILE] fichier transféré de " + telephoneConnecte + " vers " + telDest);
+        ChunkBuffer buf = uploadsEnCours.computeIfAbsent(key, k -> {
+            ChunkBuffer b = new ChunkBuffer();
+            b.destOrGroupe = destOrGroupe;
+            b.groupe = groupe;
+            b.type = type;
+            b.fileName = fileName;
+            b.totalChunks = total;
+            return b;
+        });
+        buf.chunks.add(Base64.getDecoder().decode(b64));
+
+        int pct = (int) ((buf.chunks.size() * 100L) / total);
+        pw.println(Protocol.FILE_PROGRESS.name() + "|" + pct);
+
+        if (buf.chunks.size() < total) return;
+
+        uploadsEnCours.remove(key);
+        byte[] full = concatener(buf.chunks);
+        if (groupe) {
+            messageRouter.envoyerFichierGroupe(telephoneConnecte,
+                    Integer.parseInt(destOrGroupe), type, fileName, full, this);
+        } else {
+            messageRouter.envoyerFichier(telephoneConnecte, destOrGroupe, type, fileName, full, this);
+        }
+    }
+
+    private static byte[] concatener(List<byte[]> chunks) {
+        int len = 0;
+        for (byte[] c : chunks) len += c.length;
+        byte[] out = new byte[len];
+        int pos = 0;
+        for (byte[] c : chunks) {
+            System.arraycopy(c, 0, out, pos, c.length);
+            pos += c.length;
+        }
+        return out;
+    }
+
+    private static boolean isTypeMessage(String s) {
+        return "texte".equals(s) || "image".equals(s) || "video".equals(s)
+                || "audio".equals(s) || "fichier".equals(s);
     }
     /** Même logique que le client : aligner saisie et clés UserManager. */
     private static String normaliserNumeroPourRecherche(String raw) {
@@ -783,11 +922,16 @@ public class ClientHandler extends Thread {
             StringBuilder sb = new StringBuilder();
             for (MessageGroupe msg : liste) {
                 if (sb.length() > 0) sb.append("|");
+                String contenu = msg.getContenu() != null ? msg.getContenu() : "";
                 sb.append(msg.getIdMessage()).append(";")
                         .append(msg.getTelephoneExpediteur()).append(";")
                         .append(msg.getNomExpediteur()).append(";")
-                        .append(msg.getContenu()).append(";")
+                        .append(contenu).append(";")
                         .append(msg.getDateEnvoi() != null ? msg.getDateEnvoi().toString() : "");
+                if (FileMediaUtil.isGroupFileContent(contenu)) {
+                    String b64 = MessageRouter.lireBase64DepuisContenuGroupe(contenu);
+                    if (b64 != null) sb.append(";").append(b64);
+                }
             }
             pw.println(Protocol.GROUP_MESSAGES_LIST.name() + "|" + sb);
         } catch (Exception e) {

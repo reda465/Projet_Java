@@ -18,10 +18,16 @@ import javafx.scene.text.*;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import service.Fileservice;
+import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import util.FileMediaUtil;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.util.Base64;
+import javax.sound.sampled.*;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -54,6 +60,15 @@ public class Discussion implements EcouteurClient {
     private String typeAppelEnCours = null;
     private Fileservice fileService;
     private Button attachBtn;
+    private Button voiceBtn;
+    private TextField searchField;
+    private ProgressBar fileProgressBar;
+    private final List<HBox> convListMaster = new ArrayList<>();
+    private final List<HBox> groupesListMaster = new ArrayList<>();
+    private TargetDataLine ligneVocale;
+    private ByteArrayOutputStream bufferVocal;
+    private Thread threadEnregistrement;
+    private AudioFormat formatVocalEnCours;
 
     // Nouveaux champs pour les groupes
     private Groupe groupeActif = null;
@@ -92,6 +107,7 @@ public class Discussion implements EcouteurClient {
 
     public Scene creerScene(Stage stage) {
         this.primaryStage = stage;
+        Messagefx.setStage(stage);
         this.fileService = new Fileservice(ClientHandlerAuth.getInstance().getClientReseau());
 
         VBox sidebar = new VBox(0);
@@ -119,12 +135,13 @@ public class Discussion implements EcouteurClient {
 
         sideHeader.getChildren().addAll(userAvatar, userName, spacerHeader, actionBtn);
 
-        TextField search = new TextField();
-        search.setPromptText("🔍  Rechercher");
-        search.setStyle("-fx-background-color: #f0f0f0; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 8px 12px;");
-        HBox searchBox = new HBox(search);
-        HBox.setHgrow(search, Priority.ALWAYS);
+        searchField = new TextField();
+        searchField.setPromptText("🔍  Rechercher");
+        searchField.setStyle("-fx-background-color: #f0f0f0; -fx-border-radius: 8px; -fx-background-radius: 8px; -fx-padding: 8px 12px;");
+        HBox searchBox = new HBox(searchField);
+        HBox.setHgrow(searchField, Priority.ALWAYS);
         searchBox.setPadding(new Insets(8, 10, 8, 10));
+        configurerRecherche();
 
         labelBarreAppelSidebar = new Label();
         labelBarreAppelSidebar.setTextFill(Color.WHITE);
@@ -307,30 +324,24 @@ public class Discussion implements EcouteurClient {
         styleIconBtn(attachBtn, "#25D366", "#128C7E");
         attachBtn.setTooltip(new Tooltip("Envoyer un fichier"));
         attachBtn.setDisable(true);
-        attachBtn.setOnAction(e -> {
-            if (!numeroContactUtilisable(contactActif)) return;
+        attachBtn.setOnAction(e -> choisirEtEnvoyerFichier(false));
+        MenuItem itemGalerie = new MenuItem("Galerie / Fichiers");
+        itemGalerie.setOnAction(e -> choisirEtEnvoyerFichier(false));
+        MenuItem itemCamera = new MenuItem("Appareil photo");
+        itemCamera.setOnAction(e -> choisirEtEnvoyerFichier(true));
+        ContextMenu menuAttach = new ContextMenu(itemGalerie, itemCamera);
+        attachBtn.setOnContextMenuRequested(ev -> menuAttach.show(attachBtn, ev.getScreenX(), ev.getScreenY()));
 
-            // Ouvre l'explorateur de fichiers natif
-            javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
-            chooser.setTitle("Choisir un fichier à envoyer");
-            chooser.getExtensionFilters().addAll(
-                    new javafx.stage.FileChooser.ExtensionFilter("Tous les fichiers", "*.*"),
-                    new javafx.stage.FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp"),
-                    new javafx.stage.FileChooser.ExtensionFilter("Documents", "*.pdf", "*.docx", "*.txt", "*.xlsx")
-            );
+        voiceBtn = new Button("🎤");
+        styleIconBtn(voiceBtn, "#25D366", "#128C7E");
+        voiceBtn.setTooltip(new Tooltip("Message vocal (maintenir pour enregistrer)"));
+        voiceBtn.setDisable(true);
+        configurerBoutonVocal();
 
-            File fichier = chooser.showOpenDialog(primaryStage);
-            if (fichier != null) {
-                // Envoyer le fichier via le service
-                fileService.envoyerFichier(contactActif, fichier);
-
-                // Afficher une bulle de confirmation dans le chat
-                String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-                HBox bulle = Messagefx.Messageenvoyer("📎 " + fichier.getName(), time);
-                messagesBox.getChildren().add(bulle);
-                scrollToBottom();
-            }
-        });
+        fileProgressBar = new ProgressBar(0);
+        fileProgressBar.setVisible(false);
+        fileProgressBar.setManaged(false);
+        fileProgressBar.setPrefWidth(120);
 
         msgField = new TextField();
         msgField.setPromptText("Tapez un message");
@@ -369,7 +380,7 @@ public class Discussion implements EcouteurClient {
         sendBtn.setOnAction(e -> sendAction.run());
         msgField.setOnAction(e -> sendAction.run());
 
-        inputBar.getChildren().addAll(attachBtn, msgField, sendBtn);
+        inputBar.getChildren().addAll(attachBtn, voiceBtn, msgField, fileProgressBar, sendBtn);
         chatPanel.getChildren().addAll(chatHeader, scrollPane, inputBar);
 
         afficherAccueil();
@@ -379,15 +390,296 @@ public class Discussion implements EcouteurClient {
         return new Scene(root, 900, 620);
     }
 
-    private void handleAttachFile() {
-        if (!estEnGroupe && !numeroContactUtilisable(contactActif)) return;
-        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
-        File f = chooser.showOpenDialog(primaryStage);
-        if (f != null && !estEnGroupe) {
-            fileService.envoyerFichier(contactActif, f);
-            messagesBox.getChildren().add(Messagefx.Messageenvoyer("📎 " + f.getName(), LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))));
-            scrollToBottom();
+    private void configurerRecherche() {
+        if (searchField == null) return;
+        searchField.textProperty().addListener((obs, old, query) -> filtrerListes());
+    }
+
+    private void filtrerListes() {
+        String q = searchField != null && searchField.getText() != null
+                ? searchField.getText().trim().toLowerCase() : "";
+        convList.getItems().clear();
+        for (HBox item : convListMaster) {
+            if (q.isEmpty() || correspondRechercheConv(item, q)) convList.getItems().add(item);
         }
+        groupesList.getItems().clear();
+        for (HBox item : groupesListMaster) {
+            if (q.isEmpty() || correspondRechercheGroupe(item, q)) groupesList.getItems().add(item);
+        }
+    }
+
+    private boolean correspondRechercheConv(HBox item, String q) {
+        Object ud = item.getUserData();
+        if (ud instanceof String s) {
+            String[] p = s.split(";", 3);
+            if (p.length >= 3 && (p[2].toLowerCase().contains(q) || p[1].toLowerCase().contains(q))) return true;
+        }
+        for (javafx.scene.Node n : item.getChildren()) {
+            if (n instanceof VBox v) {
+                for (javafx.scene.Node c : v.getChildren()) {
+                    if (c instanceof Label lbl && lbl.getText() != null
+                            && lbl.getText().toLowerCase().contains(q)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean correspondRechercheGroupe(HBox item, String q) {
+        Object ud = item.getUserData();
+        if (ud instanceof Groupe g && g.getNomGroupe() != null
+                && g.getNomGroupe().toLowerCase().contains(q)) return true;
+        return correspondRechercheConv(item, q);
+    }
+
+    private void choisirEtEnvoyerFichier(boolean depuisCamera) {
+        boolean ok = estEnGroupe ? groupeActif != null : numeroContactUtilisable(contactActif);
+        if (!ok) return;
+
+        javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+        chooser.setTitle("Choisir un fichier à envoyer");
+        javafx.stage.FileChooser.ExtensionFilter tous = new javafx.stage.FileChooser.ExtensionFilter("Tous les fichiers", "*.*");
+        chooser.getExtensionFilters().addAll(
+                tous,
+                new javafx.stage.FileChooser.ExtensionFilter("Images", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.bmp"),
+                new javafx.stage.FileChooser.ExtensionFilter("Vidéos", "*.mp4", "*.mov", "*.avi", "*.mkv", "*.webm"),
+                new javafx.stage.FileChooser.ExtensionFilter("Documents", "*.pdf", "*.doc", "*.docx", "*.txt", "*.xlsx", "*.pptx"),
+                new javafx.stage.FileChooser.ExtensionFilter("Audio", "*.wav", "*.mp3", "*.ogg", "*.m4a", "*.aac"));
+        chooser.setSelectedExtensionFilter(tous);
+        File fichier = depuisCamera ? capturerPhoto() : chooser.showOpenDialog(primaryStage);
+        if (fichier != null) montrerApercuEtEnvoyer(fichier);
+    }
+
+    private File capturerPhoto() {
+        try {
+            com.github.sarxos.webcam.Webcam cam = com.github.sarxos.webcam.Webcam.getDefault();
+            if (cam == null) {
+                showAlert(Alert.AlertType.WARNING, "Caméra", "Aucune caméra détectée.");
+                return null;
+            }
+            java.awt.image.BufferedImage img = cam.getImage();
+            if (img == null) {
+                cam.open();
+                img = cam.getImage();
+                cam.close();
+            }
+            if (img == null) return null;
+            File out = new File("downloads/capture_" + System.currentTimeMillis() + ".png");
+            out.getParentFile().mkdirs();
+            javax.imageio.ImageIO.write(img, "png", out);
+            return out;
+        } catch (Exception e) {
+            showAlert(Alert.AlertType.ERROR, "Caméra", "Impossible de capturer : " + e.getMessage());
+            return null;
+        }
+    }
+
+    private void montrerApercuEtEnvoyer(File fichier) {
+        String type = FileMediaUtil.detectType(fichier);
+        Alert preview = new Alert(Alert.AlertType.CONFIRMATION);
+        preview.setTitle("Aperçu avant envoi");
+        preview.setHeaderText(fichier.getName() + " (" + FileMediaUtil.labelForType(type) + ")");
+        VBox box = new VBox(8);
+        if ("image".equals(type)) {
+            ImageView iv = new ImageView(new Image(fichier.toURI().toString(), 280, 280, true, true));
+            iv.setPreserveRatio(true);
+            box.getChildren().add(iv);
+        } else {
+            box.getChildren().add(new Label(FileMediaUtil.labelForType(type) + " — " + formatTaille(fichier.length())));
+        }
+        preview.getDialogPane().setContent(box);
+        ButtonType btnEnvoyer = new ButtonType("Envoyer", ButtonBar.ButtonData.OK_DONE);
+        preview.getButtonTypes().setAll(btnEnvoyer, ButtonType.CANCEL);
+        preview.showAndWait().ifPresent(btn -> {
+            if (btn == btnEnvoyer) envoyerFichierDepuisUI(fichier, type);
+        });
+    }
+
+    private void envoyerFichierDepuisUI(File fichier, String type) {
+        String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+        File copie = fichier;
+        try {
+            if (!fichier.getAbsolutePath().startsWith(dossierTelechargements().getAbsolutePath())) {
+                copie = sauvegarderFichierLocal(fichier.getName(),
+                        java.nio.file.Files.readAllBytes(fichier.toPath()),
+                        estEnGroupe && groupeActif != null ? groupeActif.getIdGroupe() : null);
+            }
+        } catch (Exception ignored) {}
+        ajouterBulleFichier(true, type, fichier.getName(), time, copie);
+        java.util.function.Consumer<Integer> progress = this::fichierProgress;
+        if (estEnGroupe && groupeActif != null) {
+            ClientHandlerAuth.getInstance().envoyerFichierGroupe(groupeActif.getIdGroupe(), fichier, progress);
+        } else {
+            ClientHandlerAuth.getInstance().envoyerFichier(contactActif, fichier, progress);
+        }
+        scrollToBottom();
+        ClientHandlerAuth.getInstance().demanderConversations();
+        if (estEnGroupe) ClientHandlerAuth.getInstance().demanderListeGroupes();
+    }
+
+    private void traiterFichierRecu(String tel, String type, String name, String b64,
+                                     boolean groupe, Integer idGroupe, String nomExp,
+                                     LocalTime timeHistorique) {
+        try {
+            byte[] data = Base64.getDecoder().decode(b64);
+            File out = sauvegarderFichierLocal(name, data, groupe ? idGroupe : null);
+            String time = timeHistorique != null
+                    ? timeHistorique.format(DateTimeFormatter.ofPattern("HH:mm"))
+                    : LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
+            boolean afficher = !groupe || (estEnGroupe && groupeActif != null
+                    && idGroupe != null && groupeActif.getIdGroupe() == idGroupe);
+            if (afficher) {
+                boolean estMoi = estMonNumero(tel);
+                if (groupe && !estMoi && nomExp != null) {
+                    messagesBox.getChildren().add(Messagefx.MessagerecuFichier(type, nomExp + ": " + name, time, out));
+                } else {
+                    ajouterBulleFichier(estMoi, type, name, time, out);
+                }
+                if (timeHistorique == null) scrollToBottom();
+            }
+            if (!groupe && tel != null && !tel.equals(contactActif)) mettreAJourBadgeNonLu(tel);
+            if (groupe) {
+                ClientHandlerAuth.getInstance().demanderListeGroupes();
+            } else {
+                ClientHandlerAuth.getInstance().demanderConversations();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            showAlert(Alert.AlertType.ERROR, "Erreur fichier", "Impossible de recevoir : " + name);
+        }
+    }
+
+    private static File dossierTelechargements() {
+        File dir = new File(System.getProperty("user.dir"), "downloads");
+        if (!dir.exists()) dir.mkdirs();
+        return dir;
+    }
+
+    private File sauvegarderFichierLocal(String name, byte[] data, Integer idGroupe) throws java.io.IOException {
+        if (data == null || data.length == 0) {
+            throw new java.io.IOException("Données fichier vides");
+        }
+        String prefix = idGroupe != null ? "g" + idGroupe + "_" : "";
+        String safeName = name != null ? name.replaceAll("[\\\\/:*?\"<>|]", "_") : "fichier";
+        File out = new File(dossierTelechargements(), prefix + System.currentTimeMillis() + "_" + safeName);
+        java.nio.file.Files.write(out.toPath(), data);
+        return out;
+    }
+
+    private void ajouterBulleFichier(boolean estMoi, String type, String name, String time, File local) {
+        if (estMoi) {
+            messagesBox.getChildren().add(Messagefx.MessageenvoyerFichier(type, name, time, local));
+        } else {
+            messagesBox.getChildren().add(Messagefx.MessagerecuFichier(type, name, time, local));
+        }
+    }
+
+    private void configurerBoutonVocal() {
+        voiceBtn.setOnMousePressed(e -> {
+            e.consume();
+            demarrerEnregistrementVocal();
+        });
+        voiceBtn.setOnMouseReleased(e -> {
+            e.consume();
+            arreterEtEnvoyerVocal();
+        });
+    }
+
+    private void demarrerEnregistrementVocal() {
+        if (ligneVocale != null) return;
+        try {
+            formatVocalEnCours = null;
+            AudioFormat[] essais = {
+                    new AudioFormat(16000, 16, 1, true, false),
+                    new AudioFormat(8000, 16, 1, true, false),
+                    new AudioFormat(44100, 16, 1, true, false)
+            };
+            for (AudioFormat f : essais) {
+                try {
+                    DataLine.Info info = new DataLine.Info(TargetDataLine.class, f);
+                    if (!AudioSystem.isLineSupported(info)) continue;
+                    ligneVocale = (TargetDataLine) AudioSystem.getLine(info);
+                    ligneVocale.open(f);
+                    formatVocalEnCours = f;
+                    break;
+                } catch (Exception ignored) {}
+            }
+            if (ligneVocale == null) {
+                AudioFormat def = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, 16000, 16, 1, 2, 16000, false);
+                DataLine.Info info = new DataLine.Info(TargetDataLine.class, def);
+                ligneVocale = (TargetDataLine) AudioSystem.getLine(info);
+                ligneVocale.open(def);
+                formatVocalEnCours = def;
+            }
+            bufferVocal = new ByteArrayOutputStream();
+            ligneVocale.start();
+            byte[] buf = new byte[4096];
+            TargetDataLine ligne = ligneVocale;
+            threadEnregistrement = new Thread(() -> {
+                try {
+                    while (ligne.isOpen()) {
+                        int n = ligne.read(buf, 0, buf.length);
+                        if (n > 0) bufferVocal.write(buf, 0, n);
+                    }
+                } catch (Exception ignored) {}
+            });
+            threadEnregistrement.setDaemon(true);
+            threadEnregistrement.start();
+            voiceBtn.setStyle("-fx-background-color:#EA2424; -fx-text-fill:white; -fx-background-radius:50%; -fx-min-width:38px; -fx-min-height:38px;");
+            chatStatus.setText("🎤 Enregistrement...");
+        } catch (Exception ex) {
+            ligneVocale = null;
+            showAlert(Alert.AlertType.ERROR, "Micro", "Enregistrement impossible : " + ex.getMessage());
+        }
+    }
+
+    private void arreterEtEnvoyerVocal() {
+        styleIconBtn(voiceBtn, "#25D366", "#128C7E");
+        if (estEnGroupe && groupeActif != null) {
+            chatStatus.setText(groupeActif.getNumerosMembres() != null
+                    ? groupeActif.getNumerosMembres().size() + " membres" : "");
+        } else if (numeroContactUtilisable(contactActif)) {
+            chatStatus.setText("en ligne");
+        }
+        if (ligneVocale == null) return;
+        TargetDataLine ligne = ligneVocale;
+        ligneVocale = null;
+        try {
+            ligne.stop();
+            ligne.close();
+        } catch (Exception ignored) {}
+        if (threadEnregistrement != null) {
+            try { threadEnregistrement.join(800); } catch (InterruptedException ignored) {}
+            threadEnregistrement = null;
+        }
+        if (bufferVocal == null || bufferVocal.size() < 200) {
+            bufferVocal = null;
+            showAlert(Alert.AlertType.WARNING, "Message vocal", "Enregistrement trop court. Maintenez le bouton 🎤 plus longtemps.");
+            return;
+        }
+        try {
+            AudioFormat format = formatVocalEnCours != null ? formatVocalEnCours
+                    : new AudioFormat(16000, 16, 1, true, false);
+            File wav = new File("downloads/vocal_" + System.currentTimeMillis() + ".wav");
+            wav.getParentFile().mkdirs();
+            byte[] pcm = bufferVocal.toByteArray();
+            long frames = pcm.length / format.getFrameSize();
+            try (AudioInputStream ais = new AudioInputStream(
+                    new ByteArrayInputStream(pcm), format, frames)) {
+                AudioSystem.write(ais, AudioFileFormat.Type.WAVE, wav);
+            }
+            bufferVocal = null;
+            envoyerFichierDepuisUI(wav, "audio");
+        } catch (Exception e) {
+            bufferVocal = null;
+            showAlert(Alert.AlertType.ERROR, "Vocal", "Erreur enregistrement : " + e.getMessage());
+        }
+    }
+
+    private static String formatTaille(long bytes) {
+        if (bytes < 1024) return bytes + " o";
+        if (bytes < 1024 * 1024) return (bytes / 1024) + " Ko";
+        return String.format("%.1f Mo", bytes / (1024.0 * 1024));
     }
 
     private void ouvrirGroupe(Groupe g) {
@@ -427,7 +719,8 @@ public class Discussion implements EcouteurClient {
     private void majEtatBoutonEnvoi() {
         boolean ok = estEnGroupe ? (groupeActif != null) : numeroContactUtilisable(contactActif);
         if (sendBtn != null) sendBtn.setDisable(!ok);
-        if (attachBtn != null) attachBtn.setDisable(estEnGroupe || !ok);
+        if (attachBtn != null) attachBtn.setDisable(!ok);
+        if (voiceBtn != null) voiceBtn.setDisable(!ok);
     }
 
     @Override public void messageRecu(String num, String contenu) {
@@ -444,10 +737,12 @@ public class Discussion implements EcouteurClient {
     @Override public void messageGroupeRecu(MessageGroupe m) {
         Platform.runLater(() -> {
             if (estEnGroupe && groupeActif != null && m.getIdGroupe() == groupeActif.getIdGroupe()) {
+                if (FileMediaUtil.isGroupFileContent(m.getContenu())) return;
                 Utilisateur moi = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
                 boolean estMoi = moi != null && m.getTelephoneExpediteur().equals(moi.getNumeroTelephone());
-                String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-
+                String time = m.getDateEnvoi() != null
+                        ? m.getDateEnvoi().format(DateTimeFormatter.ofPattern("HH:mm"))
+                        : LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
                 if (estMoi) {
                     messagesBox.getChildren().add(Messagefx.Messageenvoyer(m.getContenu(), time));
                 } else {
@@ -465,6 +760,7 @@ public class Discussion implements EcouteurClient {
     @Override public void listeGroupesRecue(List<Groupe> gs) {
         Platform.runLater(() -> {
             groupesList.getItems().clear();
+            groupesListMaster.clear();
             cacheGroupes.clear();
             if (gs == null) return;
             for (Groupe g : gs) {
@@ -492,8 +788,9 @@ public class Discussion implements EcouteurClient {
             for (Groupe g : gs) {
                 HBox item = makeConvItem(g.getNomGroupe(), "", "Groupe", "#25D366", g.getIdGroupe(), 0);
                 item.setUserData(g);
-                groupesList.getItems().add(item);
+                groupesListMaster.add(item);
             }
+            filtrerListes();
         });
     }
 
@@ -512,35 +809,20 @@ public class Discussion implements EcouteurClient {
 
     @Override public void conversationsRecues(List<Conversation> cs) {
         Platform.runLater(() -> {
-            convList.getItems().clear();
-            if (cs == null) return;
+            convListMaster.clear();
+            if (cs == null) { filtrerListes(); return; }
             for (Conversation nouvelle : cs) {
-                boolean existe = false;
-                for (int i = 0; i < convList.getItems().size(); i++) {
-                    HBox existing = convList.getItems().get(i);
-                    Object ud = existing.getUserData();
-                    if (ud instanceof String s) {
-                        String[] p = s.split(";", 3);
-                        if (p.length >= 2 && p[1].equals(nouvelle.getNumeroContact())) {
-                            // Mettre à jour l'existant
-                            existe = true;
-                            break;
-                        }
-                    }
-                }
-                if (!existe) {
-                    // Ajouter la nouvelle conversation
-                    String color = "#128C7E";
-                    convList.getItems().add(makeConvItem(
-                            nouvelle.getNomContact(),
-                            nouvelle.getNumeroContact(),
-                            nouvelle.getDernierMessage() != null ? nouvelle.getDernierMessage() : "",
-                            color,
-                            nouvelle.getIdConversation(),
-                            nouvelle.getMessagesNonLus()
-                    ));
-                }
+                String color = "#128C7E";
+                HBox item = makeConvItem(
+                        nouvelle.getNomContact(),
+                        nouvelle.getNumeroContact(),
+                        nouvelle.getDernierMessage() != null ? nouvelle.getDernierMessage() : "",
+                        color,
+                        nouvelle.getIdConversation(),
+                        nouvelle.getMessagesNonLus());
+                convListMaster.add(item);
             }
+            filtrerListes();
         });
     }
 
@@ -550,32 +832,113 @@ public class Discussion implements EcouteurClient {
             if (ms == null) return;
             for (Message m : ms) {
                 String time = m.getDateEnvoi() != null ? m.getDateEnvoi().format(DateTimeFormatter.ofPattern("HH:mm")) : "";
-                messagesBox.getChildren().add(m.isEstMoi() ? Messagefx.Messageenvoyer(m.getContenuTexte(), time) : Messagefx.Messagerecu(m.getContenuTexte(), time));
+                String type = m.getTypeMessage() != null ? m.getTypeMessage() : "texte";
+                if (!"texte".equals(type) && m.getUrlFichier() != null && !m.getUrlFichier().isBlank()) {
+                    File local = null;
+                    try {
+                        local = sauvegarderFichierLocal(m.getNomFichier(), Base64.getDecoder().decode(m.getUrlFichier()), null);
+                    } catch (Exception e) {
+                        System.out.println("[FILE] Historique 1:1 : " + e.getMessage());
+                    }
+                    ajouterBulleFichier(m.isEstMoi(), type, m.getNomFichier(), time, local);
+                } else if (!"texte".equals(type) && m.getNomFichier() != null) {
+                    ajouterBulleFichier(m.isEstMoi(), type, m.getNomFichier(), time, null);
+                } else {
+                    messagesBox.getChildren().add(m.isEstMoi()
+                            ? Messagefx.Messageenvoyer(m.getContenuTexte(), time)
+                            : Messagefx.Messagerecu(m.getContenuTexte(), time));
+                }
             }
             if (!numeroContactUtilisable(contactActif)) contactActif = infererNumeroInterlocuteur(ms);
             scrollToBottom();
         });
     }
 
-    @Override public void fichierRecu(String tel, String name, String b64) {
-        Platform.runLater(() -> {
+    @Override public void fichierRecu(String tel, String type, String name, String b64) {
+        Platform.runLater(() -> traiterFichierRecu(tel, type, name, b64, false, null, null, null));
+    }
+
+    @Override
+    public void fichierGroupeRecu(int idGroupe, String tel, String nomExp, String type, String name, String b64) {
+        fichierGroupeRecu(idGroupe, tel, nomExp, type, name, b64, null);
+    }
+
+    @Override
+    public void fichierGroupeRecu(int idGroupe, String tel, String nomExp, String type, String name,
+                                  String b64, String dateEnvoi) {
+        Platform.runLater(() -> traiterFichierRecu(tel, type, name, b64, true, idGroupe, nomExp,
+                parserHeureMessage(dateEnvoi)));
+    }
+
+    private static LocalTime parserHeureMessage(String dateEnvoi) {
+        if (dateEnvoi == null || dateEnvoi.isBlank()) return null;
+        try {
+            return java.time.LocalDateTime.parse(dateEnvoi).toLocalTime();
+        } catch (Exception e) {
             try {
-                byte[] data = Base64.getDecoder().decode(b64);
-                File out = new File("downloads/" + name); out.getParentFile().mkdirs();
-                java.nio.file.Files.write(out.toPath(), data);
-                messagesBox.getChildren().add(Messagefx.Messagerecu("📎 " + name, LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))));
-                scrollToBottom();
-
-                // Notifier l'utilisateur si la conversation n'est pas active
-                if (!tel.equals(contactActif)) {
-                    mettreAJourBadgeNonLu(tel);
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                showAlert(Alert.AlertType.ERROR, "Erreur fichier",
-                        "Impossible de recevoir le fichier : " + name);
+                return LocalTime.parse(dateEnvoi);
+            } catch (Exception ignored) {
+                return null;
             }
+        }
+    }
+
+    @Override
+    public void debutHistoriqueGroupe(int idGroupe) {
+        Platform.runLater(() -> {
+            if (estEnGroupe && groupeActif != null && groupeActif.getIdGroupe() == idGroupe) {
+                messagesBox.getChildren().clear();
+            }
+        });
+    }
+
+    @Override
+    public void finHistoriqueGroupe(int idGroupe) {
+        Platform.runLater(() -> {
+            if (estEnGroupe && groupeActif != null && groupeActif.getIdGroupe() == idGroupe) {
+                scrollToBottom();
+            }
+        });
+    }
+
+    @Override public void fichierProgress(int percent) {
+        Platform.runLater(() -> {
+            if (fileProgressBar == null) return;
+            fileProgressBar.setVisible(true);
+            fileProgressBar.setManaged(true);
+            fileProgressBar.setProgress(Math.min(1.0, percent / 100.0));
+            if (percent >= 100) {
+                fileProgressBar.setVisible(false);
+                fileProgressBar.setManaged(false);
+            }
+        });
+    }
+
+    @Override public void fichierEnvoiReussi(String fileName) {
+        Platform.runLater(() -> {
+            if (fileProgressBar != null) {
+                fileProgressBar.setProgress(1);
+                fileProgressBar.setVisible(false);
+                fileProgressBar.setManaged(false);
+            }
+        });
+    }
+
+    @Override public void fichierEnvoiEchoue(String raison) {
+        Platform.runLater(() -> {
+            if (fileProgressBar != null) {
+                fileProgressBar.setVisible(false);
+                fileProgressBar.setManaged(false);
+            }
+            Alert a = new Alert(Alert.AlertType.ERROR);
+            a.setTitle("Envoi fichier");
+            a.setHeaderText(null);
+            a.setContentText(raison != null ? raison : "Échec de l'envoi");
+            ButtonType retry = new ButtonType("Réessayer");
+            a.getButtonTypes().setAll(retry, ButtonType.CANCEL);
+            a.showAndWait().ifPresent(btn -> {
+                if (btn == retry) ClientHandlerAuth.getInstance().retryEnvoiFichier();
+            });
         });
     }
 
@@ -995,6 +1358,7 @@ public class Discussion implements EcouteurClient {
         chatName.setText(""); chatStatus.setText("");
         btnAppelAudio.setVisible(false); btnAppelVideo.setVisible(false); groupMenu.setVisible(false);
         msgField.setDisable(true); attachBtn.setDisable(true); sendBtn.setDisable(true);
+        if (voiceBtn != null) voiceBtn.setDisable(true);
     }
 
     private void mettreAJourBadgeNonLu(String expediteur) {
