@@ -262,4 +262,15 @@ public class AppelVideoGroupe {
     public void fermerFenetre() {
         quitterAppel();
     }
+
+    /** Ramène la fenêtre d'appel au premier plan si elle est ouverte. */
+    public void afficherFenetre() {
+        Platform.runLater(() -> {
+            if (stageFenetre != null) {
+                if (!stageFenetre.isShowing()) stageFenetre.show();
+                stageFenetre.toFront();
+                stageFenetre.requestFocus();
+            }
+        });
+    }
 }

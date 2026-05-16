@@ -5,6 +5,8 @@ import client.ClientHandlerAuth;
 import client.EcouteurClient;
 import client.VideoUDP;
 import model.*;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.geometry.*;
 import javafx.scene.*;
@@ -14,16 +16,21 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.*;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import service.Fileservice;
 import javafx.scene.image.ImageView;
 
 import java.io.File;
 import java.util.Base64;
+import java.time.Instant;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Discussion implements EcouteurClient {
     private Utilisateur utilisateurConnecte;
@@ -56,7 +63,25 @@ public class Discussion implements EcouteurClient {
     private Button btnAppelVideo;
     private AppelAudioGroupe appelAudioGroupeActif;
     private AppelVideoGroupe appelVideoGroupeActif;
-    private Label appelEnCoursLabel; // Indicateur visuel "en appel"
+    private Label appelEnCoursLabel; // Indicateur visuel "en appel" (en-tête chat)
+
+    /** Barre d'appel en cours au-dessus de la liste des contacts */
+    private HBox barreAppelSidebar;
+    private Label labelBarreAppelSidebar;
+    private Timeline chronometreAppel;
+    private Instant debutAppelGroupe;
+    private int idGroupeEnAppel = -1;
+    private String nomGroupeEnAppel = "";
+    private String typeAppelGroupeEnCours = "";
+
+    /** Groupes connus (pour rejoindre un appel sans ouvrir la conversation) */
+    private final Map<Integer, Groupe> cacheGroupes = new ConcurrentHashMap<>();
+    /** Groupes dont nous avons initié l'appel — ne pas afficher la popup entrante */
+    private final Set<Integer> appelsGroupeInitiateur = ConcurrentHashMap.newKeySet();
+    /** Invitation en attente si la liste des groupes n'est pas encore chargée */
+    private int invitationAppelIdGroupe = -1;
+    private String invitationAppelType = "";
+    private String invitationAppelNomGroupe = "";
 
     /** Contacts issus du serveur (GET_CONTACTS) — utilisé pour les groupes et cohérent avec la BDD */
     private final List<Contact> mesContacts = new ArrayList<>();
@@ -100,6 +125,24 @@ public class Discussion implements EcouteurClient {
         HBox searchBox = new HBox(search);
         HBox.setHgrow(search, Priority.ALWAYS);
         searchBox.setPadding(new Insets(8, 10, 8, 10));
+
+        labelBarreAppelSidebar = new Label();
+        labelBarreAppelSidebar.setTextFill(Color.WHITE);
+        labelBarreAppelSidebar.setFont(Font.font("Segoe UI", FontWeight.BOLD, 12));
+        labelBarreAppelSidebar.setWrapText(true);
+
+        Button btnRetourAppel = new Button("Rejoindre");
+        btnRetourAppel.setStyle("-fx-background-color: white; -fx-text-fill: #128C7E; -fx-font-size: 11px; -fx-background-radius: 12px; -fx-padding: 4 10 4 10; -fx-cursor: hand;");
+        btnRetourAppel.setText("Afficher");
+        btnRetourAppel.setOnAction(e -> afficherFenetreAppelGroupeActif());
+
+        barreAppelSidebar = new HBox(8, labelBarreAppelSidebar, new Region(), btnRetourAppel);
+        HBox.setHgrow(barreAppelSidebar.getChildren().get(1), Priority.ALWAYS);
+        barreAppelSidebar.setAlignment(Pos.CENTER_LEFT);
+        barreAppelSidebar.setPadding(new Insets(8, 12, 8, 12));
+        barreAppelSidebar.setStyle("-fx-background-color: #128C7E;");
+        barreAppelSidebar.setVisible(false);
+        barreAppelSidebar.setManaged(false);
 
         convList = new ListView<>();
         VBox.setVgrow(convList, Priority.ALWAYS);
@@ -190,7 +233,7 @@ public class Discussion implements EcouteurClient {
             }
         });
 
-        sidebar.getChildren().addAll(sideHeader, searchBox, new HBox(5, tabConv, tabGroup), convList, groupesList);
+        sidebar.getChildren().addAll(sideHeader, searchBox, barreAppelSidebar, new HBox(5, tabConv, tabGroup), convList, groupesList);
 
         VBox chatPanel = new VBox(0);
         chatPanel.setStyle("-fx-background-color: #e5ddd5;");
@@ -422,7 +465,20 @@ public class Discussion implements EcouteurClient {
     @Override public void listeGroupesRecue(List<Groupe> gs) {
         Platform.runLater(() -> {
             groupesList.getItems().clear();
+            cacheGroupes.clear();
             if (gs == null) return;
+            for (Groupe g : gs) {
+                cacheGroupes.put(g.getIdGroupe(), g);
+            }
+            if (invitationAppelIdGroupe >= 0) {
+                int id = invitationAppelIdGroupe;
+                String type = invitationAppelType;
+                String nom = invitationAppelNomGroupe.isEmpty() ? "Groupe" : invitationAppelNomGroupe;
+                invitationAppelIdGroupe = -1;
+                invitationAppelType = "";
+                invitationAppelNomGroupe = "";
+                proposerAppelGroupeEntrant(id, nom, type);
+            }
             if (estEnGroupe && groupeActif != null) {
                 for (Groupe g : gs) {
                     if (g.getIdGroupe() == groupeActif.getIdGroupe()) {
@@ -525,34 +581,37 @@ public class Discussion implements EcouteurClient {
 
     @Override
     public void appelGroupeEntrant(int idGroupe, String nomGroupe, String type, String initiateurNom) {
-        Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-            alert.setTitle("Appel " + ("VIDEO".equalsIgnoreCase(type) ? "vidéo" : "audio") + " groupe");
-            alert.setHeaderText(null);
-            alert.setContentText(initiateurNom + " démarre un appel " +
-                    ("VIDEO".equalsIgnoreCase(type) ? "vidéo" : "audio") +
-                    " dans \"" + nomGroupe + "\"");
+        Platform.runLater(() -> proposerAppelGroupeEntrant(idGroupe, nomGroupe, type));
+    }
 
-            ButtonType accepter = new ButtonType("Rejoindre");
-            ButtonType refuser = new ButtonType("Refuser", ButtonBar.ButtonData.CANCEL_CLOSE);
-            alert.getButtonTypes().setAll(accepter, refuser);
+    /** Propose de rejoindre un appel groupe (sauf si nous l'avons initié ou sommes déjà dedans). */
+    private void proposerAppelGroupeEntrant(int idGroupe, String nomGroupe, String type) {
+        if (appelsGroupeInitiateur.contains(idGroupe)) return;
+        if (estDejaDansAppelGroupe(idGroupe)) return;
 
-            Optional<ButtonType> result = alert.showAndWait();
-            if (result.isPresent() && result.get() == accepter) {
-                // Trouver le groupe et rejoindre
-                for (HBox item : groupesList.getItems()) {
-                    if (item.getUserData() instanceof Groupe g && g.getIdGroupe() == idGroupe) {
-                        ouvrirGroupe(g);
-                        if ("VIDEO".equalsIgnoreCase(type)) {
-                            demarrerAppelVideoGroupe(g);
-                        } else {
-                            demarrerAppelAudioGroupe(g);
-                        }
-                        break;
-                    }
-                }
-            }
-        });
+        Groupe g = trouverGroupeParId(idGroupe);
+        if (g == null) {
+            invitationAppelIdGroupe = idGroupe;
+            invitationAppelType = type;
+            invitationAppelNomGroupe = nomGroupe;
+            ClientHandlerAuth.getInstance().demanderListeGroupes();
+            return;
+        }
+
+        String typeLabel = "VIDEO".equalsIgnoreCase(type) ? "vidéo" : "audio";
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Appel " + typeLabel + " groupe");
+        alert.setHeaderText(null);
+        alert.setContentText("Un appel " + typeLabel + " est en cours dans \"" + nomGroupe + "\".\nVoulez-vous rejoindre ?");
+
+        ButtonType accepter = new ButtonType("Rejoindre");
+        ButtonType refuser = new ButtonType("Refuser", ButtonBar.ButtonData.CANCEL_CLOSE);
+        alert.getButtonTypes().setAll(accepter, refuser);
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isPresent() && result.get() == accepter) {
+            rejoindreAppelGroupe(g, type);
+        }
     }
 
     @Override
@@ -597,14 +656,9 @@ public class Discussion implements EcouteurClient {
             }
 
             // --- Cas 3 : invitation entrante (pas encore dans l'appel) ---
-            if (!isReply) {
-                String nomGroupe = "Groupe";
-                for (javafx.scene.layout.HBox item : groupesList.getItems()) {
-                    if (item.getUserData() instanceof model.Groupe g && g.getIdGroupe() == idGroupe) {
-                        nomGroupe = g.getNomGroupe();
-                        break;
-                    }
-                }
+            if (!isReply && !appelsGroupeInitiateur.contains(idGroupe)) {
+                Groupe g = trouverGroupeParId(idGroupe);
+                String nomGroupe = g != null ? g.getNomGroupe() : "Groupe";
                 appelGroupeEntrant(idGroupe, nomGroupe, type, nomMembre);
             }
         });
@@ -637,7 +691,8 @@ public class Discussion implements EcouteurClient {
             // Sécurité : forcer la remise à null même si onTermine n'a pas été appelé
             appelAudioGroupeActif = null;
             appelVideoGroupeActif = null;
-            if (appelEnCoursLabel != null) appelEnCoursLabel.setVisible(false);
+            appelsGroupeInitiateur.remove(idGroupe);
+            arreterIndicateurAppelGroupe();
             showAlert(Alert.AlertType.INFORMATION, "Appel groupe", "L'appel est terminé.");
         });
     }
@@ -715,44 +770,143 @@ public class Discussion implements EcouteurClient {
     }
 
     private void demarrerAppelAudioGroupe(Groupe groupe) {
-        if (groupe == null) return;
+        demarrerAppelAudioGroupe(groupe, true);
+    }
 
+    private void demarrerAppelAudioGroupe(Groupe groupe, boolean commeInitiateur) {
+        if (groupe == null) return;
         if (appelAudioGroupeActif != null || appelVideoGroupeActif != null) {
             showAlert(Alert.AlertType.WARNING, "Appel", "Vous êtes déjà dans un appel.");
             return;
         }
-        // Assigner AVANT d'envoyer JOIN_GROUP_CALL pour éviter l'auto-notification
-        appelAudioGroupeActif = AppelAudioGroupe.demarrer(primaryStage, groupe, groupe.getIdGroupe(), () -> {
+        int idGroupe = groupe.getIdGroupe();
+        if (commeInitiateur) appelsGroupeInitiateur.add(idGroupe);
+        appelAudioGroupeActif = AppelAudioGroupe.demarrer(primaryStage, groupe, idGroupe, () -> {
             appelAudioGroupeActif = null;
-            if (appelEnCoursLabel != null) appelEnCoursLabel.setVisible(false);
+            appelsGroupeInitiateur.remove(idGroupe);
+            arreterIndicateurAppelGroupe();
         });
-        // Maintenant appelAudioGroupeActif est assigné → envoyer le signal
         int portAudio = appelAudioGroupeActif.getLocalPort();
-        ClientHandlerAuth.getInstance().demarrerAppelGroupe(
-                groupe.getIdGroupe(), "AUDIO", portAudio, portAudio, false);
-        if (appelEnCoursLabel != null) appelEnCoursLabel.setVisible(true);
+        ClientHandlerAuth.getInstance().demarrerAppelGroupe(idGroupe, "AUDIO", portAudio, portAudio, false);
+        demarrerIndicateurAppelGroupe(idGroupe, groupe.getNomGroupe(), "AUDIO");
     }
 
     private void demarrerAppelVideoGroupe(Groupe groupe) {
-        if (groupe == null) return;
+        demarrerAppelVideoGroupe(groupe, true);
+    }
 
+    private void demarrerAppelVideoGroupe(Groupe groupe, boolean commeInitiateur) {
+        if (groupe == null) return;
         if (appelAudioGroupeActif != null || appelVideoGroupeActif != null) {
             showAlert(Alert.AlertType.WARNING, "Appel", "Vous êtes déjà dans un appel.");
             return;
         }
-
-        // Assigner AVANT d'envoyer JOIN_GROUP_CALL pour éviter l'auto-notification
-        appelVideoGroupeActif = AppelVideoGroupe.demarrer(primaryStage, groupe, groupe.getIdGroupe(), () -> {
+        int idGroupe = groupe.getIdGroupe();
+        if (commeInitiateur) appelsGroupeInitiateur.add(idGroupe);
+        appelVideoGroupeActif = AppelVideoGroupe.demarrer(primaryStage, groupe, idGroupe, () -> {
             appelVideoGroupeActif = null;
-            if (appelEnCoursLabel != null) appelEnCoursLabel.setVisible(false);
+            appelsGroupeInitiateur.remove(idGroupe);
+            arreterIndicateurAppelGroupe();
         });
-        // Maintenant appelVideoGroupeActif est assigné → envoyer le signal
         ClientHandlerAuth.getInstance().demarrerAppelGroupe(
-                groupe.getIdGroupe(), "VIDEO",
+                idGroupe, "VIDEO",
                 appelVideoGroupeActif.getLocalPort(),
                 appelVideoGroupeActif.getLocalAudioPort(),
                 false);
-        if (appelEnCoursLabel != null) appelEnCoursLabel.setVisible(true);
+        demarrerIndicateurAppelGroupe(idGroupe, groupe.getNomGroupe(), "VIDEO");
+    }
+
+    /** Rejoint un appel groupe : ouvre directement l'écran d'appel (sans ouvrir le chat). */
+    private void rejoindreAppelGroupe(Groupe groupe, String type) {
+        if (groupe == null) return;
+        if ("VIDEO".equalsIgnoreCase(type)) {
+            demarrerAppelVideoGroupe(groupe, false);
+        } else {
+            demarrerAppelAudioGroupe(groupe, false);
+        }
+    }
+
+    private Groupe trouverGroupeParId(int idGroupe) {
+        Groupe g = cacheGroupes.get(idGroupe);
+        if (g != null) return g;
+        for (HBox item : groupesList.getItems()) {
+            if (item.getUserData() instanceof Groupe gr && gr.getIdGroupe() == idGroupe) {
+                cacheGroupes.put(idGroupe, gr);
+                return gr;
+            }
+        }
+        return null;
+    }
+
+    private boolean estDejaDansAppelGroupe(int idGroupe) {
+        return (appelAudioGroupeActif != null && appelAudioGroupeActif.getIdGroupe() == idGroupe)
+                || (appelVideoGroupeActif != null && appelVideoGroupeActif.getIdGroupe() == idGroupe);
+    }
+
+    private void demarrerIndicateurAppelGroupe(int idGroupe, String nomGroupe, String type) {
+        idGroupeEnAppel = idGroupe;
+        nomGroupeEnAppel = nomGroupe != null ? nomGroupe : "Groupe";
+        typeAppelGroupeEnCours = type;
+        debutAppelGroupe = Instant.now();
+
+        if (barreAppelSidebar != null) {
+            barreAppelSidebar.setVisible(true);
+            barreAppelSidebar.setManaged(true);
+        }
+        if (appelEnCoursLabel != null) {
+            appelEnCoursLabel.setVisible(true);
+        }
+        majAffichageDureeAppel();
+
+        if (chronometreAppel != null) chronometreAppel.stop();
+        chronometreAppel = new Timeline(new KeyFrame(Duration.seconds(1), e -> majAffichageDureeAppel()));
+        chronometreAppel.setCycleCount(Timeline.INDEFINITE);
+        chronometreAppel.play();
+    }
+
+    private void arreterIndicateurAppelGroupe() {
+        if (chronometreAppel != null) {
+            chronometreAppel.stop();
+            chronometreAppel = null;
+        }
+        idGroupeEnAppel = -1;
+        nomGroupeEnAppel = "";
+        typeAppelGroupeEnCours = "";
+        if (barreAppelSidebar != null) {
+            barreAppelSidebar.setVisible(false);
+            barreAppelSidebar.setManaged(false);
+        }
+        if (appelEnCoursLabel != null) {
+            appelEnCoursLabel.setVisible(false);
+        }
+    }
+
+    private void majAffichageDureeAppel() {
+        if (debutAppelGroupe == null) return;
+        long sec = java.time.Duration.between(debutAppelGroupe, Instant.now()).getSeconds();
+        String duree = formatDureeAppel(sec);
+        String typeLabel = "VIDEO".equalsIgnoreCase(typeAppelGroupeEnCours) ? "vidéo" : "audio";
+        String texte = "🔴 " + nomGroupeEnAppel + " — Appel " + typeLabel + " " + duree;
+
+        if (labelBarreAppelSidebar != null) labelBarreAppelSidebar.setText(texte);
+        if (appelEnCoursLabel != null) appelEnCoursLabel.setText(duree);
+    }
+
+    private static String formatDureeAppel(long secondes) {
+        long h = secondes / 3600;
+        long m = (secondes % 3600) / 60;
+        long s = secondes % 60;
+        if (h > 0) return String.format("%d:%02d:%02d", h, m, s);
+        return String.format("%02d:%02d", m, s);
+    }
+
+    /** Ramène la fenêtre d'appel au premier plan (bouton sur la barre latérale). */
+    private void afficherFenetreAppelGroupeActif() {
+        if (appelVideoGroupeActif != null) {
+            appelVideoGroupeActif.afficherFenetre();
+        } else if (appelAudioGroupeActif != null) {
+            appelAudioGroupeActif.afficherFenetre();
+        }
     }
 
     private void afficherFenetreAttenteVideo(String nom) {
@@ -926,7 +1080,10 @@ public class Discussion implements EcouteurClient {
     private static boolean numeroContactUtilisable(String t) { return t != null && !t.isBlank() && !"null".equalsIgnoreCase(t); }
     private static String normaliserNumeroContact(String t) { return numeroContactUtilisable(t) ? t.trim() : null; }
 
-    @Override public void connexionReussie(Utilisateur u) { this.utilisateurConnecte = u; }
+    @Override public void connexionReussie(Utilisateur u) {
+        this.utilisateurConnecte = u;
+        ClientHandlerAuth.getInstance().demanderListeGroupes();
+    }
     @Override public void inscriptionReussie(String m) {}
     @Override public void erreur(String m) { Platform.runLater(() -> showAlert(Alert.AlertType.ERROR, "Erreur", m)); }
     @Override public void deconnexion() { Platform.runLater(() -> showAlert(Alert.AlertType.WARNING, "Déconnexion", "Déconnecté")); }
