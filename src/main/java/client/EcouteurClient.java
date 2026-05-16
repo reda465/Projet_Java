@@ -35,7 +35,7 @@ public interface EcouteurClient {
     void groupeCree(Groupe groupe);                    // CREATE_GROUP_OK
     void creationGroupeEchouee(String raison);          // CREATE_GROUP_FAIL
     void listeGroupesRecue(List<Groupe> groupes);       // GROUPS_LIST
-    void membresGroupeRecus(int idGroupe, List<Utilisateur> membres); // GROUP_MEMBERS_LIST
+    default void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {}
     void messageGroupeRecu(MessageGroupe message);      // GROUP_MSG_RECEIVE
     void membreAjoute(int idGroupe, String numero);     // ADD_MEMBER_OK
     void membreRetire(int idGroupe, String numero);     // REMOVE_MEMBER_OK
@@ -47,7 +47,7 @@ public interface EcouteurClient {
     void fichierRecu(String telephoneExp, String fileName, String base64);
     void appelGroupeEntrant(int idGroupe, String nomGroupe, String type, String initiateurNom);
     void appelGroupeDemarre(int idGroupe, String type);
-    void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre, String ip, String type, int port, boolean isReply);
+    void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre, String ip, String type, int port, int portAudio, boolean isReply);
     void membreQuitteAppelGroupe(int idGroupe, String numeroMembre);
     void appelGroupeTermine(int idGroupe);
     void signalisationAppelGroupe(int idGroupe, String numeroSource, String typeSignal, String payload);

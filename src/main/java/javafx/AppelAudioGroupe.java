@@ -8,7 +8,6 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -25,7 +24,6 @@ import client.GroupAudioUDP;
 
 public class AppelAudioGroupe {
 
-    // Participants connectés (numero -> nom)
     private final Set<String> participantsConnectes = ConcurrentHashMap.newKeySet();
     private Label statutLabel;
     private ListView<String> participantsList;
@@ -33,24 +31,27 @@ public class AppelAudioGroupe {
     private GroupAudioUDP audioUDP;
     private int idGroupe;
 
+    /** Callback appelé quand l'utilisateur quitte l'appel (bouton ou fermeture fenêtre). */
+    private Runnable onTermine;
+
     public int getIdGroupe() { return idGroupe; }
     public int getLocalPort() { return audioUDP != null ? audioUDP.getLocalPort() : -1; }
 
-    public static AppelAudioGroupe demarrer(Stage parent, Groupe groupe, int idConversationGroupe) {
+    public static AppelAudioGroupe demarrer(Stage parent, Groupe groupe, int idConversationGroupe, Runnable onTermine) {
         AppelAudioGroupe instance = new AppelAudioGroupe();
-        instance.idGroupe = groupe.getIdGroupe();
+        instance.idGroupe  = groupe.getIdGroupe();
+        instance.onTermine = onTermine;
         instance.afficherFenetre(parent, groupe, idConversationGroupe);
         return instance;
     }
 
     private void afficherFenetre(Stage parent, Groupe groupe, int idConversationGroupe) {
-        this.stage = new Stage();  // [NOUVEAU] Stocker la référence
-        stage.initModality(Modality.WINDOW_MODAL);
+        this.stage = new Stage();
+        stage.initModality(Modality.NONE); // Non-bloquant pour permettre de continuer à utiliser l'app
         stage.initOwner(parent);
         stage.setTitle("Appel audio groupe — " + groupe.getNomGroupe());
-        stage.setOnCloseRequest(e -> raccrocherTout(stage));
+        stage.setOnCloseRequest(e -> raccrocherTout());
 
-        // UI Principal
         Label icone = new Label("👥📞");
         icone.setFont(Font.font("Segoe UI", 48));
 
@@ -62,7 +63,6 @@ public class AppelAudioGroupe {
         statutLabel.setFont(Font.font("Segoe UI", 14));
         statutLabel.setTextFill(Color.web("#667781"));
 
-        // Liste participants
         participantsList = new ListView<>();
         participantsList.setPrefHeight(150);
         participantsList.setStyle("-fx-background-color: white; -fx-border-color: #ddd;");
@@ -73,7 +73,7 @@ public class AppelAudioGroupe {
                 "-fx-background-color: #EA2424; -fx-text-fill: white; -fx-font-size: 14px;" +
                         "-fx-background-radius: 30px; -fx-padding: 10px 28px; -fx-cursor: hand;"
         );
-        btnRaccrocher.setOnAction(e -> raccrocherTout(stage));
+        btnRaccrocher.setOnAction(e -> raccrocherTout());
 
         VBox root = new VBox(15, icone, nomGroupe, statutLabel, new Label("Participants:"), participantsList, btnRaccrocher);
         root.setAlignment(Pos.CENTER);
@@ -83,18 +83,20 @@ public class AppelAudioGroupe {
         stage.setScene(new Scene(root, 350, 500));
         stage.show();
 
-        // Démarrer UDP
+        // Démarrer UDP audio
         audioUDP = new GroupAudioUDP();
-        int localPort = audioUDP.demarrer();
-        
-        ClientHandlerAuth.getInstance().demarrerAppelGroupe(groupe.getIdGroupe(), "AUDIO", localPort, false);
-
         Utilisateur moi = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
         if (moi != null) {
+            audioUDP.setMonNumero(moi.getNumeroTelephone());
             participantsConnectes.add(moi.getNumeroTelephone());
         }
+        int localPort = audioUDP.demarrer();
+
+        // NE PAS appeler demarrerAppelGroupe ici.
+        // C'est Discussion qui l'appelle APRES l'assignation de appelAudioGroupeActif.
 
         statutLabel.setText("Appel en cours • " + participantsConnectes.size() + " participants");
+
     }
 
     public void notifierMembreRejoint(String numero, String nom, String ip, int port) {
@@ -106,7 +108,6 @@ public class AppelAudioGroupe {
         });
     }
 
-    /** Appelé par EcouteurClient quand un membre quitte */
     public void notifierMembreParti(String numero) {
         if (audioUDP != null) audioUDP.removeDestination(numero);
         participantsConnectes.remove(numero);
@@ -119,13 +120,9 @@ public class AppelAudioGroupe {
     private void majListeParticipants(Groupe groupe) {
         if (participantsList == null) return;
         participantsList.getItems().clear();
-
-        // [NOUVEAU] Afficher les participants connectés avec indicateur vert
         for (String num : participantsConnectes) {
             participantsList.getItems().add("🟢 " + num + " (connecté)");
         }
-
-        // [NOUVEAU] Afficher les membres du groupe non connectés avec indicateur gris
         if (groupe != null && groupe.getNumerosMembres() != null) {
             for (String num : groupe.getNumerosMembres()) {
                 if (!participantsConnectes.contains(num)) {
@@ -135,20 +132,24 @@ public class AppelAudioGroupe {
         }
     }
 
-    private void raccrocherTout(Stage stage) {
-        ClientHandlerAuth.getInstance().quitterAppelGroupe(idGroupe);
-        if (audioUDP != null) audioUDP.arreter();
+    /** Quitter l'appel proprement et notifier Discussion. */
+    public void raccrocherTout() {
+        if (audioUDP != null) {
+            ClientHandlerAuth.getInstance().quitterAppelGroupe(idGroupe);
+            audioUDP.arreter();
+            audioUDP = null;
+        }
         participantsConnectes.clear();
-        stage.close();
-    }
-
-    // [NOUVEAU] Méthode pour fermer la fenêtre depuis l'extérieur (quand l'appel est terminé par le serveur)
-    public void fermerFenetre() {
-        if (stage != null) {
-            Platform.runLater(() -> stage.close());
+        Platform.runLater(() -> {
+            if (stage != null && stage.isShowing()) stage.close();
+        });
+        // Notifier Discussion que l'appel est terminé → appelAudioGroupeActif = null
+        if (onTermine != null) {
+            Platform.runLater(onTermine);
         }
     }
 
-    // Helper pour Platform.runLater sans importer javafx.application.Platform partout
-    private static void runLater(Runnable r) { javafx.application.Platform.runLater(r); }
+    public void fermerFenetre() {
+        raccrocherTout();
+    }
 }

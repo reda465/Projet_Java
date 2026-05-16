@@ -19,7 +19,9 @@ import model.Groupe;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import client.GroupVideoUDP;
+import client.GroupAudioUDP;
 import javafx.scene.image.Image;
+import model.Utilisateur;
 
 public class AppelVideoGroupe {
 
@@ -30,23 +32,30 @@ public class AppelVideoGroupe {
     private Stage stageFenetre;
     private boolean cameraActive = true;
     private boolean micActive = true;
-    
+
     private GroupVideoUDP videoUDP;
+    private GroupAudioUDP audioUDP; // Audio pour les appels vidéo groupe
     private int idGroupe;
+    private int localAudioPort = -1;
+
+    /** Callback appelé quand l'utilisateur quitte l'appel (bouton ou fermeture fenêtre). */
+    private Runnable onTermine;
 
     public int getIdGroupe() { return idGroupe; }
     public int getLocalPort() { return videoUDP != null ? videoUDP.getLocalPort() : -1; }
+    public int getLocalAudioPort() { return localAudioPort; }
 
-    public static AppelVideoGroupe demarrer(Stage parent, Groupe groupe, int idConversationGroupe) {
+    public static AppelVideoGroupe demarrer(Stage parent, Groupe groupe, int idConversationGroupe, Runnable onTermine) {
         AppelVideoGroupe instance = new AppelVideoGroupe();
-        instance.idGroupe = groupe.getIdGroupe();
+        instance.idGroupe  = groupe.getIdGroupe();
+        instance.onTermine = onTermine;
         instance.afficherFenetre(parent, groupe, idConversationGroupe);
         return instance;
     }
 
     private void afficherFenetre(Stage parent, Groupe groupe, int idConversationGroupe) {
         this.stageFenetre = new Stage();
-        stageFenetre.initModality(Modality.WINDOW_MODAL);
+        stageFenetre.initModality(Modality.NONE); // Non-bloquant
         stageFenetre.initOwner(parent);
         stageFenetre.setTitle("Visioconférence — " + groupe.getNomGroupe());
         stageFenetre.setOnCloseRequest(e -> quitterAppel());
@@ -72,18 +81,19 @@ public class AppelVideoGroupe {
         gridVideos.setPadding(new Insets(15));
         gridVideos.setStyle("-fx-background-color: #1a1a1a;");
 
-        // Ajouter sa propre vidéo locale
+        // Vidéo locale
         ajouterVideoLocale("Moi (Local)");
 
         ScrollPane scroll = new ScrollPane(gridVideos);
         scroll.setFitToWidth(true);
         scroll.setStyle("-fx-background: #1a1a1a; -fx-background-color: transparent;");
 
-        // Footer contrôles
+        // Contrôles
         Button btnMic = new Button("🎤");
         btnMic.setStyle("-fx-background-color: #333; -fx-text-fill: white; -fx-background-radius: 50%; -fx-min-width: 50px; -fx-min-height: 50px;");
         btnMic.setOnAction(e -> {
             micActive = !micActive;
+            if (audioUDP != null) audioUDP.setMicroActif(micActive);
             btnMic.setStyle(micActive
                     ? "-fx-background-color: #333; -fx-text-fill: white; -fx-background-radius: 50%; -fx-min-width: 50px; -fx-min-height: 50px;"
                     : "-fx-background-color: #EA2424; -fx-text-fill: white; -fx-background-radius: 50%; -fx-min-width: 50px; -fx-min-height: 50px;");
@@ -119,27 +129,42 @@ public class AppelVideoGroupe {
         Scene scene = new Scene(root, 900, 600);
         stageFenetre.setScene(scene);
         stageFenetre.show();
-        
-        // Start UDP
+
+        // Démarrer UDP vidéo
         videoUDP = new GroupVideoUDP(
             (numeroDistant, image) -> surFluxVideoRecu(numeroDistant, image),
-            (imageLocale) -> surFluxVideoLocalRecu(imageLocale)
+            (imageLocale)         -> surFluxVideoLocalRecu(imageLocale)
         );
-        int localPort = videoUDP.demarrer();
-        ClientHandlerAuth.getInstance().demarrerAppelGroupe(groupe.getIdGroupe(), "VIDEO", localPort, false);
+        Utilisateur moi = client.ClientHandlerAuth.getInstance().getUtilisateurConnecte();
+        if (moi != null) videoUDP.setMonNumero(moi.getNumeroTelephone());
+        int localVideoPort = videoUDP.demarrer();
 
-        statutLabel.setText("Connecté • " + videoFeeds.size() + " participant(s)");
+        // L'audio écoute sur videoPort+1 (convention fixée pour que les participants sachent où envoyer)
+        audioUDP = new GroupAudioUDP();
+        if (moi != null) audioUDP.setMonNumero(moi.getNumeroTelephone());
+        int audioPort = audioUDP.demarrerSurPort(localVideoPort + 1);
+        if (audioPort == -1) {
+            System.err.println("[AppelVideoGroupe] Port audio " + (localVideoPort + 1) + " indisponible, port aléatoire...");
+            audioPort = audioUDP.demarrer();
+        }
+        localAudioPort = audioPort;
+        if (localAudioPort > 0) {
+            System.out.println("[AppelVideoGroupe] Vidéo sur " + localVideoPort + ", Audio sur " + localAudioPort);
+        }
+
+        statutLabel.setText("En attente de participants...");
     }
 
     private void ajouterVideoLocale(String label) {
-        // [MODIF] Stocker le StackPane wrapper, pas juste l'ImageView
         StackPane wrapper = creerVideoWrapper(label);
         videoFeeds.put("local", wrapper);
         repositionnerGrille();
     }
 
-    public void surParticipantRejoint(String numero, String nom, String ip, int port) {
-        if (videoUDP != null) videoUDP.addDestination(numero, ip, port);
+    public void surParticipantRejoint(String numero, String nom, String ip, int videoPort, int audioPort) {
+        if (videoUDP != null) videoUDP.addDestination(numero, ip, videoPort);
+        int portAudioEffectif = audioPort > 0 ? audioPort : videoPort + 1;
+        if (audioUDP != null) audioUDP.addDestination(numero, ip, portAudioEffectif);
         Platform.runLater(() -> {
             if (!videoFeeds.containsKey(numero)) {
                 StackPane wrapper = creerVideoWrapper(nom);
@@ -159,7 +184,7 @@ public class AppelVideoGroupe {
             }
         });
     }
-    
+
     private void surFluxVideoLocalRecu(Image image) {
         Platform.runLater(() -> {
             StackPane wrapper = videoFeeds.get("local");
@@ -172,6 +197,7 @@ public class AppelVideoGroupe {
 
     public void surParticipantParti(String numero) {
         if (videoUDP != null) videoUDP.removeDestination(numero);
+        if (audioUDP != null) audioUDP.removeDestination(numero);
         Platform.runLater(() -> {
             videoFeeds.remove(numero);
             repositionnerGrille();
@@ -179,23 +205,17 @@ public class AppelVideoGroupe {
         });
     }
 
-    // [MODIF] repositionnerGrille() utilise maintenant StackPane
     private void repositionnerGrille() {
         gridVideos.getChildren().clear();
-        int col = 0, row = 0;
-        int maxCols = 3;
-
+        int col = 0, row = 0, maxCols = 3;
         for (StackPane wrapper : videoFeeds.values()) {
             gridVideos.add(wrapper, col, row);
             GridPane.setHgrow(wrapper, Priority.ALWAYS);
             GridPane.setVgrow(wrapper, Priority.ALWAYS);
-
-            col++;
-            if (col >= maxCols) { col = 0; row++; }
+            if (++col >= maxCols) { col = 0; row++; }
         }
     }
 
-    // [MODIF] creerVideoView() renommé en creerVideoWrapper() + retourne StackPane
     private StackPane creerVideoWrapper(String name) {
         ImageView iv = new ImageView();
         iv.setFitWidth(280);
@@ -215,19 +235,31 @@ public class AppelVideoGroupe {
     }
 
     private void majStatut() {
-        if(statutLabel != null) statutLabel.setText("Connecté • " + videoFeeds.size() + " participant(s)");
+        if (statutLabel != null) statutLabel.setText("Connecté • " + videoFeeds.size() + " participant(s)");
     }
 
-    private void quitterAppel() {
-        ClientHandlerAuth.getInstance().quitterAppelGroupe(idGroupe);
-        if (videoUDP != null) videoUDP.arreter();
+    /** Quitter l'appel proprement et notifier Discussion. */
+    public void quitterAppel() {
+        if (videoUDP != null) {
+            ClientHandlerAuth.getInstance().quitterAppelGroupe(idGroupe);
+            videoUDP.arreter();
+            videoUDP = null;
+        }
+        if (audioUDP != null) {
+            audioUDP.arreter();
+            audioUDP = null;
+        }
         videoFeeds.clear();
-        if (stageFenetre != null) stageFenetre.close();
+        Platform.runLater(() -> {
+            if (stageFenetre != null && stageFenetre.isShowing()) stageFenetre.close();
+        });
+        // Notifier Discussion → appelVideoGroupeActif = null
+        if (onTermine != null) {
+            Platform.runLater(onTermine);
+        }
     }
 
     public void fermerFenetre() {
-        if (stageFenetre != null) {
-            Platform.runLater(() -> stageFenetre.close());
-        }
+        quitterAppel();
     }
 }

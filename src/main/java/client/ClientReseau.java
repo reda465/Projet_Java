@@ -308,8 +308,16 @@ public class ClientReseau {
                         String ip = parts[3];
                         String type = parts[4];
                         int port = Integer.parseInt(parts[5]);
-                        boolean isReply = "1".equals(parts[6]);
-                        ecouteur.membreRejointAppelGroupe(idGroupe, numeroMembre, nomMembre, ip, type, port, isReply);
+                        int portAudio;
+                        boolean isReply;
+                        if (parts.length >= 8) {
+                            portAudio = Integer.parseInt(parts[6]);
+                            isReply = "1".equals(parts[7]);
+                        } else {
+                            portAudio = "VIDEO".equalsIgnoreCase(type) ? port + 1 : port;
+                            isReply = "1".equals(parts[6]);
+                        }
+                        ecouteur.membreRejointAppelGroupe(idGroupe, numeroMembre, nomMembre, ip, type, port, portAudio, isReply);
                     }
                     break;
                 case LEAVE_GROUP_CALL:

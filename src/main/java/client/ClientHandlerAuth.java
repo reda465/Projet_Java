@@ -193,11 +193,17 @@ public class ClientHandlerAuth {
         return callService != null && callService.isEnAppel();
     }
 
+    public boolean isAppelEntrant() {
+        return callService != null && callService.isAppelEntrant();
+    }
+
     // ===== APPELS DE GROUPE =====
-    public void demarrerAppelGroupe(int idGroupe, String typeAppel, int localPort, boolean isReply) {
+    public void demarrerAppelGroupe(int idGroupe, String typeAppel, int portMedia, int portAudio, boolean isReply) {
         if (!verifierConnexion()) return;
+        int audio = portAudio > 0 ? portAudio : portMedia;
         String isRepStr = isReply ? "1" : "0";
-        clientReseau.envoyer(new Packet(Protocol.JOIN_GROUP_CALL, idGroupe + "|" + typeAppel + "|" + localPort + "|" + isRepStr));
+        clientReseau.envoyer(new Packet(Protocol.JOIN_GROUP_CALL,
+                idGroupe + "|" + typeAppel + "|" + portMedia + "|" + audio + "|" + isRepStr));
     }
 
     public void quitterAppelGroupe(int idGroupe) {

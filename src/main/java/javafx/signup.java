@@ -368,7 +368,7 @@ public class signup implements EcouteurClient {
     }
 
     @Override
-    public void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre, String ip, String type, int port, boolean isReply) {
+    public void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre, String ip, String type, int port, int portAudio, boolean isReply) {
 
     }
 
