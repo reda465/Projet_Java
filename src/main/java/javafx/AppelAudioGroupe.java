@@ -152,4 +152,15 @@ public class AppelAudioGroupe {
     public void fermerFenetre() {
         raccrocherTout();
     }
+
+    /** Ramène la fenêtre d'appel au premier plan si elle est ouverte. */
+    public void afficherFenetre() {
+        Platform.runLater(() -> {
+            if (stage != null) {
+                if (!stage.isShowing()) stage.show();
+                stage.toFront();
+                stage.requestFocus();
+            }
+        });
+    }
 }
