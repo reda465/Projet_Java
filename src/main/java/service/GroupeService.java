@@ -50,6 +50,13 @@ public class GroupeService {
         clientReseau.envoyer(new Packet(Protocol.SEND_GROUP_MESSAGE, data));
     }
 
+    public void envoyerFichierGroupe(int idGroupe, java.io.File file,
+                                     java.util.function.Consumer<Integer> onProgress) {
+        if (!verifier()) return;
+        Fileservice fs = new Fileservice(clientReseau);
+        fs.envoyerFichierGroupe(idGroupe, file, onProgress);
+    }
+
     public void ajouterMembre(int idGroupe, String numeroMembre) {
         if (!verifier()) return;
         String admin = clientReseau.getMoi() != null ? normTel(clientReseau.getMoi().getNumeroTelephone()) : "";

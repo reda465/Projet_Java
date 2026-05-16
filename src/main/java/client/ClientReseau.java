@@ -246,14 +246,54 @@ public class ClientReseau {
                     break;
                     //fichier
                 case FILE_RECEIVE:
-                    if (parts.length >= 3) {
+                    if (parts.length >= 3 && ecouteur != null) {
                         String telExp = parts[0];
-                        String fileName = parts[1];
-                        String base64 = parts[2];
-
-                        if (ecouteur != null) {
-                            ecouteur.fichierRecu(telExp, fileName, base64);
+                        String type;
+                        String fileName;
+                        String base64;
+                        if (parts.length >= 4 && isFileType(parts[1])) {
+                            type = parts[1];
+                            fileName = parts[2];
+                            base64 = parts[3];
+                            for (int i = 4; i < parts.length; i++) base64 += "|" + parts[i];
+                        } else {
+                            type = "fichier";
+                            fileName = parts[1];
+                            base64 = parts[2];
+                            for (int i = 3; i < parts.length; i++) base64 += "|" + parts[i];
                         }
+                        ecouteur.fichierRecu(telExp, type, fileName, base64);
+                    }
+                    break;
+                case FILE_GROUP_RECEIVE:
+                    if (parts.length >= 6 && ecouteur != null) {
+                        int idG = Integer.parseInt(parts[0]);
+                        String telExp = parts[1];
+                        String nomExp = parts[2];
+                        String type = parts[3];
+                        String fileName = parts[4];
+                        String base64 = parts[5];
+                        for (int i = 6; i < parts.length; i++) base64 += "|" + parts[i];
+                        ecouteur.fichierGroupeRecu(idG, telExp, nomExp, type, fileName, base64);
+                    }
+                    break;
+                case FILE_OK:
+                    if (ecouteur != null) {
+                        String name = parts.length > 0 ? parts[parts.length - 1] : "";
+                        ecouteur.fichierEnvoiReussi(name);
+                        ecouteur.fichierProgress(100);
+                    }
+                    break;
+                case FILE_FAIL:
+                    if (ecouteur != null) {
+                        ecouteur.fichierEnvoiEchoue(data != null ? data : "Échec envoi");
+                    }
+                    break;
+                case FILE_PROGRESS:
+                    if (ecouteur != null && parts.length >= 1) {
+                        try {
+                            ecouteur.fichierProgress(Integer.parseInt(parts[0]));
+                        } catch (NumberFormatException ignored) {}
                     }
                     break;
                 case CREATE_GROUP_OK:
@@ -423,6 +463,13 @@ public class ClientReseau {
                     } catch (Exception e) {
                         msg.setDateEnvoi(null);
                     }
+                    if (champs.length >= 6) {
+                        msg.setTypeMessage(champs[5]);
+                        msg.setNomFichier(champs[6]);
+                    }
+                    if (champs.length >= 8 && champs[7] != null && !champs[7].isEmpty()) {
+                        msg.setUrlFichier(champs[7]);
+                    }
                     // Déterminer si c'est un message envoyé ou reçu
                     msg.setEstMoi(moi != null && champs[1].equals(moi.getNumeroTelephone()));
                     messages.add(msg);
@@ -481,29 +528,45 @@ public class ClientReseau {
         }
 
         private void traiterMessagesGroupeRecus(String data) {
-            if (data == null || data.isEmpty()) return;
+            int idGroupe = dernierIdGroupeDemande;
+            if (ecouteur != null) ecouteur.debutHistoriqueGroupe(idGroupe);
+            if (data == null || data.isEmpty()) {
+                if (ecouteur != null) ecouteur.finHistoriqueGroupe(idGroupe);
+                return;
+            }
+            // Format serveur : id;tel;nom;contenu;date[;base64Fichier]
             String[] lignes = data.split("\\|");
             for (String ligne : lignes) {
+                if (ligne == null || ligne.isEmpty()) continue;
                 String[] champs = ligne.split(";", -1);
                 if (champs.length < 5) continue;
+
                 MessageGroupe msg = new MessageGroupe();
-                if (champs.length >= 6) {
-                    try { msg.setIdMessage(Integer.parseInt(champs[0])); } catch (Exception ignored) {}
-                    try { msg.setIdGroupe(Integer.parseInt(champs[1])); } catch (Exception ignored) {}
-                    msg.setTelephoneExpediteur(champs[2]);
-                    msg.setNomExpediteur(champs[3]);
-                    msg.setContenu(champs[4]);
-                    try { msg.setDateEnvoi(LocalDateTime.parse(champs[5])); } catch (Exception e) { msg.setDateEnvoi(null); }
-                } else {
-                    try { msg.setIdMessage(Integer.parseInt(champs[0])); } catch (Exception ignored) {}
-                    msg.setIdGroupe(dernierIdGroupeDemande);
-                    msg.setTelephoneExpediteur(champs[1]);
-                    msg.setNomExpediteur(champs[2]);
-                    msg.setContenu(champs[3]);
-                    try { msg.setDateEnvoi(LocalDateTime.parse(champs[4])); } catch (Exception e) { msg.setDateEnvoi(null); }
+                try { msg.setIdMessage(Integer.parseInt(champs[0].trim())); } catch (Exception ignored) {}
+                msg.setIdGroupe(idGroupe);
+                msg.setTelephoneExpediteur(champs[1]);
+                msg.setNomExpediteur(champs[2]);
+                msg.setContenu(champs[3]);
+                try {
+                    msg.setDateEnvoi(LocalDateTime.parse(champs[4]));
+                } catch (Exception e) {
+                    msg.setDateEnvoi(null);
                 }
-                if (ecouteur != null) ecouteur.messageGroupeRecu(msg);
+                String b64File = champs.length >= 6 ? champs[5] : null;
+
+                if (ecouteur == null) continue;
+                if (b64File != null && !b64File.isEmpty()
+                        && util.FileMediaUtil.isGroupFileContent(msg.getContenu())) {
+                    String[] meta = util.FileMediaUtil.parseGroupFileContent(msg.getContenu());
+                    if (meta != null) {
+                        ecouteur.fichierGroupeRecu(idGroupe, msg.getTelephoneExpediteur(),
+                                msg.getNomExpediteur(), meta[0], meta[1], b64File, champs[4]);
+                        continue;
+                    }
+                }
+                ecouteur.messageGroupeRecu(msg);
             }
+            if (ecouteur != null) ecouteur.finHistoriqueGroupe(idGroupe);
         }
 
         private void traiterMessageGroupeRecu(String[] parts) {
@@ -526,10 +589,11 @@ public class ClientReseau {
             if (ecouteur != null) ecouteur.messageGroupeRecu(msg);
         }
     }
-    //fichiers
-    public void envoyerFichier(String telDest, String fileName, byte[] dataBase64) {
-        String contenu = telDest + "|" + fileName + "|" + new String(dataBase64);
-        Packet p = new Packet(Protocol.FILE_SEND, contenu);
-        envoyer(p);
+    private static boolean isFileType(String s) {
+        return "image".equals(s) || "video".equals(s) || "audio".equals(s) || "fichier".equals(s);
+    }
+
+    public void notifierEchecFichier(String message) {
+        if (ecouteur != null) ecouteur.fichierEnvoiEchoue(message);
     }
 }

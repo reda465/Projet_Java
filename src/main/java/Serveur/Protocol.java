@@ -72,6 +72,10 @@ public enum Protocol {
     //fichier
     FILE_SEND,
     FILE_RECEIVE,
-    FILE_FAIL
+    FILE_FAIL,
+    FILE_OK,
+    FILE_PROGRESS,
+    FILE_GROUP_SEND,
+    FILE_GROUP_RECEIVE
 
 }
