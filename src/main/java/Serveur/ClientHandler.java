@@ -916,11 +916,12 @@ public class ClientHandler extends Thread {
 
     private void handleJoinGroupCall(String[] parts) {
         try {
-            if (parts.length < 5) return;
+            if (parts.length < 6) return;
             int idGroupe = Integer.parseInt(parts[1]);
             String type = parts[2];
             String port = parts[3];
-            String isReply = parts[4];
+            String portAudio = parts[4];
+            String isReply = parts[5];
 
             Groupe g = groupeDAO.getById(idGroupe);
             if (g == null) return;
@@ -929,12 +930,14 @@ public class ClientHandler extends Thread {
             String nom = moi != null ? moi.getNomComplet() : telephoneConnecte;
             String ip = socket != null && socket.getInetAddress() != null ? socket.getInetAddress().getHostAddress() : "";
             
-            String payload = Protocol.JOIN_GROUP_CALL.name() + "|" + idGroupe + "|" + telephoneConnecte + "|" + nom + "|" + ip + "|" + type + "|" + port + "|" + isReply;
+            String payload = Protocol.JOIN_GROUP_CALL.name() + "|" + idGroupe + "|" + telephoneConnecte + "|" + nom + "|" + ip + "|" + type + "|" + port + "|" + portAudio + "|" + isReply;
+            
             if (g.getNumerosMembres() != null) {
                 for (String membre : g.getNumerosMembres()) {
-                    if (!membre.equals(telephoneConnecte)) {
-                        ClientHandler h = userManager.getHandler(membre);
-                        if (h != null) h.sendMessage(payload);
+                    ClientHandler h = userManager.getHandler(membre);
+                    // Comparaison directe des instances pour exclure l'expéditeur de manière fiable
+                    if (h != null && h != this) {
+                        h.sendMessage(payload);
                     }
                 }
             }
@@ -951,9 +954,9 @@ public class ClientHandler extends Thread {
             String payload = Protocol.LEAVE_GROUP_CALL.name() + "|" + idGroupe + "|" + telephoneConnecte;
             if (g.getNumerosMembres() != null) {
                 for (String membre : g.getNumerosMembres()) {
-                    if (!membre.equals(telephoneConnecte)) {
-                        ClientHandler h = userManager.getHandler(membre);
-                        if (h != null) h.sendMessage(payload);
+                    ClientHandler h = userManager.getHandler(membre);
+                    if (h != null && h != this) {
+                        h.sendMessage(payload);
                     }
                 }
             }
