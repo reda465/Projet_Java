@@ -10,8 +10,6 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.scene.media.Media;
-import javafx.scene.media.MediaPlayer;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
@@ -21,7 +19,6 @@ import java.io.File;
 //je dois voir etat de message mn ba3d
 public class Messagefx {
 
-    private static MediaPlayer lecteurAudioActif;
     private static Stage stageRef;
 
     public static void setStage(Stage stage) {
@@ -170,51 +167,102 @@ public class Messagefx {
         Button btnStop = new Button("⏹");
         btnStop.setStyle(styleBouton("#888888"));
 
-        Media media = new Media(localFile.toURI().toString());
-        MediaPlayer player = new MediaPlayer(media);
-
-        player.setOnReady(() -> {
-            javafx.util.Duration total = player.getTotalDuration();
-            if (total != null && !total.isUnknown()) {
-                statut.setText(formatDuree(total));
-            }
-        });
-        player.currentTimeProperty().addListener((obs, o, cur) -> {
-            javafx.util.Duration total = player.getTotalDuration();
-            if (total != null && !total.isUnknown() && total.toMillis() > 0) {
-                progression.setVisible(true);
-                progression.setManaged(true);
-                progression.setProgress(cur.toMillis() / total.toMillis());
-            }
-        });
-        player.setOnEndOfMedia(() -> {
-            statut.setText("Terminé");
-            btnPlay.setText("▶ Rejouer");
-            progression.setProgress(0);
-        });
+        // État partagé entre les threads
+        java.util.concurrent.atomic.AtomicBoolean enLecture = new java.util.concurrent.atomic.AtomicBoolean(false);
+        java.util.concurrent.atomic.AtomicBoolean enPause   = new java.util.concurrent.atomic.AtomicBoolean(false);
+        Thread[] threadRef = {null};
 
         btnPlay.setOnAction(e -> {
-            if (player.getStatus() == MediaPlayer.Status.PLAYING) {
-                player.pause();
-                statut.setText("Pause");
-                btnPlay.setText("▶ Lire");
-                return;
-            }
-            if (player.getStatus() == MediaPlayer.Status.PAUSED) {
-                player.play();
+            // Si en pause → reprendre
+            if (enPause.get()) {
+                enPause.set(false);
                 statut.setText("Lecture...");
                 btnPlay.setText("⏸ Pause");
                 return;
             }
-            if (lecteurAudioActif != null && lecteurAudioActif != player) lecteurAudioActif.stop();
-            lecteurAudioActif = player;
-            player.play();
+            // Si en lecture → mettre en pause
+            if (enLecture.get()) {
+                enPause.set(true);
+                statut.setText("Pause");
+                btnPlay.setText("▶ Lire");
+                return;
+            }
+
+            // Démarrer lecture
+            enLecture.set(true);
+            enPause.set(false);
             statut.setText("Lecture...");
             btnPlay.setText("⏸ Pause");
+            progression.setVisible(true);
+            progression.setManaged(true);
+
+            threadRef[0] = new Thread(() -> {
+                try (javax.sound.sampled.AudioInputStream ais =
+                             javax.sound.sampled.AudioSystem.getAudioInputStream(localFile)) {
+
+                    javax.sound.sampled.AudioFormat format = ais.getFormat();
+
+                    // Convertir si format compressé (ex: MP3)
+                    javax.sound.sampled.AudioFormat decodedFormat = new javax.sound.sampled.AudioFormat(
+                            javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED,
+                            format.getSampleRate(), 16,
+                            format.getChannels(),
+                            format.getChannels() * 2,
+                            format.getSampleRate(), false
+                    );
+                    javax.sound.sampled.AudioInputStream decodedAis =
+                            javax.sound.sampled.AudioSystem.getAudioInputStream(decodedFormat, ais);
+
+                    try (javax.sound.sampled.SourceDataLine line =
+                                 javax.sound.sampled.AudioSystem.getSourceDataLine(decodedFormat)) {
+
+                        line.open(decodedFormat);
+                        line.start();
+
+                        long totalBytes = localFile.length();
+                        long bytesLus = 0;
+                        byte[] buf = new byte[4096];
+                        int n;
+
+                        while (enLecture.get() && (n = decodedAis.read(buf)) != -1) {
+                            // Attendre si en pause
+                            while (enPause.get() && enLecture.get()) {
+                                line.stop();
+                                Thread.sleep(100);
+                            }
+                            if (!enLecture.get()) break;
+                            line.start();
+                            line.write(buf, 0, n);
+                            bytesLus += n;
+
+                            final double progress = totalBytes > 0 ? (double) bytesLus / totalBytes : 0;
+                            javafx.application.Platform.runLater(() ->
+                                    progression.setProgress(progress));
+                        }
+                        line.drain();
+                        line.stop();
+                    }
+                } catch (Exception ex) {
+                    javafx.application.Platform.runLater(() ->
+                            statut.setText("Erreur : " + ex.getMessage()));
+                    ex.printStackTrace();
+                } finally {
+                    enLecture.set(false);
+                    enPause.set(false);
+                    javafx.application.Platform.runLater(() -> {
+                        statut.setText("Terminé");
+                        btnPlay.setText("▶ Rejouer");
+                        progression.setProgress(0);
+                    });
+                }
+            });
+            threadRef[0].setDaemon(true);
+            threadRef[0].start();
         });
 
         btnStop.setOnAction(e -> {
-            player.stop();
+            enLecture.set(false);
+            enPause.set(false);
             statut.setText("Arrêté");
             btnPlay.setText("▶ Lire");
             progression.setProgress(0);
