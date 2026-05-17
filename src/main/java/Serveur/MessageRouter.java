@@ -244,6 +244,8 @@ public class MessageRouter {
                                      String typeMessage, String nomFichier, byte[] fileBytes,
                                      ClientHandler expHandler) throws Exception {
 
+        telephoneExpediteur = normaliserTel(telephoneExpediteur);
+
         Groupe g = groupeDAO.getById(idGroupe);
         if (g == null) {
             if (expHandler != null) expHandler.sendMessage(Protocol.FILE_FAIL.name() + "|GROUP_NOT_FOUND");
@@ -251,6 +253,20 @@ public class MessageRouter {
         }
 
         Utilisateur exp = utilisateurDAO.findByTelephone(telephoneExpediteur);
+        if (exp == null) {
+            List<String> membres = g.getNumerosMembres();
+            if (membres != null) {
+                for (String membre : membres) {
+                    if (membre != null && normaliserTel(membre).equals(telephoneExpediteur)) {
+                        exp = utilisateurDAO.findByTelephone(membre.trim());
+                        if (exp != null) {
+                            telephoneExpediteur = normaliserTel(exp.getNumeroTelephone());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         String nomExp = exp != null ? exp.getNomComplet() : telephoneExpediteur;
 
         String url = FileStorage.saveForGroup(idGroupe, nomFichier, fileBytes);
@@ -267,24 +283,41 @@ public class MessageRouter {
         msg.setIdMessage(idMsg);
 
         String b64 = FileStorage.toBase64(fileBytes);
+        String type = typeMessage != null ? typeMessage : "fichier";
         String payload = Protocol.FILE_GROUP_RECEIVE.name() + "|"
                 + idGroupe + "|"
                 + telephoneExpediteur + "|"
-                + nomExp + "|"
-                + (typeMessage != null ? typeMessage : "fichier") + "|"
-                + nomFichier + "|"
+                + FileMediaUtil.safeProtocolField(nomExp) + "|"
+                + type + "|"
+                + FileMediaUtil.safeProtocolField(nomFichier) + "|"
                 + b64;
 
+        String notifGroupe = Protocol.GROUP_MESSAGE_RECEIVE.name() + "|"
+                + idGroupe + "|"
+                + telephoneExpediteur + "|"
+                + FileMediaUtil.safeProtocolField(nomExp) + "|"
+                + contenu + "|"
+                + msg.getDateEnvoi();
+
         String telExpNorm = normaliserTel(telephoneExpediteur);
+        int livres = 0;
         if (g.getNumerosMembres() != null) {
             for (String membre : g.getNumerosMembres()) {
                 if (membre == null || membre.isBlank()) continue;
                 if (normaliserTel(membre).equals(telExpNorm)) continue;
                 ClientHandler h = userManager.getHandler(membre.trim());
-                if (h != null) h.sendMessage(payload);
+                if (h != null) {
+                    h.sendMessage(payload);
+                    h.sendMessage(notifGroupe);
+                    livres++;
+                }
             }
         }
-        if (expHandler != null) expHandler.sendMessage(Protocol.FILE_OK.name() + "|" + nomFichier);
+        if (expHandler != null) {
+            String ok = livres > 0 ? nomFichier : "QUEUED|" + nomFichier;
+            expHandler.sendMessage(Protocol.FILE_OK.name() + "|" + ok);
+        }
+        System.out.println("[FILE GROUPE] " + nomFichier + " → " + livres + " membre(s) en ligne");
     }
 
     /** Lit un fichier groupé depuis son contenu DB et renvoie le base64 (historique). */
@@ -318,10 +351,10 @@ public class MessageRouter {
                     String b64 = FileStorage.toBase64(bytes);
                     String payload = Protocol.FILE_GROUP_RECEIVE.name() + "|"
                             + g.getIdGroupe() + "|"
-                            + msg.getTelephoneExpediteur() + "|"
-                            + msg.getNomExpediteur() + "|"
+                            + normaliserTel(msg.getTelephoneExpediteur()) + "|"
+                            + FileMediaUtil.safeProtocolField(msg.getNomExpediteur()) + "|"
                             + meta[0] + "|"
-                            + meta[1] + "|"
+                            + FileMediaUtil.safeProtocolField(meta[1]) + "|"
                             + b64;
                     handler.sendMessage(payload);
                 } catch (IOException e) {

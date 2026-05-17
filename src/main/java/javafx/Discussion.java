@@ -538,6 +538,9 @@ public class Discussion implements EcouteurClient {
                 if (timeHistorique == null) scrollToBottom();
             }
             if (!groupe && tel != null && !tel.equals(contactActif)) mettreAJourBadgeNonLu(tel);
+            if (groupe && idGroupe != null && !afficher) {
+                mettreAJourBadgeGroupeNonLu(idGroupe, name);
+            }
             if (groupe) {
                 ClientHandlerAuth.getInstance().demanderListeGroupes();
             } else {
@@ -736,8 +739,18 @@ public class Discussion implements EcouteurClient {
 
     @Override public void messageGroupeRecu(MessageGroupe m) {
         Platform.runLater(() -> {
+            if (FileMediaUtil.isGroupFileContent(m.getContenu())) {
+                boolean groupeOuvert = estEnGroupe && groupeActif != null
+                        && m.getIdGroupe() == groupeActif.getIdGroupe();
+                if (!groupeOuvert && m.getIdGroupe() > 0) {
+                    String[] meta = FileMediaUtil.parseGroupFileContent(m.getContenu());
+                    String nomFichier = meta != null ? meta[1] : "fichier";
+                    mettreAJourBadgeGroupeNonLu(m.getIdGroupe(), nomFichier);
+                }
+                ClientHandlerAuth.getInstance().demanderListeGroupes();
+                return;
+            }
             if (estEnGroupe && groupeActif != null && m.getIdGroupe() == groupeActif.getIdGroupe()) {
-                if (FileMediaUtil.isGroupFileContent(m.getContenu())) return;
                 Utilisateur moi = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
                 boolean estMoi = moi != null && m.getTelephoneExpediteur().equals(moi.getNumeroTelephone());
                 String time = m.getDateEnvoi() != null
@@ -1359,6 +1372,27 @@ public class Discussion implements EcouteurClient {
         btnAppelAudio.setVisible(false); btnAppelVideo.setVisible(false); groupMenu.setVisible(false);
         msgField.setDisable(true); attachBtn.setDisable(true); sendBtn.setDisable(true);
         if (voiceBtn != null) voiceBtn.setDisable(true);
+    }
+
+    private void mettreAJourBadgeGroupeNonLu(int idGroupe, String fileName) {
+        for (HBox item : groupesList.getItems()) {
+            Object ud = item.getUserData();
+            if (!(ud instanceof Groupe g) || g.getIdGroupe() != idGroupe) continue;
+            item.getChildren().stream()
+                    .filter(n -> n instanceof VBox)
+                    .map(n -> (VBox) n)
+                    .findFirst()
+                    .ifPresent(vbox -> {
+                        if (vbox.getChildren().size() >= 2) {
+                            Label lbl = (Label) vbox.getChildren().get(1);
+                            String hint = fileName != null && !fileName.isBlank()
+                                    ? "• Fichier : " + fileName : "• Nouveau fichier";
+                            lbl.setText(hint);
+                            lbl.setTextFill(Color.web("#25D366"));
+                        }
+                    });
+            break;
+        }
     }
 
     private void mettreAJourBadgeNonLu(String expediteur) {

@@ -7,6 +7,8 @@ import java.util.Set;
 public final class FileMediaUtil {
 
     public static final String GROUP_FILE_MARKER = "__FILE__";
+    /** Séparateur d'enregistrements pour GROUP_MESSAGES_LIST (évite les conflits avec | dans le contenu). */
+    public static final String GROUP_MSG_RECORD_SEP = "\u001e";
     public static final int CHUNK_SIZE = 48 * 1024;
 
     private static final Set<String> IMAGE_EXT = Set.of("png", "jpg", "jpeg", "gif", "webp", "bmp");
@@ -48,6 +50,12 @@ public final class FileMediaUtil {
 
     public static String buildGroupFileContent(String type, String nom, String url) {
         return GROUP_FILE_MARKER + "|" + type + "|" + nom + "|" + url;
+    }
+
+    /** Nettoie un champ du protocole réseau (les | cassent le découpage des paquets). */
+    public static String safeProtocolField(String value) {
+        if (value == null) return "";
+        return value.replace("|", " ").replace('\n', ' ').replace('\r', ' ');
     }
 
     public static String labelForType(String type) {
