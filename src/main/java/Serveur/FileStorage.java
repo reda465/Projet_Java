@@ -1,5 +1,7 @@
 package Serveur;
 
+import util.AudioConverter;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,6 +16,10 @@ public final class FileStorage {
     private FileStorage() {}
 
     public static String saveForConversation(int idConversation, String fileName, byte[] data) throws IOException {
+        if (AudioConverter.isWav(fileName)) {
+            data = AudioConverter.wavToMp3(data, fileName);
+            fileName = AudioConverter.renommerEnMp3(fileName);
+        }
         Path dir = UPLOAD_ROOT.resolve("conv").resolve(String.valueOf(idConversation));
         Files.createDirectories(dir);
         Path path = dir.resolve(uniqueName(fileName));
@@ -22,6 +28,10 @@ public final class FileStorage {
     }
 
     public static String saveForGroup(int idGroupe, String fileName, byte[] data) throws IOException {
+        if (AudioConverter.isWav(fileName)) {
+            data = AudioConverter.wavToMp3(data, fileName);
+            fileName = AudioConverter.renommerEnMp3(fileName);
+        }
         Path dir = UPLOAD_ROOT.resolve("groups").resolve(String.valueOf(idGroupe));
         Files.createDirectories(dir);
         Path path = dir.resolve(uniqueName(fileName));
