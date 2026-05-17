@@ -534,8 +534,8 @@ public class ClientReseau {
                 if (ecouteur != null) ecouteur.finHistoriqueGroupe(idGroupe);
                 return;
             }
-            // Format serveur : id;tel;nom;contenu;date[;base64Fichier]
-            String[] lignes = data.split("\\|");
+            // Format serveur : id;tel;nom;contenu;date[;base64Fichier] (séparateur \u001e entre messages)
+            String[] lignes = data.split(java.util.regex.Pattern.quote(util.FileMediaUtil.GROUP_MSG_RECORD_SEP), -1);
             for (String ligne : lignes) {
                 if (ligne == null || ligne.isEmpty()) continue;
                 String[] champs = ligne.split(";", -1);

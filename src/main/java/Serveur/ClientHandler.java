@@ -577,10 +577,12 @@ public class ClientHandler extends Thread {
         uploadsEnCours.remove(key);
         byte[] full = concatener(buf.chunks);
         if (groupe) {
-            messageRouter.envoyerFichierGroupe(telephoneConnecte,
+            messageRouter.envoyerFichierGroupe(
+                    normaliserNumeroPourRecherche(telephoneConnecte),
                     Integer.parseInt(destOrGroupe), type, fileName, full, this);
         } else {
-            messageRouter.envoyerFichier(telephoneConnecte, destOrGroupe, type, fileName, full, this);
+            messageRouter.envoyerFichier(
+                    normaliserNumeroPourRecherche(telephoneConnecte), destOrGroupe, type, fileName, full, this);
         }
     }
 
@@ -921,7 +923,7 @@ public class ClientHandler extends Thread {
             List<MessageGroupe> liste = messageGroupeDAO.getByGroupe(idGroupe);
             StringBuilder sb = new StringBuilder();
             for (MessageGroupe msg : liste) {
-                if (sb.length() > 0) sb.append("|");
+                if (sb.length() > 0) sb.append(FileMediaUtil.GROUP_MSG_RECORD_SEP);
                 String contenu = msg.getContenu() != null ? msg.getContenu() : "";
                 sb.append(msg.getIdMessage()).append(";")
                         .append(msg.getTelephoneExpediteur()).append(";")
