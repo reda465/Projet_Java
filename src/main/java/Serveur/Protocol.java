@@ -2,25 +2,80 @@ package Serveur;
 
 public class Protocol {
     // Auth
-    public static final String LOGIN        = "LOGIN";
-    public static final String REGISTER     = "REGISTER";
-    public static final String LOGIN_OK     = "LOGIN_OK";
-    public static final String LOGIN_FAIL   = "LOGIN_FAIL";
-    public static final String LOGOUT       = "LOGOUT";
+    LOGIN ,
+    REGISTER,
+    REGISTER_OK ,
+    REGISTER_FAIL ,
+    LOGIN_OK ,
+    LOGIN_FAIL ,
+    LOGOUT ,
 
     // Utilisateurs
-    public static final String USERS_LIST   = "USERS_LIST";
+    USERS_LIST,
 
     // Messagerie
-    public static final String MSG_SEND     = "MSG_SEND";
-    public static final String MSG_RECEIVE  = "MSG_RECEIVE";
+    MSG_SEND ,
+    MSG_RECEIVE ,
+    // Contacts
+
+    BLOCK_CONTACT,
+    BLOCK_OK,
+
+    // Notification de premier message
+    CONTACT_REQUEST,    // ← notification envoyée au destinataire
+    CONTACT_ACCEPTED,   // ← le destinataire accepte
+    CONTACT_BLOCKED,    // ← le destinataire bloque
+    //conversation
+    GET_CONVERSATIONS,   // client demande sa liste de conversations
+    CONVERSATIONS_LIST,
+    CONVERSATIONS_RECUES,// serveur répond avec la liste
+    GET_MESSAGES,        // client demande les messages d'une conversation
+    MESSAGES_LIST,
 
     // Appels
-    public static final String CALL_REQUEST = "CALL_REQUEST";
-    public static final String CALL_ACCEPT  = "CALL_ACCEPT";
-    public static final String CALL_REFUSE  = "CALL_REFUSE";
-    public static final String CALL_END     = "CALL_END";
+    CALL_REQUEST,
+    CALL_ACCEPT ,
+    CALL_REFUSE ,
+    CALL_END,
 
-    // Séparateur
-    public static final String SEP = "|";
+    ADD_CONTACT,
+    ADD_CONTACT_OK,
+    ADD_CONTACT_FAIL,
+    CONTACTS_LIST,
+    GET_CONTACTS,
+    // Groupes V2
+    CREATE_GROUP,
+    CREATE_GROUP_OK,
+    CREATE_GROUP_FAIL,
+    GET_GROUPS,
+    GROUPS_LIST,
+    GET_GROUP_MESSAGES,
+    GROUP_MESSAGES_LIST,
+    SEND_GROUP_MESSAGE,
+    GROUP_MESSAGE_RECEIVE,
+    ADD_GROUP_MEMBER,
+    ADD_GROUP_MEMBER_OK,
+    ADD_GROUP_MEMBER_FAIL,
+    REMOVE_GROUP_MEMBER,
+    REMOVE_GROUP_MEMBER_OK,
+    REMOVE_GROUP_MEMBER_FAIL,
+    QUIT_GROUP,
+    QUIT_GROUP_OK,
+    DELETE_GROUP,
+    DELETE_GROUP_OK,
+    RENAME_GROUP,
+    RENAME_GROUP_OK,
+    START_GROUP_CALL,
+    JOIN_GROUP_CALL,
+    LEAVE_GROUP_CALL,
+    END_GROUP_CALL,
+    //fichier
+    FILE_SEND,
+    FILE_RECEIVE,
+    FILE_FAIL,
+    FILE_OK,
+    FILE_PROGRESS,
+    FILE_GROUP_SEND,
+    FILE_GROUP_RECEIVE
+
 }

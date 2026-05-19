@@ -1,6 +1,6 @@
 package service;
 
-import Serveur.Commande;
+import Serveur.*;
 import client.ClientReseau;
 import network.*;
 
@@ -13,18 +13,10 @@ public class AuthService {
     }
 
     // ===== INSCRIPTION =====
-    public String inscrire(String nom, String prenom, String numero, String password) {
+    public String inscrire(String nomComplet, String numero, String password) {
 
-        if (nom.isEmpty() || prenom.isEmpty() || numero.isEmpty() || password.isEmpty()) {
-            return "Tous les champs sont obligatoires !"; // Retourne l'erreur à l'UI
-        }
-
-        if (numero.length() != 10) {
-            return "Le numéro doit faire 10 chiffres !"; // Retourne l'erreur à l'UI
-        }
-
-        String data = nom + "|" + prenom + "|" + numero + "|" + password;
-        Packet p = new Packet(Commande.INSCRIPTION, data);
+        String data = nomComplet+ "|" + numero + "|" + password;
+        Packet p = new Packet(Protocol.REGISTER, data);
         client.envoyer(p);
 
         return "OK"; // Indique que la demande est bien partie
@@ -33,19 +25,15 @@ public class AuthService {
     // ===== CONNEXION =====
     public String connecter(String numero, String password) {
 
-        if (numero.isEmpty() || password.isEmpty()) {
-            return "Remplis tous les champs !";
-        }
-
         String data = numero + "|" + password;
-        Packet p = new Packet(Commande.CONNEXION, data);
+        Packet p = new Packet(Protocol.LOGIN, data);
         client.envoyer(p);
 
         return "OK";
     }
     // ===== DÉCONNEXION =====
     public void deconnecter() {
-        Packet p = new Packet(Commande.DECONNEXION, "");
+        Packet p = new Packet(Protocol.LOGOUT, "");
         client.envoyer(p);
         client.deconnecter();
     }

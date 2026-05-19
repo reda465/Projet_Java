@@ -1,19 +1,41 @@
 package model;
 
 import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Data
 @NoArgsConstructor
-
-public class Message {
+@Getter
+@Setter
+public abstract class Message {
     private int idMessage;
     private int idConversation;
     private int idExpediteur;
+    private String telephoneExpediteur;
+    private String telephoneDestinataire;
     private String typeMessage;
     private String contenuTexte;
     private String urlFichier;
     private String nomFichier;
     private Long tailleFichier;
-    private java.time.LocalDateTime dateEnvoi;
+    private LocalDateTime dateEnvoi;
+    private boolean estMoi;
+    private String nomExpediteur;
+
+    public String getDateFormatee() {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
+        return dateEnvoi.format(formatter);
+    }
+
+    public String toString() {
+        return "[" + getDateFormatee() + "] " + contenuTexte;
+    }
+
+    // Format réseau: idMessage;idGroupe;telephoneExp;nomExp;contenu;date;nomGroupe
+    public abstract String toNetworkString();
 }

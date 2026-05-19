@@ -1,0 +1,401 @@
+package javafx;
+import client.ClientHandlerAuth;//coomunication avec le serveur
+import client.EcouteurClient;//intrface cllback
+import javafx.application.Platform;//permet de modifier l'intercfece a partir de thred secondaire
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;//cop graphique (button label textfied password hyperlink
+import javafx.scene.layout.*;//vbox hbox
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
+import javafx.scene.text.*;
+import javafx.stage.Stage;
+import model.*;
+
+import javafx.scene.image.ImageView;
+import java.util.List;
+
+import static javafx.application.Application.launch;
+public class signup implements EcouteurClient {
+    private Label messageLabel;
+    private Button btn;
+    private Stage stage;
+    private boolean inscriptionEnCours = false;
+    // ===== CRÉER LA SCÈNE =====
+    public  Scene creerScene(Stage stage) {
+        this.stage = stage;
+        String chams = login.fieldStyle();
+        String btst = login.btnStyle();
+
+        // Logo
+        Circle circle = new Circle(30);
+        circle.setFill(Color.web("#25D366"));
+        Text w = new Text("W");
+        w.setFill(Color.WHITE);
+        w.setFont(Font.font("Arial", FontWeight.BOLD, 26));
+        StackPane logo = new StackPane(circle, w);
+        // Titre
+        Label title = new Label("Créer un compte");
+        title.setFont(Font.font("Arial", FontWeight.BOLD, 18));
+        title.setTextFill(Color.web("#25D366"));
+        VBox header = new VBox(6, logo, title);
+        header.setAlignment(Pos.CENTER);
+        // Champs
+        TextField nom = new TextField();//vide
+        nom.setPromptText("Nom complet");
+        nom.setStyle(chams);
+
+        TextField tel = new TextField();
+        tel.setPromptText("Numéro de téléphone ");
+        tel.setStyle(chams);
+
+        PasswordField pass1 = new PasswordField();
+        pass1.setPromptText("Mot de passe");
+        pass1.setStyle(chams);
+
+        PasswordField pass2 = new PasswordField();
+        pass2.setPromptText("Confirmer mot de passe");
+        pass2.setStyle(chams);
+        // Message (champ d'instance)
+        messageLabel = new Label();
+        messageLabel.setFont(Font.font("Arial", 12));
+        messageLabel.setWrapText(true);
+        messageLabel.setAlignment(Pos.CENTER);
+        // Bouton (champ d'instance)
+        btn = new Button("S'inscrire");
+        btn.setMaxWidth(Double.MAX_VALUE);
+        btn.setStyle(chams);
+        btn.setOnMouseEntered(e -> btn.setStyle(chams.replace("#25D366", "#128C7E")));
+        btn.setOnMouseExited(e -> btn.setStyle(chams));
+
+        // ===== ACTION BOUTON =====
+        btn.setOnAction(e -> {
+            //ajouter pout liaison
+            if (inscriptionEnCours) {
+                messageLabel.setTextFill(Color.ORANGE);
+                messageLabel.setText("Inscription déjà en cours...");
+                return;
+            }
+            String nomComplet = nom.getText().trim();
+            String numero = tel.getText().trim();
+            String pw = pass1.getText();
+            String pw2 = pass2.getText();
+
+            // verification
+            if (nomComplet.isEmpty() || numero.isEmpty() || pw.isEmpty() || pw2.isEmpty()) {
+                messageLabel.setTextFill(Color.RED);
+                messageLabel.setText("Tous les champs sont obligatoires");
+                return;
+            }
+
+            if (!pw.equals(pw2)) {
+                messageLabel.setTextFill(Color.RED);
+                messageLabel.setText("Les mots de passe ne correspondent pas");
+                return;
+            }
+
+            if (numero.length() != 10) {
+                messageLabel.setTextFill(Color.RED);
+                messageLabel.setText("Le numéro doit faire 10 chiffres");
+                return;
+            }
+
+            // 2. Désactiver le bouton
+            inscriptionEnCours=true;//liaison
+            btn.setDisable(true);
+            messageLabel.setTextFill(Color.web("#128C7E"));
+            messageLabel.setText("Inscription en cours...");
+
+            // 3. Envoyer au serveur
+            /*String resultat = ClientHandlerAuth.getInstance().sInscrire(nomComplet, numero, pw);
+            // 4. Erreur locale
+            if (!resultat.equals("OK")) {
+                messageLabel.setTextFill(Color.RED);
+                messageLabel.setText(resultat);
+                btn.setDisable(false);
+            }*/
+            new Thread(() -> {
+                String resultat = ClientHandlerAuth.getInstance().sInscrire(nomComplet, numero, pw);
+
+                Platform.runLater(() -> {
+                    if (!resultat.equals("OK")) {
+                        // Erreur : réactiver le bouton
+                        inscriptionEnCours=false;
+                        messageLabel.setTextFill(Color.RED);
+                        messageLabel.setText(resultat);
+                        btn.setDisable(false);
+                    }
+                    // Si OK : ne rien faire ici, attendre le callback inscriptionReussie()
+                });
+            }).start();
+        });
+
+        // Lien vers login
+        Hyperlink loginLink = new Hyperlink("Se connecter");
+        loginLink.setTextFill(Color.web("#25D366"));
+        loginLink.setOnAction(e -> {
+            login l = new login();
+            ClientHandlerAuth.getInstance().setEcouteur(l);
+            stage.setScene(l.creerScene(stage));
+        });
+
+        HBox linkBox = new HBox(5, new Label("Déjà un compte ?"), loginLink);
+        linkBox.setAlignment(Pos.CENTER);
+        // Card
+        VBox card = new VBox(10, header, nom, tel, pass1, pass2, btn, messageLabel, linkBox);
+        card.setPadding(new Insets(30));
+        card.setPrefWidth(320);
+        card.setStyle(login.cardStyle());
+
+        StackPane root = new StackPane(card);
+        root.setStyle("-fx-background-color: linear-gradient(to bottom right, #25D366, #128C7E);");
+        root.setPadding(new Insets(40));
+
+        return new Scene(root, 420, 600);
+    }
+    // ===== CALLBACKS EcouteurClient =====
+
+
+    /*public void inscriptionReussie(String msg) {
+        Platform.runLater(() -> {
+            messageLabel.setTextFill(Color.web("#25D366"));
+            messageLabel.setText("Compte créé avec succès ! Connectez-vous.");
+            btn.setDisable(false);
+            // Rediriger vers login après 1.5 secondes
+            new Thread(() -> {
+                try { Thread.sleep(1500); } catch (InterruptedException ignored) {}
+                Platform.runLater(() -> stage.setScene(new login().creerScene(stage)));
+            }).start();
+        });
+    }*/
+   /*@Override
+    public void inscriptionReussie(String msg) {
+        Platform.runLater(() -> {
+            messageLabel.setTextFill(Color.web("#25D366"));
+            messageLabel.setText("Compte créé avec succès !");
+            btn.setDisable(false);
+
+            // Récupérer l'utilisateur connecté
+            Utilisateur utilisateur = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
+
+            // Ouvrir Discussion directement
+            Discussion discussion = new Discussion(utilisateur);
+            ClientHandlerAuth.getInstance().setEcouteur(discussion);
+            stage.setScene(discussion.creerScene(stage));
+        });
+    }*/
+
+    @Override
+    public void inscriptionReussie(String msg) {
+        Platform.runLater(() -> {
+            // 1. Récupérer l'utilisateur
+            Utilisateur utilisateur = ClientHandlerAuth.getInstance().getUtilisateurConnecte();
+
+            if (utilisateur == null) {
+                messageLabel.setTextFill(Color.RED);
+                messageLabel.setText("Erreur: Impossible de récupérer l'utilisateur");
+                inscriptionEnCours = false;
+                btn.setDisable(false);
+                return;
+            }
+
+            // 2. Initialiser CallService
+            ClientHandlerAuth.getInstance().onConnexionReussie(utilisateur);
+
+            // 3. Créer Discussion
+            Discussion discussion = new Discussion(utilisateur);
+
+            // 4. Changer l'écouteur vers Discussion
+            if (ClientHandlerAuth.getInstance().getClientReseau() != null) {
+                ClientHandlerAuth.getInstance().getClientReseau().setEcouteur(discussion);
+            }
+
+            // 5. Afficher d'abord la fenêtre discussions (évite implicit exit si le stage principal se ferme avant)
+            Stage discussionStage = new Stage();
+            discussionStage.setScene(discussion.creerScene(discussionStage));
+            discussionStage.setTitle("WhatsApp – Discussions");
+            discussionStage.setOnCloseRequest(e -> {
+                ClientHandlerAuth.getInstance().seDeconnecter();
+            });
+            discussionStage.show();
+            inscriptionEnCours = false;
+            stage.close();
+
+            // 6. Demander les conversations
+            ClientHandlerAuth.getInstance().demanderConversations();
+        });
+    }
+
+    @Override
+    public void erreur(String message) {
+        Platform.runLater(() -> {
+            messageLabel.setTextFill(Color.RED);
+            messageLabel.setText(message);
+            btn.setDisable(false);
+        });
+    }
+    @Override
+    public void connexionReussie(Utilisateur moi) { /* pas utilisé ici */ }
+    @Override
+    public void messageRecu(String num, String contenu) { /* pas utilisé ici */ }
+
+    @Override
+    public void conversationsRecues(List<Conversation> conversations) {
+
+    }
+
+    @Override
+    public void messagesRecus(List<Message> messages) {
+
+    }
+
+    @Override
+    public void contactAjoute(Contact contact) {
+
+    }
+
+    @Override
+    public void demandeContactRecue(String numeroDemandeur, String nomDemandeur) {
+        EcouteurClient.super.demandeContactRecue(numeroDemandeur, nomDemandeur);
+    }
+
+    @Override
+    public void contactAcceptationConfirmee() {
+        EcouteurClient.super.contactAcceptationConfirmee();
+    }
+
+    @Override
+    public void listeContactsRecue(List<Contact> contacts) {
+
+    }
+
+
+    @Override
+    public void deconnexion() {
+        Platform.runLater(() -> {
+            messageLabel.setTextFill(Color.RED);
+            messageLabel.setText("Déconnecté du serveur");
+            btn.setDisable(false);
+        });
+    }
+
+    // removed duplicate fluxVideoGroupeRecu
+
+    @Override
+    public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
+
+    }
+
+    @Override
+    public void appelAccepte(String numero, String ip) {
+        System.out.println("📞 Appel accepté par " + numero + " ip=" + ip);
+    }
+
+    @Override
+    public void appelRefuse() {
+
+    }
+
+    @Override
+    public void appelTermine(String numero) {
+
+    }
+
+    @Override
+    public void groupeCree(Groupe groupe) {
+
+    }
+
+    @Override
+    public void creationGroupeEchouee(String raison) {
+
+    }
+
+    @Override
+    public void listeGroupesRecue(List<Groupe> groupes) {
+
+    }
+
+    @Override
+    public void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {
+
+    }
+
+    @Override
+    public void messageGroupeRecu(MessageGroupe message) {
+
+    }
+
+    @Override
+    public void membreAjoute(int idGroupe, String numero) {
+
+    }
+
+    @Override
+    public void membreRetire(int idGroupe, String numero) {
+
+    }
+
+    @Override
+    public void aQuitteGroupe(int idGroupe) {
+
+    }
+
+    @Override
+    public void groupeSupprime(int idGroupe) {
+
+    }
+
+    @Override
+    public void nomGroupeModifie(int idGroupe, String nouveauNom) {
+
+    }
+
+    @Override
+    public void fichierRecu(String telephoneExp, String type, String fileName, String base64) {
+
+    }
+
+    @Override
+    public void appelGroupeEntrant(int idGroupe, String nomGroupe, String type, String initiateurNom) {
+
+    }
+
+    @Override
+    public void appelGroupeDemarre(int idGroupe, String type) {
+
+    }
+
+    @Override
+    public void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre, String ip, String type, int port, int portAudio, boolean isReply) {
+
+    }
+
+    @Override
+    public void membreQuitteAppelGroupe(int idGroupe, String numeroMembre) {
+
+    }
+
+    @Override
+    public void appelGroupeTermine(int idGroupe) {
+
+    }
+
+    @Override
+    public void signalisationAppelGroupe(int idGroupe, String numeroSource, String typeSignal, String payload) {
+
+    }
+
+    @Override
+    public void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, ImageView videoNode) {
+
+    }
+
+    @Override
+    public void fluxVideoGroupeArrete(int idGroupe, String numeroExpediteur) {
+
+    }
+
+
+}
