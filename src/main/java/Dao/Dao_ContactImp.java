@@ -142,18 +142,20 @@ public class Dao_ContactImp implements DAO_Contact {
         return c;
     }
     /** Stocke une demande de contact en attente pour un utilisateur hors ligne */
-    public void ajouterDemandeEnAttente(int idDemandeur,
-                                        int idDestinataire) throws SQLException {
-        // On réutilise la table contacts avec un statut spécial "en_attente"
-        // Si le contact n'existe pas encore côté destinataire → on l'insère
-        // avec nom_affiche = "PENDING" comme marqueur
-        String sql = "INSERT IGNORE INTO contacts "
+    public void ajouterDemandeEnAttente(int idDemandeur, int idDestinataire) throws SQLException {
+        // Utiliser INSERT ... ON DUPLICATE KEY UPDATE pour éviter le silence
+        String sql = "INSERT INTO contacts "
                 + "(id_utilisateur, id_contact_utilisateur, nom_affiche, est_bloque) "
-                + "VALUES (?, ?, 'PENDING', 0)";
+                + "VALUES (?, ?, 'PENDING', 0) "
+                + "ON DUPLICATE KEY UPDATE "
+                + "nom_affiche = IF(nom_affiche = 'PENDING', 'PENDING', VALUES(nom_affiche))";
+
+        System.out.println("[DEBUG] Demande en attente : dest=" + idDestinataire
+                + ", demandeur=" + idDemandeur);
         try (Connection con = DataBase.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setInt(1, idDestinataire);  // côté Bob
-            ps.setInt(2, idDemandeur);     // Alice est le contact
+            ps.setInt(1, idDestinataire);   // côté destinataire
+            ps.setInt(2, idDemandeur);      // le contact = demandeur
             ps.executeUpdate();
         }
     }
@@ -163,11 +165,27 @@ public class Dao_ContactImp implements DAO_Contact {
         List<Contact> liste = new ArrayList<>();
         String sql = "SELECT * FROM contacts "
                 + "WHERE id_utilisateur = ? AND nom_affiche = 'PENDING'";
+        System.out.println("[DEBUG] Recherche demandes pour utilisateur=" + idUtilisateur);
         try (Connection con = DataBase.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, idUtilisateur);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) liste.add(mapResultSet(rs));
+        }
+        return liste;
+    }
+    public List<Contact> getContactsByUtilisateur(int idUtilisateur) throws SQLException {
+        List<Contact> liste = new ArrayList<>();
+        String sql = "SELECT * FROM contacts WHERE id_utilisateur = ?";
+        try (Connection con = DataBase.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, idUtilisateur);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) liste.add(mapResultSet(rs));
+
+        }catch (SQLException e) {
+            System.err.println("[ERROR] getContactsByUtilisateur: " + e.getMessage());
+            throw e;
         }
         return liste;
     }

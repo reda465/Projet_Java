@@ -14,6 +14,7 @@ import javafx.stage.Stage;
 import client.EcouteurClient;
 import model.*;
 
+import javafx.scene.image.ImageView;
 import java.util.List;
 public class login extends Application implements EcouteurClient {
     private Label message;
@@ -127,6 +128,8 @@ public class login extends Application implements EcouteurClient {
 
         signupLink.setOnAction(e -> {
             signup s = new signup();
+            //pour lier avec disscusion
+            ClientHandlerAuth.getInstance().setEcouteur(s);
             stage.setScene(s.creerScene(stage));
         });
 
@@ -182,6 +185,7 @@ public class login extends Application implements EcouteurClient {
                     });
                     discussionStage.show();
                     ClientHandlerAuth.getInstance().demanderConversations();
+                    ClientHandlerAuth.getInstance().demanderContacts();
                 });
             }).start();
         });
@@ -208,6 +212,8 @@ public class login extends Application implements EcouteurClient {
             message.setText("Déconnecté du serveur");
         });
     }
+
+    // removed duplicate fluxVideoGroupeRecu
 
     @Override
     public void appelEntrant(String numero, String type, String ipAppelant, String ip) {
@@ -281,7 +287,47 @@ public class login extends Application implements EcouteurClient {
     }
 
     @Override
-    public void fichierRecu(String telephoneExp, String fileName, String base64) {
+    public void fichierRecu(String telephoneExp, String type, String fileName, String base64) {
+
+    }
+
+    @Override
+    public void appelGroupeEntrant(int idGroupe, String nomGroupe, String type, String initiateurNom) {
+
+    }
+
+    @Override
+    public void appelGroupeDemarre(int idGroupe, String type) {
+
+    }
+
+    @Override
+    public void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre, String ip, String type, int port, int portAudio, boolean isReply) {
+
+    }
+
+    @Override
+    public void membreQuitteAppelGroupe(int idGroupe, String numeroMembre) {
+
+    }
+
+    @Override
+    public void appelGroupeTermine(int idGroupe) {
+
+    }
+
+    @Override
+    public void signalisationAppelGroupe(int idGroupe, String numeroSource, String typeSignal, String payload) {
+
+    }
+
+    @Override
+    public void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, ImageView videoNode) {
+
+    }
+
+    @Override
+    public void fluxVideoGroupeArrete(int idGroupe, String numeroExpediteur) {
 
     }
 
@@ -299,6 +345,16 @@ public class login extends Application implements EcouteurClient {
     @Override
     public void contactAjoute(Contact contact) {
 
+    }
+
+    @Override
+    public void demandeContactRecue(String numeroDemandeur, String nomDemandeur) {
+        EcouteurClient.super.demandeContactRecue(numeroDemandeur, nomDemandeur);
+    }
+
+    @Override
+    public void contactAcceptationConfirmee() {
+        EcouteurClient.super.contactAcceptationConfirmee();
     }
 
     @Override

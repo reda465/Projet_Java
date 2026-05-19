@@ -41,40 +41,41 @@ public enum Protocol {
     ADD_CONTACT,
     ADD_CONTACT_OK,
     ADD_CONTACT_FAIL,
-
-    CREATE_GROUP,           // Client demande création groupe
-    CREATE_GROUP_OK,        // Serveur confirme création
-    CREATE_GROUP_FAIL,      // Échec (nom existant, erreur, etc.)
-
-    ADD_MEMBER,             // Ajouter membre au groupe
-    ADD_MEMBER_OK,
-    ADD_MEMBER_FAIL,
-
-    REMOVE_MEMBER,          // Retirer membre (admin seulement)
-    REMOVE_MEMBER_OK,
-    REMOVE_MEMBER_FAIL,
-
-    LEAVE_GROUP,            // Quitter le groupe soi-même
-    LEAVE_GROUP_OK,
-
-    DELETE_GROUP,           // Supprimer groupe (créateur seulement)
+    CONTACTS_LIST,
+    GET_CONTACTS,
+    // Groupes V2
+    CREATE_GROUP,
+    CREATE_GROUP_OK,
+    CREATE_GROUP_FAIL,
+    GET_GROUPS,
+    GROUPS_LIST,
+    GET_GROUP_MESSAGES,
+    GROUP_MESSAGES_LIST,
+    SEND_GROUP_MESSAGE,
+    GROUP_MESSAGE_RECEIVE,
+    ADD_GROUP_MEMBER,
+    ADD_GROUP_MEMBER_OK,
+    ADD_GROUP_MEMBER_FAIL,
+    REMOVE_GROUP_MEMBER,
+    REMOVE_GROUP_MEMBER_OK,
+    REMOVE_GROUP_MEMBER_FAIL,
+    QUIT_GROUP,
+    QUIT_GROUP_OK,
+    DELETE_GROUP,
     DELETE_GROUP_OK,
-    DELETE_GROUP_FAIL,
-
-    GET_GROUPS,             // Demander liste des groupes du client
-    GROUPS_LIST,            // Serveur envoie la liste
-
-    GET_GROUP_MEMBERS,      // Demander membres d'un groupe
-    GROUP_MEMBERS_LIST,     // Serveur envoie les membres
-
-    GROUP_MSG_SEND,         // Envoyer message dans groupe
-    GROUP_MSG_RECEIVE,      // Recevoir message de groupe
-
-    UPDATE_GROUP_NAME,      // Modifier nom du groupe (admin)
-    UPDATE_GROUP_NAME_OK,
-
+    RENAME_GROUP,
+    RENAME_GROUP_OK,
+    START_GROUP_CALL,
+    JOIN_GROUP_CALL,
+    LEAVE_GROUP_CALL,
+    END_GROUP_CALL,
     //fichier
     FILE_SEND,
     FILE_RECEIVE,
-    FILE_FAIL
+    FILE_FAIL,
+    FILE_OK,
+    FILE_PROGRESS,
+    FILE_GROUP_SEND,
+    FILE_GROUP_RECEIVE
+
 }

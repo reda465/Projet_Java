@@ -4,22 +4,28 @@ import lombok.Getter;
 import lombok.Setter;
 import model.Contact;
 import model.Conversation;
+import model.Groupe;
 import model.Message;
+import model.MessageGroupe;
 import model.Utilisateur;
 
 import java.io.*;
 import java.net.Socket;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.time.LocalDateTime;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import Dao.*;
+import util.FileMediaUtil;
 @Getter
 @Setter
 
 public class ClientHandler extends Thread {
-
     private final Socket socket;
     private PrintWriter pw;
     private String telephoneConnecte; // null = pas encore authentifié
@@ -32,6 +38,19 @@ public class ClientHandler extends Thread {
     private final DaoConversationImp convDAO    = new DaoConversationImp();
     private final Dao_MessageImp     messageDAO = new Dao_MessageImp();
     private final Dao_MessageFileAttenteImp fileDAO = new Dao_MessageFileAttenteImp();
+    private final Dao_GroupeImp groupeDAO = new Dao_GroupeImp();
+    private final Dao_MessageGroupeImp messageGroupeDAO = new Dao_MessageGroupeImp();
+    private static final Map<String, ChunkBuffer> uploadsEnCours = new ConcurrentHashMap<>();
+
+    private static final class ChunkBuffer {
+        String destOrGroupe;
+        boolean groupe;
+        String type;
+        String fileName;
+        int totalChunks;
+        final List<byte[]> chunks = new ArrayList<>();
+    }
+
     public ClientHandler(Socket s) {
         this.socket = s;
     }
@@ -55,6 +74,7 @@ public class ClientHandler extends Thread {
                     case Protocol.LOGOUT   -> { handleLogout(); return; }
                     case Protocol.MSG_SEND -> handleMessage(parts);
                     case Protocol.GET_CONVERSATIONS -> handleGetConversations();
+                    case Protocol.GET_CONTACTS -> handleGetContacts();
                     case Protocol.GET_MESSAGES -> handleGetMessages(parts);
                     case CALL_REQUEST -> handleCallRequest(parts);
                     case CALL_ACCEPT  -> handleCallAccept(parts);
@@ -66,6 +86,19 @@ public class ClientHandler extends Thread {
                     //case CALL_CANCEL  -> handleCallCancel(parts);
                    //fichier
                     case FILE_SEND -> handleFileSend(parts);
+                    case FILE_GROUP_SEND -> handleFileGroupSend(parts);
+                    case CREATE_GROUP -> handleCreateGroup(parts);
+                    case GET_GROUPS -> handleGetGroups(parts);
+                    case SEND_GROUP_MESSAGE -> handleSendGroupMessage(parts);
+                    case GET_GROUP_MESSAGES -> handleGetGroupMessages(parts);
+                    case ADD_GROUP_MEMBER -> handleAddGroupMember(parts);
+                    case REMOVE_GROUP_MEMBER -> handleRemoveGroupMember(parts);
+                    case QUIT_GROUP -> handleQuitGroup(parts);
+                    case DELETE_GROUP -> handleDeleteGroup(parts);
+                    case RENAME_GROUP -> handleRenameGroup(parts);
+
+                    case JOIN_GROUP_CALL -> handleJoinGroupCall(parts);
+                    case LEAVE_GROUP_CALL -> handleLeaveGroupCall(parts);
                     default                -> pw.println("UNKNOWN_COMMAND");
                 }
             }
@@ -80,7 +113,10 @@ public class ClientHandler extends Thread {
 
     // ── LOGIN|numero_telephone|mot_de_passe ──────────────────────────────────
     private void handleLogin(String[] parts) {
-        if (parts.length < 3) { pw.println(Protocol.LOGIN_FAIL); return; }
+        if (parts.length < 3) {
+            pw.println(Protocol.LOGIN_FAIL + "|Format_invalide");
+            return;
+        }
 
         String tel      = parts[1];
         String password = parts[2];
@@ -90,6 +126,7 @@ public class ClientHandler extends Thread {
             if (u != null) {
                 telephoneConnecte = u.getNumeroTelephone();
                 userManager.addUser(telephoneConnecte, this);
+                java.time.LocalDateTime connexionPrecedente = u.getDerniereConnexion();
                 userDAO.updateDerniereConnexion(u.getIdUtilisateur());
 
                 pw.println(Protocol.LOGIN_OK + "|"
@@ -98,6 +135,7 @@ public class ClientHandler extends Thread {
 
                 broadcastUsersList();
                 messageRouter.delivrerMessagesEnAttente(telephoneConnecte);
+                messageRouter.delivrerFichiersGroupeEnAttente(telephoneConnecte, connexionPrecedente);
 
                 // ← NOUVEAU : délivrer les demandes de contact en attente
                 delivrerDemandesContactEnAttente(u);
@@ -107,7 +145,9 @@ public class ClientHandler extends Thread {
             }
         } catch (SQLException e) {
             e.printStackTrace();
-            pw.println(Protocol.LOGIN_FAIL);
+            pw.println(Protocol.LOGIN_FAIL + "|ErreurServeur");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -150,7 +190,19 @@ public class ClientHandler extends Thread {
                 return;
             }
             userDAO.Add(u);
-            pw.println("REGISTER_OK|Inscription_Avec_Succes");
+            
+            // Auto-login après inscription
+            Utilisateur newUser = userDAO.findByTelephone(u.getNumeroTelephone());
+            if (newUser != null) {
+                telephoneConnecte = newUser.getNumeroTelephone();
+                userManager.addUser(telephoneConnecte, this);
+                userDAO.updateDerniereConnexion(newUser.getIdUtilisateur());
+                
+                pw.println(Protocol.REGISTER_OK + "|" + newUser.getNomComplet() + "|" + newUser.getNumeroTelephone());
+                broadcastUsersList();
+            } else {
+                pw.println(Protocol.REGISTER_OK + "|" + u.getNomComplet() + "|" + u.getNumeroTelephone());
+            }
         } catch (SQLException e) {
             e.printStackTrace();
             pw.println("REGISTER_FAIL|Erreur_Inscription");
@@ -171,16 +223,15 @@ public class ClientHandler extends Thread {
     // ── MSG_SEND — sprint suivant ─────────────────────────────────────────────
         private void handleMessage(String[] parts) {
             if (parts.length < 3) return;
-            if (telephoneConnecte == null) {
-                pw.println("ERREUR|Non authentifié");
-                return;
+
+            String telephoneDest = normaliserNumeroPourRecherche(parts[1]);
+            StringBuilder contenu = new StringBuilder(parts[2] != null ? parts[2] : "");
+            for (int i = 3; i < parts.length; i++) {
+                contenu.append('|').append(parts[i] != null ? parts[i] : "");
             }
 
-            String telephoneDest = parts[1];
-            String contenu = parts[2];
-
             try {
-                messageRouter.envoyerMessage(telephoneConnecte, telephoneDest, contenu);
+                messageRouter.envoyerMessage(telephoneConnecte, telephoneDest, contenu.toString());
             } catch (SQLException e) {
                 e.printStackTrace();
                 pw.println("MSG_FAIL|Erreur_Envoi");
@@ -279,15 +330,15 @@ public class ClientHandler extends Thread {
 
             for (Conversation c : convs) {
                 String nomAffichage;
-                String numeroContact = "";
+                String numeroAutre = "";
 
-                // Pour conversation individuelle → nom de l'autre participant
                 if ("individuelle".equals(c.getTypeConversation())) {
                     Utilisateur autre = convDAO.getAutreParticipant(
                             c.getIdConversation(), u.getIdUtilisateur());
                     nomAffichage = (autre != null) ? autre.getNomComplet() : "Inconnu";
-                    numeroContact = (autre != null && autre.getNumeroTelephone() != null)
-                            ? autre.getNumeroTelephone() : "";
+                    if (autre != null && autre.getNumeroTelephone() != null) {
+                        numeroAutre = autre.getNumeroTelephone().trim();
+                    }
                 } else {
                     nomAffichage = c.getNomGroupe() != null ? c.getNomGroupe() : "Groupe";
                 }
@@ -301,10 +352,11 @@ public class ClientHandler extends Thread {
                             ? dernierMsg.getContenuTexte() : "";
                 }
 
+                // id;type;nom;numeroTel;date;nonLus;dernierMsg
                 sb.append(c.getIdConversation()).append(";")
                         .append(c.getTypeConversation()).append(";")
                         .append(nomAffichage).append(";")
-                        .append(numeroContact).append(";")
+                        .append(numeroAutre).append(";")
                         .append((c.getDateDernierMessage() != null)
                                 ? c.getDateDernierMessage().toString() : "").append(";")
                         .append(nbNonLus).append(";")
@@ -318,6 +370,45 @@ public class ClientHandler extends Thread {
         } catch (SQLException e) {
             e.printStackTrace();
             pw.println(Protocol.CONVERSATIONS_LIST.name() + "|ERROR");
+        }
+    }
+
+    // ── GET_CONTACTS ─────────────────────────────────────────────────────────
+    private void handleGetContacts() {
+        try {
+            if (telephoneConnecte == null || telephoneConnecte.isBlank()) {
+                pw.println(Protocol.CONTACTS_LIST.name() + "|ERROR");
+                return;
+            }
+            Utilisateur u = userDAO.findByTelephone(telephoneConnecte);
+            if (u == null) {
+                pw.println(Protocol.CONTACTS_LIST.name() + "|");
+                return;
+            }
+
+            List<Contact> contacts = contactDAO. getContactsByUtilisateur(u.getIdUtilisateur());
+
+            if (contacts.isEmpty()) {
+                pw.println(Protocol.CONTACTS_LIST.name() + "|");
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder(Protocol.CONTACTS_LIST.name() + "|");
+            for (Contact c : contacts) {
+                sb.append(c.getIdContact()).append(";")
+                        .append(c.getNumeroTelephone() != null ? c.getNumeroTelephone().trim() : "")
+                        .append(";")
+                        .append(c.getNomComplet() != null ? c.getNomComplet().trim() : "")
+                        .append("|");
+            }
+
+            pw.println(sb.toString());
+            System.out.println("[CONTACTS] Envoyé " + contacts.size()
+                    + " contacts à " + telephoneConnecte);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            pw.println(Protocol.CONTACTS_LIST.name() + "|ERROR");
         }
     }
 
@@ -344,11 +435,22 @@ public class ClientHandler extends Thread {
                 String telExp = exp != null ? exp.getNumeroTelephone() : "?";
                 String nomExp = exp != null ? exp.getNomComplet() : "?";
 
+                String type = m.getTypeMessage() != null ? m.getTypeMessage() : "texte";
                 sb.append(m.getIdMessage()).append(";")
                         .append(telExp).append(";")
                         .append(nomExp).append(";")
                         .append(m.getContenuTexte() != null ? m.getContenuTexte() : "").append(";")
-                        .append(m.getDateEnvoi() != null ? m.getDateEnvoi().toString() : "").append("|");
+                        .append(m.getDateEnvoi() != null ? m.getDateEnvoi().toString() : "").append(";")
+                        .append(type).append(";")
+                        .append(m.getNomFichier() != null ? m.getNomFichier() : "");
+                if (!"texte".equals(type) && m.getUrlFichier() != null) {
+                    try {
+                        sb.append(";").append(FileStorage.toBase64(FileStorage.read(m.getUrlFichier())));
+                    } catch (IOException ignored) {
+                        sb.append(";");
+                    }
+                }
+                sb.append("|");
             }
 
             pw.println(sb.toString());
@@ -367,28 +469,145 @@ public class ClientHandler extends Thread {
     //fichier
 
     private void handleFileSend(String[] parts) {
-        if (parts.length < 4) return;
+        if (telephoneConnecte == null || parts.length < 4) return;
+        try {
+            if (parts.length >= 7) {
+                traiterChunkFichier(false, parts);
+                return;
+            }
+            String telDest = normaliserNumeroPourRecherche(parts[1]);
+            String type;
+            String fileName;
+            String base64;
+            if (isTypeMessage(parts[2])) {
+                type = parts[2];
+                fileName = parts[3];
+                base64 = parts[4];
+                for (int i = 5; i < parts.length; i++) base64 += "|" + parts[i];
+            } else {
+                type = FileMediaUtil.detectType(parts[2]);
+                fileName = parts[2];
+                base64 = parts[3];
+                for (int i = 4; i < parts.length; i++) base64 += "|" + parts[i];
+            }
+            byte[] bytes = Base64.getDecoder().decode(base64);
+            messageRouter.envoyerFichier(
+                    normaliserNumeroPourRecherche(telephoneConnecte), telDest, type, fileName, bytes, this);
+        } catch (Exception e) {
+            e.printStackTrace();
+            String msg = e.getMessage() != null ? e.getMessage() : "ERREUR";
+            pw.println(Protocol.FILE_FAIL.name() + "|" + msg);
+        }
+    }
 
-        String telDest = parts[1];
-        String fileName = parts[2];
-        String base64 = parts[3];
-
-        ClientHandler destHandler = userManager.getHandler(telDest);
-
-        if (destHandler == null) {
-            pw.println(Protocol.FILE_FAIL.name() + "|DEST_OFFLINE");
+    private void handleFileGroupSend(String[] parts) {
+        if (telephoneConnecte == null || parts.length < 5) {
+            if (pw != null) pw.println(Protocol.FILE_FAIL.name() + "|FORMAT_INVALIDE");
             return;
         }
-
-        destHandler.sendMessage(
-                Protocol.FILE_RECEIVE.name() + "|" +
-                        telephoneConnecte + "|" +
-                        fileName + "|" +
-                        base64
-        );
-
-        System.out.println("[FILE] fichier transféré de " + telephoneConnecte + " vers " + telDest);
+        try {
+            if (parts.length >= 7) {
+                traiterChunkFichier(true, parts);
+                return;
+            }
+            int idGroupe = Integer.parseInt(parts[1].trim());
+            String type = parts[2];
+            String fileName = parts[3];
+            StringBuilder b64 = new StringBuilder(parts[4] != null ? parts[4] : "");
+            for (int i = 5; i < parts.length; i++) {
+                b64.append('|').append(parts[i] != null ? parts[i] : "");
+            }
+            byte[] bytes = Base64.getDecoder().decode(b64.toString());
+            messageRouter.envoyerFichierGroupe(
+                    normaliserNumeroPourRecherche(telephoneConnecte),
+                    idGroupe, type, fileName, bytes, this);
+        } catch (Exception e) {
+            e.printStackTrace();
+            String msg = e.getMessage() != null ? e.getMessage() : "ERREUR";
+            pw.println(Protocol.FILE_FAIL.name() + "|" + msg);
+        }
     }
+
+    private void traiterChunkFichier(boolean groupe, String[] parts) throws Exception {
+        String key;
+        String destOrGroupe;
+        String type;
+        String fileName;
+        int total;
+        int index;
+        String b64;
+        if (groupe) {
+            if (parts.length < 7) return;
+            destOrGroupe = parts[1];
+            type = parts[2];
+            fileName = parts[3];
+            total = Integer.parseInt(parts[4]);
+            index = Integer.parseInt(parts[5]);
+            b64 = parts[6];
+            for (int i = 7; i < parts.length; i++) b64 += "|" + parts[i];
+            key = telephoneConnecte + "|G|" + destOrGroupe + "|" + fileName;
+        } else {
+            if (parts.length < 7) return;
+            destOrGroupe = normaliserNumeroPourRecherche(parts[1]);
+            type = parts[2];
+            fileName = parts[3];
+            total = Integer.parseInt(parts[4]);
+            index = Integer.parseInt(parts[5]);
+            b64 = parts[6];
+            for (int i = 7; i < parts.length; i++) b64 += "|" + parts[i];
+            key = telephoneConnecte + "|" + destOrGroupe + "|" + fileName;
+        }
+
+        ChunkBuffer buf = uploadsEnCours.computeIfAbsent(key, k -> {
+            ChunkBuffer b = new ChunkBuffer();
+            b.destOrGroupe = destOrGroupe;
+            b.groupe = groupe;
+            b.type = type;
+            b.fileName = fileName;
+            b.totalChunks = total;
+            return b;
+        });
+        buf.chunks.add(Base64.getDecoder().decode(b64));
+
+        int pct = (int) ((buf.chunks.size() * 100L) / total);
+        pw.println(Protocol.FILE_PROGRESS.name() + "|" + pct);
+
+        if (buf.chunks.size() < total) return;
+
+        uploadsEnCours.remove(key);
+        byte[] full = concatener(buf.chunks);
+        if (groupe) {
+            messageRouter.envoyerFichierGroupe(
+                    normaliserNumeroPourRecherche(telephoneConnecte),
+                    Integer.parseInt(destOrGroupe), type, fileName, full, this);
+        } else {
+            messageRouter.envoyerFichier(
+                    normaliserNumeroPourRecherche(telephoneConnecte), destOrGroupe, type, fileName, full, this);
+        }
+    }
+
+    private static byte[] concatener(List<byte[]> chunks) {
+        int len = 0;
+        for (byte[] c : chunks) len += c.length;
+        byte[] out = new byte[len];
+        int pos = 0;
+        for (byte[] c : chunks) {
+            System.arraycopy(c, 0, out, pos, c.length);
+            pos += c.length;
+        }
+        return out;
+    }
+
+    private static boolean isTypeMessage(String s) {
+        return "texte".equals(s) || "image".equals(s) || "video".equals(s)
+                || "audio".equals(s) || "fichier".equals(s);
+    }
+    /** Même logique que le client : aligner saisie et clés UserManager. */
+    private static String normaliserNumeroPourRecherche(String raw) {
+        if (raw == null) return "";
+        return raw.trim().replaceAll("\\s+", "").replace("-", "");
+    }
+
     // ── ADD_CONTACT|telephoneContact ─────────────────────────────────────────
 // Flux :
 // 1. Alice ajoute Bob → serveur crée le contact côté Alice
@@ -396,16 +615,24 @@ public class ClientHandler extends Thread {
 // 3. Bob répond CONTACT_ACCEPTED ou BLOCK_CONTACT
     private void handleAddContact(String[] parts) {
         if (parts.length < 2) {
-            pw.println(Protocol.ADD_CONTACT_FAIL.name()); return;
+            pw.println(Protocol.ADD_CONTACT_FAIL.name());
+            return;
         }
 
-        String telephoneContact = parts[1].trim();
+        if (telephoneConnecte == null || telephoneConnecte.isBlank()) {
+            pw.println(Protocol.ADD_CONTACT_FAIL.name() + "|NON_AUTH");
+            return;
+        }
+
+        String telephoneContact = normaliserNumeroPourRecherche(parts[1]);
         String nomAffiche = parts.length >= 3 ? parts[2].trim() : "";
 
         try {
-            // 1. Retrouver les deux utilisateurs
             Utilisateur moi = userDAO.findByTelephone(telephoneConnecte);
-            if (moi == null) { pw.println(Protocol.ADD_CONTACT_FAIL.name()); return; }
+            if (moi == null) {
+                pw.println(Protocol.ADD_CONTACT_FAIL.name());
+                return;
+            }
 
             Utilisateur contact = userDAO.findByTelephone(telephoneContact);
             if (contact == null) {
@@ -413,52 +640,94 @@ public class ClientHandler extends Thread {
                 return;
             }
 
-            // 2. Pas s'ajouter soi-même
             if (moi.getIdUtilisateur() == contact.getIdUtilisateur()) {
                 pw.println(Protocol.ADD_CONTACT_FAIL.name() + "|AJOUT_SOI_MEME");
                 return;
             }
 
-            // 3. Vérifier si Bob nous a bloqués
-            if (contactDAO.estBloque(contact.getIdUtilisateur(),
-                    moi.getIdUtilisateur())) {
+            if (contactDAO.estBloque(contact.getIdUtilisateur(), moi.getIdUtilisateur())) {
                 pw.println(Protocol.ADD_CONTACT_FAIL.name() + "|BLOQUE");
                 return;
             }
 
-            // 4. Créer le contact côté Alice (si pas déjà existant)
-            if (!contactDAO.contactExiste(moi.getIdUtilisateur(),
-                    contact.getIdUtilisateur())) {
+            // Créer le contact côté Alice (moi)
+            if (!contactDAO.contactExiste(moi.getIdUtilisateur(), contact.getIdUtilisateur())) {
                 Contact c = new Contact();
                 c.setIdUtilisateur(moi.getIdUtilisateur());
                 c.setIdContactUtilisateur(contact.getIdUtilisateur());
-                c.setNomAffiche(nomAffiche.isEmpty()
-                        ? contact.getNomComplet() : nomAffiche);
+                c.setNomAffiche(nomAffiche.isEmpty() ? contact.getNomComplet() : nomAffiche);
                 c.setEstBloque(false);
                 contactDAO.Add(c);
             }
+            int idConv = -1;
+            try {
+                Conversation conv = convDAO.findIndividuelle(moi.getIdUtilisateur(), contact.getIdUtilisateur());
+                if (conv == null) {
+                    conv = new Conversation();
+                    conv.setTypeConversation("individuelle");
+                    conv.setNomGroupe(null);
+                    conv.setIdCreateur(null);
+                    idConv = convDAO.Add(conv);
+                    conv.setIdConversation(idConv);
+                    convDAO.ajouterParticipant(idConv, moi.getIdUtilisateur());
+                    convDAO.ajouterParticipant(idConv, contact.getIdUtilisateur());
+                    System.out.println("[CONTACT] Conversation créée : " + idConv);
+                } else {
+                    idConv = conv.getIdConversation();
+                }
+            } catch (SQLException convEx) {
+                convEx.printStackTrace();
+            }
+            // Format : CONVERSATIONS_LIST|id;type;nom;numero;date;0;|
+            StringBuilder convData = new StringBuilder();
+            convData.append(idConv).append(";")
+                    .append("individuelle").append(";")
+                    .append(contact.getNomComplet()).append(";")
+                    .append(contact.getNumeroTelephone()).append(";")
+                    .append(";") // date vide
+                    .append("0").append(";") // 0 non lus
+                    .append("|");
 
-            // 5. Répondre à Alice : ADD_CONTACT_OK|telephone|nomComplet
+            // Envoyer d'abord la confirmation d'ajout
             pw.println(Protocol.ADD_CONTACT_OK.name()
                     + "|" + contact.getNumeroTelephone()
                     + "|" + contact.getNomComplet());
 
-            // 6. Notifier Bob si en ligne
-            // Format : CONTACT_REQUEST|telephoneAlice|nomAlice
-            ClientHandler contactHandler = userManager.getHandler(telephoneContact);
+            // envoyer la nouvelle conversation pour mise à jour temps réel
+            pw.println(Protocol.CONVERSATIONS_LIST.name() + "|" + convData);
+            pw.println(Protocol.ADD_CONTACT_OK.name()
+                    + "|" + contact.getNumeroTelephone()
+                    + "|" + contact.getNomComplet());
+
+            // Ligne PENDING côté Bob : id_utilisateur = Bob, id_contact_utilisateur = Alice
+            try {
+                if (!contactDAO.contactExiste(contact.getIdUtilisateur(), moi.getIdUtilisateur())) {
+                    contactDAO.ajouterDemandeEnAttente(
+                            moi.getIdUtilisateur(),
+                            contact.getIdUtilisateur());
+                }
+            } catch (SQLException pendingEx) {
+                pendingEx.printStackTrace();
+                System.err.println("[CONTACT] PENDING SQL (non bloquant) : " + pendingEx.getMessage());
+            }
+
+            String telDestEnBase = contact.getNumeroTelephone();
+            ClientHandler contactHandler = telDestEnBase != null
+                    ? userManager.getHandler(telDestEnBase.trim())
+                    : null;
             if (contactHandler != null) {
+                String nomMoi = moi.getNomComplet() != null ? moi.getNomComplet() : "";
                 contactHandler.sendMessage(
                         Protocol.CONTACT_REQUEST.name()
                                 + "|" + moi.getNumeroTelephone()
-                                + "|" + moi.getNomComplet()
+                                + "|" + nomMoi
                 );
+                System.out.println("[CONTACT] CONTACT_REQUEST push → " + telDestEnBase
+                        + " (demandeur " + moi.getNumeroTelephone() + ")");
             } else {
-                // ← Bob est hors ligne : persister la demande
-                contactDAO.ajouterDemandeEnAttente(
-                        moi.getIdUtilisateur(),
-                        contact.getIdUtilisateur()
-                );
+                System.out.println("[CONTACT] Destinataire hors ligne ou clé inconnue : " + telDestEnBase);
             }
+
         } catch (SQLException e) {
             e.printStackTrace();
             pw.println(Protocol.ADD_CONTACT_FAIL.name() + "|ERREUR_SERVEUR");
@@ -469,30 +738,49 @@ public class ClientHandler extends Thread {
 // Bob accepte → on crée le contact côté Bob aussi
     private void handleContactAccepted(String[] parts) {
         if (parts.length < 2) return;
-        String telephoneAlice = parts[1].trim();
+        String telephoneAlice = normaliserNumeroPourRecherche(parts[1].trim());
 
         try {
             Utilisateur moi   = userDAO.findByTelephone(telephoneConnecte); // Bob
             Utilisateur alice = userDAO.findByTelephone(telephoneAlice);
             if (moi == null || alice == null) return;
 
-            // 1. Mettre à jour PENDING → nom réel d'Alice côté Bob
-            String sql = "UPDATE contacts SET nom_affiche=? "
-                    + "WHERE id_utilisateur=? AND id_contact_utilisateur=? "
-                    + "AND nom_affiche='PENDING'";
-            try (Connection con = DataBase.getConnection();
-                 PreparedStatement ps = con.prepareStatement(sql)) {
-                ps.setString(1, alice.getNomComplet());
-                ps.setInt(2, moi.getIdUtilisateur());
-                ps.setInt(3, alice.getIdUtilisateur());
-                ps.executeUpdate();
+            if (!contactDAO.contactExiste(moi.getIdUtilisateur(), alice.getIdUtilisateur())) {
+                Contact c = new Contact();
+                c.setIdUtilisateur(moi.getIdUtilisateur());
+                c.setIdContactUtilisateur(alice.getIdUtilisateur());
+                c.setNomAffiche(alice.getNomComplet());
+                c.setEstBloque(false);
+                contactDAO.Add(c);
+            } else {
+                String sql = "UPDATE contacts SET nom_affiche=? "
+                        + "WHERE id_utilisateur=? AND id_contact_utilisateur=? "
+                        + "AND nom_affiche='PENDING'";
+                try (Connection con = DataBase.getConnection();
+                     PreparedStatement ps = con.prepareStatement(sql)) {
+                    ps.setString(1, alice.getNomComplet());
+                    ps.setInt(2, moi.getIdUtilisateur());
+                    ps.setInt(3, alice.getIdUtilisateur());
+                    ps.executeUpdate();
+                }
             }
-
+            try {
+                Conversation conv = convDAO.findIndividuelle(moi.getIdUtilisateur(), alice.getIdUtilisateur());
+                if (conv == null) {
+                    conv = new Conversation();
+                    conv.setTypeConversation("individuelle");
+                    int idConv = convDAO.Add(conv);
+                    convDAO.ajouterParticipant(idConv, moi.getIdUtilisateur());
+                    convDAO.ajouterParticipant(idConv, alice.getIdUtilisateur());
+                    System.out.println("[CONTACT] Conversation créée côté accepteur : " + idConv);
+                }
+            } catch (SQLException e) { e.printStackTrace(); }
             // 2. Confirmer à Bob
             pw.println(Protocol.CONTACT_ACCEPTED.name() + "|OK");
 
-            // 3. ← NOUVEAU : notifier Alice que Bob a accepté
-            ClientHandler aliceHandler = userManager.getHandler(telephoneAlice);
+            // 3. Notifier Alice que Bob a accepté
+            String telAlice = alice.getNumeroTelephone();
+            ClientHandler aliceHandler = telAlice != null ? userManager.getHandler(telAlice.trim()) : null;
             if (aliceHandler != null) {
                 aliceHandler.sendMessage(
                         Protocol.CONTACT_ACCEPTED.name()
@@ -507,13 +795,14 @@ public class ClientHandler extends Thread {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
     }
 
     // ── BLOCK_CONTACT|telephoneContact ───────────────────────────────────────
 // Bob bloque Alice → plus aucun message ne passera
     private void handleBlockContact(String[] parts) {
         if (parts.length < 2) return;
-        String telephoneABloquer = parts[1].trim();
+        String telephoneABloquer = normaliserNumeroPourRecherche(parts[1]);
 
         try {
             Utilisateur moi      = userDAO.findByTelephone(telephoneConnecte);
@@ -532,5 +821,291 @@ public class ClientHandler extends Thread {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    // ── GROUPES V2 ───────────────────────────────────────────────────────────
+    private void handleCreateGroup(String[] parts) {
+        try {
+            if (parts.length < 3) {
+                pw.println(Protocol.CREATE_GROUP_FAIL.name() + "|Données invalides");
+                return;
+            }
+            List<String> membres = new ArrayList<>();
+            for (int i = 3; i < parts.length; i++) {
+                if (!parts[i].isBlank()) membres.add(normaliserNumeroPourRecherche(parts[i]));
+            }
+            Groupe groupe = groupeDAO.creerGroupe(parts[1].trim(),
+                    normaliserNumeroPourRecherche(parts[2]), membres);
+            pw.println(Protocol.CREATE_GROUP_OK.name() + "|"
+                    + groupe.getIdGroupe() + "|"
+                    + groupe.getNomGroupe() + "|"
+                    + groupe.getNumeroCreateur() + "|"
+                    + groupe.getDateCreation() + "|"
+                    + String.join(";", groupe.getNumerosMembres()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            pw.println(Protocol.CREATE_GROUP_FAIL.name() + "|Erreur création groupe");
+        }
+    }
+
+    private void handleGetGroups(String[] parts) {
+        try {
+            String numero = parts.length >= 2
+                    ? normaliserNumeroPourRecherche(parts[1])
+                    : normaliserNumeroPourRecherche(telephoneConnecte != null ? telephoneConnecte : "");
+            List<Groupe> groupes = groupeDAO.getGroupesPourMembre(numero);
+            StringBuilder sb = new StringBuilder();
+            for (Groupe g : groupes) {
+                if (sb.length() > 0) sb.append("|");
+                sb.append(g.getIdGroupe()).append(";")
+                        .append(g.getNomGroupe()).append(";")
+                        .append(g.getNumeroCreateur()).append(";")
+                        .append(g.getNumerosMembres() != null ? g.getNumerosMembres().size() : 0);
+
+                // Envoyer les vrais numéros
+                if (g.getNumerosMembres() != null) {
+                    for (String m : g.getNumerosMembres()) {
+                        if (m != null && !m.isBlank()) sb.append(";").append(m.trim());
+                    }
+                }
+            }
+            pw.println(Protocol.GROUPS_LIST.name() + "|" + sb);
+        } catch (Exception e) {
+            e.printStackTrace();
+            pw.println(Protocol.GROUPS_LIST.name() + "|");
+        }
+    }
+
+    private void handleSendGroupMessage(String[] parts) {
+        try {
+            if (parts.length < 4) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            Groupe g = groupeDAO.getById(idGroupe);
+            if (g == null) return;
+
+            String telExp = normaliserNumeroPourRecherche(parts[2]);
+            Utilisateur exp = userDAO.findByTelephone(telExp);
+            String nomExp = exp != null ? exp.getNomComplet() : telExp;
+
+            StringBuilder contenu = new StringBuilder(parts[3] != null ? parts[3] : "");
+            for (int i = 4; i < parts.length; i++) {
+                contenu.append('|').append(parts[i] != null ? parts[i] : "");
+            }
+
+            MessageGroupe msg = new MessageGroupe();
+            msg.setIdGroupe(idGroupe);
+            msg.setTelephoneExpediteur(telExp);
+            msg.setNomExpediteur(nomExp);
+            msg.setContenu(contenu.toString());
+            msg.setDateEnvoi(LocalDateTime.now());
+            int idMsg = messageGroupeDAO.ajouter(msg);
+            msg.setIdMessage(idMsg);
+
+            String payload = Protocol.GROUP_MESSAGE_RECEIVE.name() + "|"
+                    + idGroupe + "|"
+                    + msg.getTelephoneExpediteur() + "|"
+                    + msg.getNomExpediteur() + "|"
+                    + msg.getContenu() + "|"
+                    + msg.getDateEnvoi();
+            for (String membre : g.getNumerosMembres()) {
+                ClientHandler h = userManager.getHandler(membre);
+                if (h != null) h.sendMessage(payload);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void handleGetGroupMessages(String[] parts) {
+        try {
+            if (parts.length < 2) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            List<MessageGroupe> liste = messageGroupeDAO.getByGroupe(idGroupe);
+            StringBuilder sb = new StringBuilder();
+            for (MessageGroupe msg : liste) {
+                if (sb.length() > 0) sb.append(FileMediaUtil.GROUP_MSG_RECORD_SEP);
+                String contenu = msg.getContenu() != null ? msg.getContenu() : "";
+                sb.append(msg.getIdMessage()).append(";")
+                        .append(msg.getTelephoneExpediteur()).append(";")
+                        .append(msg.getNomExpediteur()).append(";")
+                        .append(contenu).append(";")
+                        .append(msg.getDateEnvoi() != null ? msg.getDateEnvoi().toString() : "");
+                if (FileMediaUtil.isGroupFileContent(contenu)) {
+                    String b64 = MessageRouter.lireBase64DepuisContenuGroupe(contenu);
+                    if (b64 != null) sb.append(";").append(b64);
+                }
+            }
+            pw.println(Protocol.GROUP_MESSAGES_LIST.name() + "|" + sb);
+        } catch (Exception e) {
+            e.printStackTrace();
+            pw.println(Protocol.GROUP_MESSAGES_LIST.name() + "|");
+        }
+    }
+
+    private void handleAddGroupMember(String[] parts) {
+        try {
+            if (parts.length < 4) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String numAdmin = normaliserNumeroPourRecherche(parts[2]);
+            String numNew = normaliserNumeroPourRecherche(parts[3]);
+            if (!groupeDAO.estAdmin(idGroupe, numAdmin)) {
+                pw.println(Protocol.ADD_GROUP_MEMBER_FAIL.name() + "|Permission refusée");
+                return;
+            }
+            groupeDAO.ajouterMembre(idGroupe, numNew);
+            Groupe g = groupeDAO.getById(idGroupe);
+            String payload = Protocol.ADD_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numNew;
+            if (g != null && g.getNumerosMembres() != null) {
+                for (String membre : g.getNumerosMembres()) {
+                    ClientHandler h = userManager.getHandler(membre);
+                    if (h != null) h.sendMessage(payload);
+                }
+            } else {
+                pw.println(payload);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            pw.println(Protocol.ADD_GROUP_MEMBER_FAIL.name() + "|Erreur serveur");
+        }
+    }
+
+    private void handleRemoveGroupMember(String[] parts) {
+        try {
+            if (parts.length < 4) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String numAdmin = normaliserNumeroPourRecherche(parts[2]);
+            String numMembre = normaliserNumeroPourRecherche(parts[3]);
+            if (!groupeDAO.estAdmin(idGroupe, numAdmin)) {
+                pw.println(Protocol.REMOVE_GROUP_MEMBER_FAIL.name() + "|Permission refusée");
+                return;
+            }
+            Groupe avant = groupeDAO.getById(idGroupe);
+            List<String> notif = avant != null && avant.getNumerosMembres() != null
+                    ? new ArrayList<>(avant.getNumerosMembres()) : new ArrayList<>();
+            groupeDAO.retirerMembre(idGroupe, numMembre);
+            if (!notif.contains(numMembre)) notif.add(numMembre);
+            String payload = Protocol.REMOVE_GROUP_MEMBER_OK.name() + "|" + idGroupe + "|" + numMembre;
+            for (String tel : notif) {
+                ClientHandler h = userManager.getHandler(tel);
+                if (h != null) h.sendMessage(payload);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            pw.println(Protocol.REMOVE_GROUP_MEMBER_FAIL.name() + "|Erreur serveur");
+        }
+    }
+
+    private void handleQuitGroup(String[] parts) {
+        try {
+            if (parts.length < 3) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String numero = normaliserNumeroPourRecherche(parts[2]);
+            Groupe avant = groupeDAO.getById(idGroupe);
+            List<String> notif = avant != null && avant.getNumerosMembres() != null
+                    ? new ArrayList<>(avant.getNumerosMembres()) : new ArrayList<>();
+            groupeDAO.retirerMembre(idGroupe, numero);
+            String payload = Protocol.QUIT_GROUP_OK.name() + "|" + idGroupe;
+            for (String tel : notif) {
+                ClientHandler h = userManager.getHandler(tel);
+                if (h != null) h.sendMessage(payload);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void handleDeleteGroup(String[] parts) {
+        try {
+            if (parts.length < 3) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String admin = normaliserNumeroPourRecherche(parts[2]);
+            if (!groupeDAO.estAdmin(idGroupe, admin)) return;
+            Groupe g = groupeDAO.getById(idGroupe);
+            List<String> membres = g != null && g.getNumerosMembres() != null
+                    ? new ArrayList<>(g.getNumerosMembres()) : new ArrayList<>();
+            groupeDAO.supprimerGroupe(idGroupe);
+            String payload = Protocol.DELETE_GROUP_OK.name() + "|" + idGroupe;
+            for (String tel : membres) {
+                ClientHandler h = userManager.getHandler(tel);
+                if (h != null) h.sendMessage(payload);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void handleRenameGroup(String[] parts) {
+        try {
+            if (parts.length < 4) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String admin = normaliserNumeroPourRecherche(parts[2]);
+            StringBuilder nouveauNom = new StringBuilder(parts[3] != null ? parts[3] : "");
+            for (int i = 4; i < parts.length; i++) {
+                nouveauNom.append('|').append(parts[i] != null ? parts[i] : "");
+            }
+            if (!groupeDAO.estAdmin(idGroupe, admin)) return;
+            groupeDAO.renommerGroupe(idGroupe, nouveauNom.toString());
+            Groupe g = groupeDAO.getById(idGroupe);
+            String payload = Protocol.RENAME_GROUP_OK.name() + "|" + idGroupe + "|" + nouveauNom;
+            if (g != null && g.getNumerosMembres() != null) {
+                for (String tel : g.getNumerosMembres()) {
+                    ClientHandler h = userManager.getHandler(tel);
+                    if (h != null) h.sendMessage(payload);
+                }
+            } else {
+                pw.println(payload);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void handleJoinGroupCall(String[] parts) {
+        try {
+            if (parts.length < 6) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            String type = parts[2];
+            String port = parts[3];
+            String portAudio = parts[4];
+            String isReply = parts[5];
+
+            Groupe g = groupeDAO.getById(idGroupe);
+            if (g == null) return;
+            
+            Utilisateur moi = userDAO.findByTelephone(telephoneConnecte);
+            String nom = moi != null ? moi.getNomComplet() : telephoneConnecte;
+            String ip = socket != null && socket.getInetAddress() != null ? socket.getInetAddress().getHostAddress() : "";
+            
+            String payload = Protocol.JOIN_GROUP_CALL.name() + "|" + idGroupe + "|" + telephoneConnecte + "|" + nom + "|" + ip + "|" + type + "|" + port + "|" + portAudio + "|" + isReply;
+            
+            if (g.getNumerosMembres() != null) {
+                for (String membre : g.getNumerosMembres()) {
+                    ClientHandler h = userManager.getHandler(membre);
+                    // Comparaison directe des instances pour exclure l'expéditeur de manière fiable
+                    if (h != null && h != this) {
+                        h.sendMessage(payload);
+                    }
+                }
+            }
+        } catch(Exception e) { e.printStackTrace(); }
+    }
+
+    private void handleLeaveGroupCall(String[] parts) {
+        try {
+            if (parts.length < 2) return;
+            int idGroupe = Integer.parseInt(parts[1]);
+            Groupe g = groupeDAO.getById(idGroupe);
+            if (g == null) return;
+            
+            String payload = Protocol.LEAVE_GROUP_CALL.name() + "|" + idGroupe + "|" + telephoneConnecte;
+            if (g.getNumerosMembres() != null) {
+                for (String membre : g.getNumerosMembres()) {
+                    ClientHandler h = userManager.getHandler(membre);
+                    if (h != null && h != this) {
+                        h.sendMessage(payload);
+                    }
+                }
+            }
+        } catch(Exception e) { e.printStackTrace(); }
     }
 }

@@ -13,12 +13,10 @@ import java.net.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
 //import Serveur.*;
 @Setter
 @Getter
 public class ClientReseau {
-
     private Socket tuyau;
     private PrintWriter stylo;
     private BufferedReader yeux;
@@ -28,6 +26,7 @@ public class ClientReseau {
     private Utilisateur moi;
     private MessageService messageService;
     private CallService callService;
+    private int dernierIdGroupeDemande = -1;
 
 
     public ClientReseau(EcouteurClient ecouteur){//lier a l'interface graphique pour les signales
@@ -76,10 +75,23 @@ public class ClientReseau {
             return;
         }
         if (stylo != null) {
+            if (packet.getProtocol() == Protocol.GET_GROUP_MESSAGES) {
+                try { dernierIdGroupeDemande = Integer.parseInt(packet.getData()); } catch (Exception ignored) {}
+            }
             stylo.println(packet.toString());
             System.out.println(" Envoyé : " + packet.getProtocol());
         }
     }
+
+    public void demanderContacts() {
+        if (!connecte || stylo == null) {
+            System.out.println("❌ Pas connecté au serveur");
+            return;
+        }
+        Packet p = new Packet(Protocol.GET_CONTACTS, "");
+        envoyer(p);
+    }
+
     public void demanderConversations() {
         if (!connecte || stylo == null) {
             System.out.println("❌ Pas connecté au serveur");
@@ -225,70 +237,138 @@ public class ClientReseau {
                         ecouteur.erreur("Échec ajout contact: " + p.getData());
                     }
                     break;
+                case CONTACT_REQUEST:
+                    if (parts.length >= 2 && ecouteur != null) {
+                        String numDemandeur = parts[0];
+                        String nomDemandeur = parts.length >= 2 ? parts[1] : "";                        System.out.println("[CONTACT] Demande reçue de " + nomDemandeur + " (" + numDemandeur + ")");
+                        System.out.println("[CONTACT] Demande reçue de " + nomDemandeur + " (" + numDemandeur + ")");
+                        ecouteur.demandeContactRecue(numDemandeur, nomDemandeur);                    }
+                    break;
                     //fichier
                 case FILE_RECEIVE:
-                    if (parts.length >= 3) {
+                    if (parts.length >= 3 && ecouteur != null) {
                         String telExp = parts[0];
-                        String fileName = parts[1];
-                        String base64 = parts[2];
-
-                        if (ecouteur != null) {
-                            ecouteur.fichierRecu(telExp, fileName, base64);
+                        String type;
+                        String fileName;
+                        String base64;
+                        if (parts.length >= 4 && isFileType(parts[1])) {
+                            type = parts[1];
+                            fileName = parts[2];
+                            base64 = parts[3];
+                            for (int i = 4; i < parts.length; i++) base64 += "|" + parts[i];
+                        } else {
+                            type = "fichier";
+                            fileName = parts[1];
+                            base64 = parts[2];
+                            for (int i = 3; i < parts.length; i++) base64 += "|" + parts[i];
                         }
+                        ecouteur.fichierRecu(telExp, type, fileName, base64);
+                    }
+                    break;
+                case FILE_GROUP_RECEIVE:
+                    if (parts.length >= 6 && ecouteur != null) {
+                        int idG = Integer.parseInt(parts[0]);
+                        String telExp = parts[1];
+                        String nomExp = parts[2];
+                        String type = parts[3];
+                        String fileName = parts[4];
+                        String base64 = parts[5];
+                        for (int i = 6; i < parts.length; i++) base64 += "|" + parts[i];
+                        ecouteur.fichierGroupeRecu(idG, telExp, nomExp, type, fileName, base64);
+                    }
+                    break;
+                case FILE_OK:
+                    if (ecouteur != null) {
+                        String name = parts.length > 0 ? parts[parts.length - 1] : "";
+                        ecouteur.fichierEnvoiReussi(name);
+                        ecouteur.fichierProgress(100);
+                    }
+                    break;
+                case FILE_FAIL:
+                    if (ecouteur != null) {
+                        ecouteur.fichierEnvoiEchoue(data != null ? data : "Échec envoi");
+                    }
+                    break;
+                case FILE_PROGRESS:
+                    if (ecouteur != null && parts.length >= 1) {
+                        try {
+                            ecouteur.fichierProgress(Integer.parseInt(parts[0]));
+                        } catch (NumberFormatException ignored) {}
                     }
                     break;
                 case CREATE_GROUP_OK:
-                    if (ecouteur != null && parts.length >= 2) {
-                        Groupe g = Groupe.fromNetworkString(parts[0] + ";" + parts[1]); // adapter selon format serveur
-                        // Ou mieux: le serveur envoie le groupe complet sérialisé
-                        ecouteur.groupeCree(g);
-                    }
+                    traiterCreateGroupOk(data);
                     break;
-
                 case CREATE_GROUP_FAIL:
                     if (ecouteur != null) ecouteur.creationGroupeEchouee(data);
                     break;
                 case GROUPS_LIST:
                     traiterGroupesRecus(data);
                     break;
-
-                case GROUP_MEMBERS_LIST:
-                    if (parts.length >= 2) {
-                        int idGroupe = Integer.parseInt(parts[0]);
-                        traiterMembresGroupe(idGroupe, parts[1]);
-                    }
+                case GROUP_MESSAGES_LIST:
+                    traiterMessagesGroupeRecus(data);
                     break;
-                case GROUP_MSG_RECEIVE:
-                    if (ecouteur != null) {
-                        MessageGroupe mg = MessageGroupe.fromNetworkString(data);
-                        // Déterminer si c'est mon message
-                        if (moi != null) mg.setEstMoi(mg.getTelephoneExpediteur().equals(moi.getNumeroTelephone()));
-                        ecouteur.messageGroupeRecu(mg);
-                    }
+                case GROUP_MESSAGE_RECEIVE:
+                    traiterMessageGroupeRecu(parts);
                     break;
-                case ADD_MEMBER_OK:
-                    if (ecouteur != null && parts.length >= 2) {
+                case ADD_GROUP_MEMBER_OK:
+                    if (parts.length >= 2 && ecouteur != null) {
                         ecouteur.membreAjoute(Integer.parseInt(parts[0]), parts[1]);
                     }
                     break;
-
-                case REMOVE_MEMBER_OK:
-                    if (ecouteur != null && parts.length >= 2) {
+                case ADD_GROUP_MEMBER_FAIL:
+                    if (ecouteur != null) {
+                        ecouteur.erreur("Ajout membre au groupe : " + (data != null ? data : ""));
+                    }
+                    break;
+                case REMOVE_GROUP_MEMBER_OK:
+                    if (parts.length >= 2 && ecouteur != null) {
                         ecouteur.membreRetire(Integer.parseInt(parts[0]), parts[1]);
                     }
                     break;
-                case LEAVE_GROUP_OK:
-                    if (ecouteur != null) ecouteur.aQuitteGroupe(Integer.parseInt(data));
-                    break;
-
-                case DELETE_GROUP_OK:
-                    if (ecouteur != null) ecouteur.groupeSupprime(Integer.parseInt(data));
-                    break;
-
-                case UPDATE_GROUP_NAME_OK:
-                    if (ecouteur != null && parts.length >= 2) {
-                        ecouteur.nomGroupeModifie(Integer.parseInt(parts[0]), parts[1]);
+                case REMOVE_GROUP_MEMBER_FAIL:
+                    if (ecouteur != null) {
+                        ecouteur.erreur("Retrait membre du groupe : " + (data != null ? data : ""));
                     }
+                    break;
+                case QUIT_GROUP_OK:
+                    if (parts.length >= 1 && ecouteur != null) ecouteur.aQuitteGroupe(Integer.parseInt(parts[0]));
+                    break;
+                case DELETE_GROUP_OK:
+                    if (parts.length >= 1 && ecouteur != null) ecouteur.groupeSupprime(Integer.parseInt(parts[0]));
+                    break;
+                case RENAME_GROUP_OK:
+                    if (parts.length >= 2 && ecouteur != null) ecouteur.nomGroupeModifie(Integer.parseInt(parts[0]), parts[1]);
+                    break;
+                case JOIN_GROUP_CALL:
+                    if (parts.length >= 7 && ecouteur != null) {
+                        int idGroupe = Integer.parseInt(parts[0]);
+                        String numeroMembre = parts[1];
+                        String nomMembre = parts[2];
+                        String ip = parts[3];
+                        String type = parts[4];
+                        int port = Integer.parseInt(parts[5]);
+                        int portAudio;
+                        boolean isReply;
+                        if (parts.length >= 8) {
+                            portAudio = Integer.parseInt(parts[6]);
+                            isReply = "1".equals(parts[7]);
+                        } else {
+                            portAudio = "VIDEO".equalsIgnoreCase(type) ? port + 1 : port;
+                            isReply = "1".equals(parts[6]);
+                        }
+                        ecouteur.membreRejointAppelGroupe(idGroupe, numeroMembre, nomMembre, ip, type, port, portAudio, isReply);
+                    }
+                    break;
+                case LEAVE_GROUP_CALL:
+                    if (parts.length >= 2 && ecouteur != null) {
+                        int idGroupe = Integer.parseInt(parts[0]);
+                        String numeroMembre = parts[1];
+                        ecouteur.membreQuitteAppelGroupe(idGroupe, numeroMembre);
+                    }
+                    break;
+                case USERS_LIST:
+                    // Optionnel : gérer la liste des utilisateurs connectés
                     break;
                 default:
                     System.out.println("Protocole inconnu : " + p.getProtocol());
@@ -297,75 +377,52 @@ public class ClientReseau {
             }
         }
 
-        private void traiterGroupesRecus(String data) {
-            List<Groupe> groupes = new ArrayList<>();
-            if (data == null || data.isEmpty()) {
-                if (ecouteur != null) ecouteur.listeGroupesRecue(groupes);
-                return;
-            }
-
-            String[] grps = data.split("\\|");
-            for (String g : grps) {
-                if (g.isEmpty()) continue;
-                try {
-                    groupes.add(Groupe.fromNetworkString(g));
-                } catch (Exception e) {
-                    System.out.println("❌ Erreur parsing groupe: " + e.getMessage());
-                }
-            }
-            System.out.println("👥 Groupes reçus: " + groupes.size());
-            if (ecouteur != null) ecouteur.listeGroupesRecue(groupes);
-        }
-
-        // ===== TRAITER MEMBRES GROUPE =====
-        private void traiterMembresGroupe(int idGroupe, String data) {
-            List<Utilisateur> membres = new ArrayList<>();
-            if (data == null || data.isEmpty()) {
-                if (ecouteur != null) ecouteur.membresGroupeRecus(idGroupe, membres);
-                return;
-            }
-
-            String[] usrs = data.split("\\|");
-            for (String u : usrs) {
-                if (u.isEmpty()) continue;
-                String[] parts = u.split(";", -1);
-                if (parts.length < 3) continue;
-                Utilisateur user = new Utilisateur();
-                user.setIdUtilisateur(Integer.parseInt(parts[0]));
-                user.setNomComplet(parts[1]);
-                user.setNumeroTelephone(parts[2]);
-                user.setPhotoProfil(parts.length >= 4 && !parts[3].isEmpty() ? parts[3] : null);
-                //user.setEnLigne(parts.length >= 5 && Boolean.parseBoolean(parts[4]));
-                membres.add(user);
-            }
-            if (ecouteur != null) ecouteur.membresGroupeRecus(idGroupe, membres);
-        }
-
         private void traiterConversationsRecues(String data) {
             List<Conversation> conversations = new ArrayList<>();
 
-            if (data.isEmpty()) {
+            if (data == null || data.isEmpty()) {
                 if (ecouteur != null) ecouteur.conversationsRecues(conversations);
                 return;
             }
-            // Format : id;type;nomExp;datedernierMsg;nonLus;contenuDerniermsg|id;nom;...
+            // Format v2 : id;type;nom;numeroTel;date;nonLus;dernierMsg|
+            // Ancien : id;type;nom;date;nonLus;dernierMsg|
             String[] convs = data.split("\\|");
             for (String c : convs) {
                 if (c.isEmpty()) continue;
-                String[] parts = c.split(";", 6);
-                if (parts.length < 5) continue;
+                String[] parts = c.split(";", -1);
+                if (parts.length < 6) continue;
 
                 Conversation conv = new Conversation();
                 conv.setIdConversation(Integer.parseInt(parts[0].trim()));
-                conv.setTypeConversation(parts[1]);
-                conv.setNomContact(parts[2]);
-                try {
-                    conv.setDateDernierMessage(java.time.LocalDateTime.parse(parts[3]));
-                } catch (Exception e) {
-                    conv.setDateDernierMessage(null);
+                conv.setTypeConversation(parts[1].trim());
+                conv.setNomContact(parts[2].trim());
+
+                if (parts.length >= 7) {
+                    conv.setNumeroContact(parts[3].trim());
+                    try {
+                        conv.setDateDernierMessage(java.time.LocalDateTime.parse(parts[4]));
+                    } catch (Exception e) {
+                        conv.setDateDernierMessage(null);
+                    }
+                    conv.setMessagesNonLus(Integer.parseInt(parts[5].trim()));
+                    if (parts.length > 7) {
+                        StringBuilder dm = new StringBuilder(parts[6] != null ? parts[6] : "");
+                        for (int pi = 7; pi < parts.length; pi++) {
+                            dm.append(';').append(parts[pi] != null ? parts[pi] : "");
+                        }
+                        conv.setDernierMessage(dm.toString());
+                    } else {
+                        conv.setDernierMessage(parts[6] != null ? parts[6] : "");
+                    }
+                } else {
+                    try {
+                        conv.setDateDernierMessage(java.time.LocalDateTime.parse(parts[3]));
+                    } catch (Exception e) {
+                        conv.setDateDernierMessage(null);
+                    }
+                    conv.setMessagesNonLus(Integer.parseInt(parts[4].trim()));
+                    conv.setDernierMessage(parts.length >= 6 ? parts[5] : "");
                 }
-                conv.setMessagesNonLus(Integer.parseInt(parts[4]));
-                conv.setDernierMessage(parts.length >= 6 ? parts[5] : "");
                 conversations.add(conv);
             }
             System.out.println("Conversations reçues : " + conversations.size());
@@ -406,6 +463,13 @@ public class ClientReseau {
                     } catch (Exception e) {
                         msg.setDateEnvoi(null);
                     }
+                    if (champs.length >= 6) {
+                        msg.setTypeMessage(champs[5]);
+                        msg.setNomFichier(champs[6]);
+                    }
+                    if (champs.length >= 8 && champs[7] != null && !champs[7].isEmpty()) {
+                        msg.setUrlFichier(champs[7]);
+                    }
                     // Déterminer si c'est un message envoyé ou reçu
                     msg.setEstMoi(moi != null && champs[1].equals(moi.getNumeroTelephone()));
                     messages.add(msg);
@@ -418,12 +482,118 @@ public class ClientReseau {
                 ecouteur.messagesRecus(messages);
             }
         }
+
+        private void traiterCreateGroupOk(String data) {
+            try {
+                String[] parts = data.split("\\|", -1);
+                Groupe groupe = new Groupe();
+                if (parts.length > 0) groupe.setIdGroupe(Integer.parseInt(parts[0]));
+                if (parts.length > 1) groupe.setNomGroupe(parts[1]);
+                if (parts.length > 2) groupe.setNumeroCreateur(parts[2]);
+                if (parts.length > 3) groupe.setDateCreation(parts[3]);
+                List<String> membres = new ArrayList<>();
+                if (parts.length > 4) {
+                    String[] nums = parts[4].split(";", -1);
+                    for (String num : nums) if (!num.isEmpty()) membres.add(num);
+                }
+                groupe.setNumerosMembres(membres);
+                if (ecouteur != null) ecouteur.groupeCree(groupe);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void traiterGroupesRecus(String data) {
+            List<Groupe> groupes = new ArrayList<>();
+            if (data == null || data.isEmpty()) {
+                if (ecouteur != null) ecouteur.listeGroupesRecue(groupes);
+                return;
+            }
+            String[] lignes = data.split("\\|");
+            for (String ligne : lignes) {
+                String[] champs = ligne.split(";", -1);
+                if (champs.length < 4) continue;
+                Groupe g = new Groupe();
+                g.setIdGroupe(Integer.parseInt(champs[0]));
+                g.setNomGroupe(champs[1]);
+                g.setNumeroCreateur(champs[2]);
+                List<String> membres = new ArrayList<>();
+                for (int i = 4; i < champs.length; i++) {
+                    if (!champs[i].isEmpty()) membres.add(champs[i].trim());
+                }
+                g.setNumerosMembres(membres);
+                groupes.add(g);
+            }
+            if (ecouteur != null) ecouteur.listeGroupesRecue(groupes);
+        }
+
+        private void traiterMessagesGroupeRecus(String data) {
+            int idGroupe = dernierIdGroupeDemande;
+            if (ecouteur != null) ecouteur.debutHistoriqueGroupe(idGroupe);
+            if (data == null || data.isEmpty()) {
+                if (ecouteur != null) ecouteur.finHistoriqueGroupe(idGroupe);
+                return;
+            }
+            // Format serveur : id;tel;nom;contenu;date[;base64Fichier] (séparateur \u001e entre messages)
+            String[] lignes = data.split(java.util.regex.Pattern.quote(util.FileMediaUtil.GROUP_MSG_RECORD_SEP), -1);
+            for (String ligne : lignes) {
+                if (ligne == null || ligne.isEmpty()) continue;
+                String[] champs = ligne.split(";", -1);
+                if (champs.length < 5) continue;
+
+                MessageGroupe msg = new MessageGroupe();
+                try { msg.setIdMessage(Integer.parseInt(champs[0].trim())); } catch (Exception ignored) {}
+                msg.setIdGroupe(idGroupe);
+                msg.setTelephoneExpediteur(champs[1]);
+                msg.setNomExpediteur(champs[2]);
+                msg.setContenu(champs[3]);
+                try {
+                    msg.setDateEnvoi(LocalDateTime.parse(champs[4]));
+                } catch (Exception e) {
+                    msg.setDateEnvoi(null);
+                }
+                String b64File = champs.length >= 6 ? champs[5] : null;
+
+                if (ecouteur == null) continue;
+                if (b64File != null && !b64File.isEmpty()
+                        && util.FileMediaUtil.isGroupFileContent(msg.getContenu())) {
+                    String[] meta = util.FileMediaUtil.parseGroupFileContent(msg.getContenu());
+                    if (meta != null) {
+                        ecouteur.fichierGroupeRecu(idGroupe, msg.getTelephoneExpediteur(),
+                                msg.getNomExpediteur(), meta[0], meta[1], b64File, champs[4]);
+                        continue;
+                    }
+                }
+                ecouteur.messageGroupeRecu(msg);
+            }
+            if (ecouteur != null) ecouteur.finHistoriqueGroupe(idGroupe);
+        }
+
+        private void traiterMessageGroupeRecu(String[] parts) {
+            if (parts.length < 5) return;
+            MessageGroupe msg = new MessageGroupe();
+            msg.setIdGroupe(Integer.parseInt(parts[0]));
+            msg.setTelephoneExpediteur(parts[1]);
+            msg.setNomExpediteur(parts[2]);
+            if (parts.length == 5) {
+                msg.setContenu(parts[3]);
+                try { msg.setDateEnvoi(LocalDateTime.parse(parts[4])); } catch (Exception e) { msg.setDateEnvoi(null); }
+            } else {
+                StringBuilder c = new StringBuilder(parts[3] != null ? parts[3] : "");
+                for (int i = 4; i < parts.length - 1; i++) {
+                    c.append('|').append(parts[i] != null ? parts[i] : "");
+                }
+                msg.setContenu(c.toString());
+                try { msg.setDateEnvoi(LocalDateTime.parse(parts[parts.length - 1])); } catch (Exception e) { msg.setDateEnvoi(null); }
+            }
+            if (ecouteur != null) ecouteur.messageGroupeRecu(msg);
+        }
+    }
+    private static boolean isFileType(String s) {
+        return "image".equals(s) || "video".equals(s) || "audio".equals(s) || "fichier".equals(s);
     }
 
-    //fichiers
-    public void envoyerFichier(String telDest, String fileName, byte[] dataBase64) {
-        String contenu = telDest + "|" + fileName + "|" + new String(dataBase64);
-        Packet p = new Packet(Protocol.FILE_SEND, contenu);
-        envoyer(p);
+    public void notifierEchecFichier(String message) {
+        if (ecouteur != null) ecouteur.fichierEnvoiEchoue(message);
     }
 }

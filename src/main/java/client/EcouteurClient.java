@@ -1,6 +1,8 @@
 package client;
 
 import model.*;
+
+import javafx.scene.image.ImageView;
 import java.util.List;
 public interface EcouteurClient {
     // Quand la connexion réussit
@@ -14,11 +16,17 @@ public interface EcouteurClient {
     void messagesRecus(List<Message> messages); // Pour une conversation donnée
     //Contact
     void contactAjoute(Contact contact);           // Quand un contact est ajouté
+    /** Demande entrante (autre utilisateur souhaite vous ajouter). */
+    default void demandeContactRecue(String numeroDemandeur, String nomDemandeur) {}
+    /** Vous avez accepté une demande : rafraîchir les conversations / contacts. */
+    default void contactAcceptationConfirmee() {}
     void listeContactsRecue(List<Contact> contacts);
 
     // Quand on se déconnecte
     void deconnexion();
-    void appelEntrant(String numero,String type, String ipAppelant, String name);
+
+    // (Methode fluxVideoGroupeRecu deplacee plus bas)
+    void appelEntrant(String numero, String type, String ipAppelant, String name);
     void appelAccepte(String numero, String ip);
      void appelRefuse();
      void appelTermine(String numero);
@@ -27,7 +35,7 @@ public interface EcouteurClient {
     void groupeCree(Groupe groupe);                    // CREATE_GROUP_OK
     void creationGroupeEchouee(String raison);          // CREATE_GROUP_FAIL
     void listeGroupesRecue(List<Groupe> groupes);       // GROUPS_LIST
-    void membresGroupeRecus(int idGroupe, List<Utilisateur> membres); // GROUP_MEMBERS_LIST
+    default void membresGroupeRecus(int idGroupe, List<Utilisateur> membres) {}
     void messageGroupeRecu(MessageGroupe message);      // GROUP_MSG_RECEIVE
     void membreAjoute(int idGroupe, String numero);     // ADD_MEMBER_OK
     void membreRetire(int idGroupe, String numero);     // REMOVE_MEMBER_OK
@@ -36,5 +44,26 @@ public interface EcouteurClient {
     void nomGroupeModifie(int idGroupe, String nouveauNom);
 
     //fichier
-    void fichierRecu(String telephoneExp, String fileName, String base64);
+    void fichierRecu(String telephoneExp, String type, String fileName, String base64);
+    default void fichierGroupeRecu(int idGroupe, String telephoneExp, String nomExp,
+                                   String type, String fileName, String base64) {
+        fichierGroupeRecu(idGroupe, telephoneExp, nomExp, type, fileName, base64, null);
+    }
+    default void fichierGroupeRecu(int idGroupe, String telephoneExp, String nomExp,
+                                   String type, String fileName, String base64, String dateEnvoi) {}
+    default void fichierProgress(int percent) {}
+    default void fichierEnvoiEchoue(String raison) {}
+    default void fichierEnvoiReussi(String fileName) {}
+    default void debutHistoriqueGroupe(int idGroupe) {}
+    default void finHistoriqueGroupe(int idGroupe) {}
+    void appelGroupeEntrant(int idGroupe, String nomGroupe, String type, String initiateurNom);
+    void appelGroupeDemarre(int idGroupe, String type);
+    void membreRejointAppelGroupe(int idGroupe, String numeroMembre, String nomMembre, String ip, String type, int port, int portAudio, boolean isReply);
+    void membreQuitteAppelGroupe(int idGroupe, String numeroMembre);
+    void appelGroupeTermine(int idGroupe);
+    void signalisationAppelGroupe(int idGroupe, String numeroSource, String typeSignal, String payload);
+    void fluxVideoGroupeRecu(int idGroupe, String numeroExpediteur, ImageView videoNode);
+    void fluxVideoGroupeArrete(int idGroupe, String numeroExpediteur);
+    //pour les ppels audio et video
+
 }

@@ -2,11 +2,16 @@ package Serveur;
 
 import Dao.*;
 import model.Conversation;
+import model.Groupe;
 import model.Message;
 import model.MessageFileAttente;
+import model.MessageGroupe;
 import model.Utilisateur;
+import util.FileMediaUtil;
 
+import java.io.IOException;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class MessageRouter {
@@ -18,6 +23,8 @@ public class MessageRouter {
     private final Dao_MessageFileAttenteImp fileDAO        = new Dao_MessageFileAttenteImp();
     private final DaoConversationImp        convDAO        = new DaoConversationImp();
     private final Dao_UtilisateurImp        utilisateurDAO = new Dao_UtilisateurImp();
+    private final Dao_GroupeImp             groupeDAO      = new Dao_GroupeImp();
+    private final Dao_MessageGroupeImp      messageGroupeDAO = new Dao_MessageGroupeImp();
 
     private MessageRouter() {}
 
@@ -35,20 +42,19 @@ public class MessageRouter {
         // 1. Retrouver les deux utilisateurs en DB
         Utilisateur expediteur   = utilisateurDAO.findByTelephone(telephoneExpediteur);
         Utilisateur destinataire = utilisateurDAO.findByTelephone(telephoneDest);
+        if (expediteur == null || destinataire == null) {
+            System.out.println("[MSG] Utilisateur introuvable : "
+                    + telephoneExpediteur + " → " + telephoneDest);
+            return;
+        }
         Dao_ContactImp contactDAO = new Dao_ContactImp();
         if (contactDAO.estBloque(destinataire.getIdUtilisateur(),
                 expediteur.getIdUtilisateur())) {
             System.out.println("[MSG] Bloqué — " + telephoneExpediteur
                     + " est bloqué par " + telephoneDest);
-            // Optionnel : notifier l'expéditeur
             ClientHandler expHandler = userManager.getHandler(telephoneExpediteur);
             if (expHandler != null)
                 expHandler.sendMessage("MSG_FAIL|BLOQUE");
-            return;
-        }
-        if (expediteur == null || destinataire == null) {
-            System.out.println("[MSG] Utilisateur introuvable : "
-                    + telephoneExpediteur + " → " + telephoneDest);
             return;
         }
 
@@ -132,7 +138,7 @@ public class MessageRouter {
         System.out.println("[ATTENTE] " + attente.size()
                 + " message(s) en attente pour " + telephone);
 
-        // 4. Envoyer chaque message
+        // 4. Envoyer chaque message (texte ou fichier)
         for (MessageFileAttente mfa : attente) {
             Message msg = messageDAO.getByID(mfa.getIdMessage());
             if (msg == null) continue;
@@ -140,15 +146,231 @@ public class MessageRouter {
             Utilisateur expediteur = utilisateurDAO.getByID(msg.getIdExpediteur());
             if (expediteur == null) continue;
 
-            String ligne = Protocol.MSG_RECEIVE.name()        + "|"
-                    + expediteur.getNumeroTelephone()    + "|"
-                    + msg.getContenuTexte()             ;
-
-            handler.sendMessage(ligne);
+            String type = msg.getTypeMessage() != null ? msg.getTypeMessage() : "texte";
+            if ("texte".equals(type)) {
+                String ligne = Protocol.MSG_RECEIVE.name() + "|"
+                        + expediteur.getNumeroTelephone() + "|"
+                        + (msg.getContenuTexte() != null ? msg.getContenuTexte() : "");
+                handler.sendMessage(ligne);
+            } else {
+                try {
+                    byte[] bytes = FileStorage.read(msg.getUrlFichier());
+                    String b64 = FileStorage.toBase64(bytes);
+                    String nom = msg.getNomFichier() != null ? msg.getNomFichier() : "fichier";
+                    String ligne = Protocol.FILE_RECEIVE.name() + "|"
+                            + expediteur.getNumeroTelephone() + "|"
+                            + type + "|"
+                            + nom + "|"
+                            + b64;
+                    handler.sendMessage(ligne);
+                } catch (IOException e) {
+                    System.out.println("[ATTENTE] Fichier introuvable id_message=" + msg.getIdMessage());
+                }
+            }
         }
 
         // 5. Marquer tous comme délivrés en DB
         fileDAO.marquerDelivres(utilisateur.getIdUtilisateur());
         System.out.println("[ATTENTE] Messages délivrés à " + telephone);
+    }
+
+    // ── ENVOYER UN FICHIER (1:1) — même flux que texte + persistance fichier ─
+    public void envoyerFichier(String telephoneExpediteur, String telephoneDest,
+                               String typeMessage, String nomFichier, byte[] fileBytes,
+                               ClientHandler expHandler) throws SQLException, IOException {
+
+        Utilisateur expediteur = utilisateurDAO.findByTelephone(telephoneExpediteur);
+        Utilisateur destinataire = utilisateurDAO.findByTelephone(telephoneDest);
+        if (expediteur == null || destinataire == null) {
+            if (expHandler != null) expHandler.sendMessage(Protocol.FILE_FAIL.name() + "|USER_NOT_FOUND");
+            return;
+        }
+
+        Dao_ContactImp contactDAO = new Dao_ContactImp();
+        if (contactDAO.estBloque(destinataire.getIdUtilisateur(), expediteur.getIdUtilisateur())) {
+            if (expHandler != null) expHandler.sendMessage(Protocol.FILE_FAIL.name() + "|BLOQUE");
+            return;
+        }
+
+        Conversation conv = convDAO.findIndividuelle(
+                expediteur.getIdUtilisateur(), destinataire.getIdUtilisateur());
+        if (conv == null) {
+            conv = new Conversation();
+            conv.setTypeConversation("individuelle");
+            int idConv = convDAO.Add(conv);
+            conv.setIdConversation(idConv);
+            convDAO.ajouterParticipant(conv.getIdConversation(), expediteur.getIdUtilisateur());
+            convDAO.ajouterParticipant(conv.getIdConversation(), destinataire.getIdUtilisateur());
+        }
+
+        String url = FileStorage.saveForConversation(conv.getIdConversation(), nomFichier, fileBytes);
+
+        Message msg = new Message() {
+            @Override
+            public String toNetworkString() { return ""; }
+        };
+        msg.setIdConversation(conv.getIdConversation());
+        msg.setIdExpediteur(expediteur.getIdUtilisateur());
+        msg.setTypeMessage(typeMessage != null ? typeMessage : "fichier");
+        msg.setContenuTexte(FileMediaUtil.labelForType(typeMessage) + " : " + nomFichier);
+        msg.setUrlFichier(url);
+        msg.setNomFichier(nomFichier);
+        msg.setTailleFichier((long) fileBytes.length);
+        messageDAO.Add(msg);
+
+        convDAO.updateDateDernierMessage(conv.getIdConversation());
+
+        String b64 = FileStorage.toBase64(fileBytes);
+        String ligne = Protocol.FILE_RECEIVE.name() + "|"
+                + expediteur.getNumeroTelephone() + "|"
+                + msg.getTypeMessage() + "|"
+                + nomFichier + "|"
+                + b64;
+
+        ClientHandler destHandler = userManager.getHandler(telephoneDest);
+        if (destHandler != null) {
+            destHandler.sendMessage(ligne);
+            if (expHandler != null) expHandler.sendMessage(Protocol.FILE_OK.name() + "|" + nomFichier);
+            System.out.println("[FILE] Livré directement à " + telephoneDest);
+        } else {
+            fileDAO.ajouterEnAttente(msg.getIdMessage(), destinataire.getIdUtilisateur());
+            if (expHandler != null) expHandler.sendMessage(Protocol.FILE_OK.name() + "|QUEUED|" + nomFichier);
+            System.out.println("[FILE] Mis en attente pour " + telephoneDest);
+        }
+    }
+
+    // ── ENVOYER UN FICHIER (groupe) ───────────────────────────────────────────
+    public void envoyerFichierGroupe(String telephoneExpediteur, int idGroupe,
+                                     String typeMessage, String nomFichier, byte[] fileBytes,
+                                     ClientHandler expHandler) throws Exception {
+
+        telephoneExpediteur = normaliserTel(telephoneExpediteur);
+
+        Groupe g = groupeDAO.getById(idGroupe);
+        if (g == null) {
+            if (expHandler != null) expHandler.sendMessage(Protocol.FILE_FAIL.name() + "|GROUP_NOT_FOUND");
+            return;
+        }
+
+        Utilisateur exp = utilisateurDAO.findByTelephone(telephoneExpediteur);
+        if (exp == null) {
+            List<String> membres = g.getNumerosMembres();
+            if (membres != null) {
+                for (String membre : membres) {
+                    if (membre != null && normaliserTel(membre).equals(telephoneExpediteur)) {
+                        exp = utilisateurDAO.findByTelephone(membre.trim());
+                        if (exp != null) {
+                            telephoneExpediteur = normaliserTel(exp.getNumeroTelephone());
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        String nomExp = exp != null ? exp.getNomComplet() : telephoneExpediteur;
+
+        String url = FileStorage.saveForGroup(idGroupe, nomFichier, fileBytes);
+        String contenu = FileMediaUtil.buildGroupFileContent(
+                typeMessage != null ? typeMessage : "fichier", nomFichier, url);
+
+        MessageGroupe msg = new MessageGroupe();
+        msg.setIdGroupe(idGroupe);
+        msg.setTelephoneExpediteur(telephoneExpediteur);
+        msg.setNomExpediteur(nomExp);
+        msg.setContenu(contenu);
+        msg.setDateEnvoi(LocalDateTime.now());
+        int idMsg = messageGroupeDAO.ajouter(msg);
+        msg.setIdMessage(idMsg);
+
+        String b64 = FileStorage.toBase64(fileBytes);
+        String type = typeMessage != null ? typeMessage : "fichier";
+        String payload = Protocol.FILE_GROUP_RECEIVE.name() + "|"
+                + idGroupe + "|"
+                + telephoneExpediteur + "|"
+                + FileMediaUtil.safeProtocolField(nomExp) + "|"
+                + type + "|"
+                + FileMediaUtil.safeProtocolField(nomFichier) + "|"
+                + b64;
+
+        String notifGroupe = Protocol.GROUP_MESSAGE_RECEIVE.name() + "|"
+                + idGroupe + "|"
+                + telephoneExpediteur + "|"
+                + FileMediaUtil.safeProtocolField(nomExp) + "|"
+                + contenu + "|"
+                + msg.getDateEnvoi();
+
+        String telExpNorm = normaliserTel(telephoneExpediteur);
+        int livres = 0;
+        if (g.getNumerosMembres() != null) {
+            for (String membre : g.getNumerosMembres()) {
+                if (membre == null || membre.isBlank()) continue;
+                if (normaliserTel(membre).equals(telExpNorm)) continue;
+                ClientHandler h = userManager.getHandler(membre.trim());
+                if (h != null) {
+                    h.sendMessage(payload);
+                    h.sendMessage(notifGroupe);
+                    livres++;
+                }
+            }
+        }
+        if (expHandler != null) {
+            String ok = livres > 0 ? nomFichier : "QUEUED|" + nomFichier;
+            expHandler.sendMessage(Protocol.FILE_OK.name() + "|" + ok);
+        }
+        System.out.println("[FILE GROUPE] " + nomFichier + " → " + livres + " membre(s) en ligne");
+    }
+
+    /** Lit un fichier groupé depuis son contenu DB et renvoie le base64 (historique). */
+    private static String normaliserTel(String raw) {
+        if (raw == null) return "";
+        return raw.trim().replaceAll("\\s+", "").replace("-", "");
+    }
+
+    /** Fichiers groupe envoyés pendant l'absence — livrés à la reconnexion. */
+    public void delivrerFichiersGroupeEnAttente(String telephone, java.time.LocalDateTime depuis)
+            throws Exception {
+        Utilisateur u = utilisateurDAO.findByTelephone(telephone);
+        if (u == null) return;
+        ClientHandler handler = userManager.getHandler(telephone);
+        if (handler == null) return;
+
+        String telNorm = normaliserTel(telephone);
+        List<Groupe> groupes = groupeDAO.getGroupesPourMembre(telephone);
+        for (Groupe g : groupes) {
+            List<MessageGroupe> msgs = messageGroupeDAO.getByGroupe(g.getIdGroupe());
+            for (MessageGroupe msg : msgs) {
+                if (!FileMediaUtil.isGroupFileContent(msg.getContenu())) continue;
+                if (normaliserTel(msg.getTelephoneExpediteur()).equals(telNorm)) continue;
+                if (depuis != null && msg.getDateEnvoi() != null && !msg.getDateEnvoi().isAfter(depuis)) {
+                    continue;
+                }
+                String[] meta = FileMediaUtil.parseGroupFileContent(msg.getContenu());
+                if (meta == null) continue;
+                try {
+                    byte[] bytes = FileStorage.read(meta[2]);
+                    String b64 = FileStorage.toBase64(bytes);
+                    String payload = Protocol.FILE_GROUP_RECEIVE.name() + "|"
+                            + g.getIdGroupe() + "|"
+                            + normaliserTel(msg.getTelephoneExpediteur()) + "|"
+                            + FileMediaUtil.safeProtocolField(msg.getNomExpediteur()) + "|"
+                            + meta[0] + "|"
+                            + FileMediaUtil.safeProtocolField(meta[1]) + "|"
+                            + b64;
+                    handler.sendMessage(payload);
+                } catch (IOException e) {
+                    System.out.println("[FILE GROUPE] Fichier introuvable pour message " + msg.getIdMessage());
+                }
+            }
+        }
+    }
+
+    public static String lireBase64DepuisContenuGroupe(String contenu) {
+        String[] meta = FileMediaUtil.parseGroupFileContent(contenu);
+        if (meta == null) return null;
+        try {
+            return FileStorage.toBase64(FileStorage.read(meta[2]));
+        } catch (IOException e) {
+            return null;
+        }
     }
 }

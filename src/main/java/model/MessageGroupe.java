@@ -1,40 +1,25 @@
 package model;
 
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
-@Data
-@NoArgsConstructor
-@EqualsAndHashCode(callSuper = true)
-public class MessageGroupe extends Message {
+public class MessageGroupe {
+    private int idMessage;
     private int idGroupe;
-    private String nomGroupe;        // Transient - pour affichage
+    private String telephoneExpediteur;
+    private String nomExpediteur;
+    private String contenu;
+    private LocalDateTime dateEnvoi;
 
-    // Format réseau: idMessage;idGroupe;telephoneExp;nomExp;contenu;date;nomGroupe
-    @Override
-    public String toNetworkString() {
-        return getIdMessage() + ";"
-                + idGroupe + ";"
-                + getTelephoneExpediteur() + ";"
-                + getNomExpediteur() + ";"
-                + getContenuTexte() + ";"
-                + (getDateEnvoi() != null ? getDateEnvoi().toString() : "") + ";"
-                + (nomGroupe != null ? nomGroupe : "");
-    }
-
-    public static MessageGroupe fromNetworkString(String data) {
-        String[] parts = data.split(";", -1);
-        MessageGroupe mg = new MessageGroupe();
-        mg.setIdMessage(Integer.parseInt(parts[0]));
-        mg.setIdGroupe(Integer.parseInt(parts[1]));
-        mg.setTelephoneExpediteur(parts[2]);
-        mg.setNomExpediteur(parts[3]);
-        mg.setContenuTexte(parts[4]);
-        try { mg.setDateEnvoi(LocalDateTime.parse(parts[5])); } catch (Exception e) { mg.setDateEnvoi(null); }
-        mg.setNomGroupe(parts[6].isEmpty() ? null : parts[6]);
-        mg.setEstMoi(false); // Sera déterminé côté client
-        return mg;
-    }
+    public int getIdMessage() { return idMessage; }
+    public void setIdMessage(int idMessage) { this.idMessage = idMessage; }
+    public int getIdGroupe() { return idGroupe; }
+    public void setIdGroupe(int idGroupe) { this.idGroupe = idGroupe; }
+    public String getTelephoneExpediteur() { return telephoneExpediteur; }
+    public void setTelephoneExpediteur(String telephoneExpediteur) { this.telephoneExpediteur = telephoneExpediteur; }
+    public String getNomExpediteur() { return nomExpediteur; }
+    public void setNomExpediteur(String nomExpediteur) { this.nomExpediteur = nomExpediteur; }
+    public String getContenu() { return contenu; }
+    public void setContenu(String contenu) { this.contenu = contenu; }
+    public LocalDateTime getDateEnvoi() { return dateEnvoi; }
+    public void setDateEnvoi(LocalDateTime dateEnvoi) { this.dateEnvoi = dateEnvoi; }
 }

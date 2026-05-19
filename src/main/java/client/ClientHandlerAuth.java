@@ -23,6 +23,7 @@ public class ClientHandlerAuth {
     private ContactService contactService;
     private GroupeService groupeService;
     private CallService callService;
+    private Fileservice fileService;
 
     // Constructeur privé (personne ne peut créer directement)
     private ClientHandlerAuth() {}
@@ -47,6 +48,7 @@ public class ClientHandlerAuth {
             messageService = new MessageService(clientReseau);
             groupeService = new GroupeService(clientReseau);
             contactService = new ContactService(clientReseau);
+            fileService = new Fileservice(clientReseau);
             connecteAuServeur = true;
             return true;
         }
@@ -88,6 +90,16 @@ public class ClientHandlerAuth {
     public void ajouterContact(String numeroTelephone) {
         ajouterContact(numeroTelephone, numeroTelephone);
     }
+
+    public void accepterDemandeContact(String numeroDemandeur) {
+        if (!verifierConnexion() || contactService == null) return;
+        contactService.accepterDemandeContact(numeroDemandeur);
+    }
+
+    public void bloquerNumeroContact(String numero) {
+        if (!verifierConnexion() || contactService == null) return;
+        contactService.bloquerNumero(numero);
+    }
     //gestion des groupes
     public void creerGroupe(String nomGroupe, String... numerosMembres) {
         if (!verifierConnexion()) return;
@@ -124,11 +136,15 @@ public class ClientHandlerAuth {
 
     public void demanderMembresGroupe(int idGroupe) {
         if (!verifierConnexion()) return;
-        groupeService.demanderMembres(idGroupe);
+        groupeService.demanderMessagesGroupe(idGroupe);
     }
     public void envoyerMessageGroupe(int idGroupe, String contenu) {
         if (!verifierConnexion()) return;
         groupeService.envoyerMessageGroupe(idGroupe, contenu);
+    }
+    public void demanderMessagesGroupe(int idGroupe) {
+        if (!verifierConnexion()) return;
+        groupeService.demanderMessagesGroupe(idGroupe);
     }
 
     // =====  DÉCONNEXION =====
@@ -179,6 +195,24 @@ public class ClientHandlerAuth {
         return callService != null && callService.isEnAppel();
     }
 
+    public boolean isAppelEntrant() {
+        return callService != null && callService.isAppelEntrant();
+    }
+
+    // ===== APPELS DE GROUPE =====
+    public void demarrerAppelGroupe(int idGroupe, String typeAppel, int portMedia, int portAudio, boolean isReply) {
+        if (!verifierConnexion()) return;
+        int audio = portAudio > 0 ? portAudio : portMedia;
+        String isRepStr = isReply ? "1" : "0";
+        clientReseau.envoyer(new Packet(Protocol.JOIN_GROUP_CALL,
+                idGroupe + "|" + typeAppel + "|" + portMedia + "|" + audio + "|" + isRepStr));
+    }
+
+    public void quitterAppelGroupe(int idGroupe) {
+        if (!verifierConnexion()) return;
+        clientReseau.envoyer(new Packet(Protocol.LEAVE_GROUP_CALL, String.valueOf(idGroupe)));
+    }
+
     // ===== 7. LISTE UTILISATEURS (NOUVEAU) =====
     public void demanderListeUtilisateurs() {
         if (!verifierConnexion()) return;
@@ -197,6 +231,17 @@ public class ClientHandlerAuth {
         clientReseau.demanderMessages(idConversation);
     }
 
+    public void demanderContacts() {
+        if (!verifierConnexion()) {
+            System.out.println("❌ Pas connecté au serveur !");
+            return;
+        }
+        if (clientReseau == null) {
+            System.out.println("❌ Client réseau non initialisé !");
+            return;
+        }
+        clientReseau.demanderContacts();
+    }
     public void demanderConversations() {
         if (!verifierConnexion()) {
             System.out.println("❌ Pas connecté au serveur !");
@@ -228,4 +273,34 @@ public class ClientHandlerAuth {
         }
         return true;
     }
+    //pour effectuer la liaisoon entre disscusion et sign up
+    public void setEcouteur(EcouteurClient ecouteur) {
+        if (clientReseau != null) {
+            clientReseau.setEcouteur(ecouteur);
+        }
+    }
+
+    public Fileservice getFileService() {
+        if (fileService == null && clientReseau != null) {
+            fileService = new Fileservice(clientReseau);
+        }
+        return fileService;
+    }
+
+    public void envoyerFichier(String numeroDest, java.io.File file,
+                               java.util.function.Consumer<Integer> onProgress) {
+        if (!verifierConnexion() || getFileService() == null) return;
+        getFileService().envoyerFichier(numeroDest, file, onProgress);
+    }
+
+    public void envoyerFichierGroupe(int idGroupe, java.io.File file,
+                                     java.util.function.Consumer<Integer> onProgress) {
+        if (!verifierConnexion() || getFileService() == null) return;
+        getFileService().envoyerFichierGroupe(idGroupe, file, onProgress);
+    }
+
+    public void retryEnvoiFichier() {
+        if (getFileService() != null) getFileService().retryDernierEnvoi();
+    }
+
 }
