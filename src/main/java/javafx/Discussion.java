@@ -1,5 +1,4 @@
 package javafx;
-
 import client.AudioUDP;
 import client.ClientHandlerAuth;
 import client.EcouteurClient;
@@ -21,7 +20,6 @@ import service.Fileservice;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import util.FileMediaUtil;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -37,7 +35,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
 public class Discussion implements EcouteurClient {
     private Utilisateur utilisateurConnecte;
     private String contactActif = null;
@@ -80,7 +77,7 @@ public class Discussion implements EcouteurClient {
     private AppelVideoGroupe appelVideoGroupeActif;
     private Label appelEnCoursLabel; // Indicateur visuel "en appel" (en-tête chat)
 
-    /** Barre d'appel en cours au-dessus de la liste des contacts */
+    //Barre d'appel en cours au-dessus de la liste des contacts
     private HBox barreAppelSidebar;
     private Label labelBarreAppelSidebar;
     private Timeline chronometreAppel;

@@ -11,13 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
-/**
- * Regroupe la configuration du menu et les flux UI liés aux groupes dans l'écran {@link Discussion}.
- */
 public final class DiscussionGroupeFX {
-
     private DiscussionGroupeFX() {}
-
     public static void configurerMenu(
             MenuButton groupMenu,
             javafx.stage.Window owner,
@@ -25,16 +20,13 @@ public final class DiscussionGroupeFX {
             Supplier<List<Contact>> contactsPourAjout,
             GroupeDiscussionActions actions,
             Runnable afficherAccueil) {
-
-        groupMenu.getItems().clear();
-
+            groupMenu.getItems().clear();
         MenuItem add = new MenuItem("Ajouter membre");
         MenuItem remove = new MenuItem("Retirer membre");
         MenuItem rename = new MenuItem("Renommer");
         MenuItem leave = new MenuItem("Quitter");
         MenuItem delete = new MenuItem("Supprimer");
         groupMenu.getItems().addAll(add, remove, rename, leave, delete);
-
         add.setOnAction(e -> {
             Groupe g = groupeActif.get();
             if (g == null) return;
@@ -50,7 +42,6 @@ public final class DiscussionGroupeFX {
                         if (!num.isEmpty()) actions.ajouterMembreAuGroupe(g.getIdGroupe(), num);
                     });
         });
-
         remove.setOnAction(e -> {
             Groupe g = groupeActif.get();
             if (g == null) return;
@@ -65,7 +56,6 @@ public final class DiscussionGroupeFX {
                         if (!num.isEmpty()) actions.retirerMembreDuGroupe(g.getIdGroupe(), num);
                     });
         });
-
         rename.setOnAction(e -> {
             Groupe g = groupeActif.get();
             if (g == null) return;
@@ -113,7 +103,6 @@ public final class DiscussionGroupeFX {
         }
         return out;
     }
-
     private static List<Contact> contactsDepuisNumeros(List<String> numeros, List<Contact> repertoire) {
         List<Contact> out = new ArrayList<>();
         if (numeros == null) return out;

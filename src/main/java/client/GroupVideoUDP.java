@@ -19,13 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-/**
- * UDP vidéo pour les appels de groupe.
- * Chaque paquet est préfixé par un en-tête :
- *   [1 octet = longueur du numéro][numéro en UTF-8][données JPEG]
- * Cela permet d'identifier l'expéditeur sans ambiguïté même quand
- * plusieurs clients tournent sur 127.0.0.1.
- */
+
 public class GroupVideoUDP {
     private static final int MAX_PACKET_SIZE = 65507;
     private static final int LARGEUR_FRAME   = 320;
@@ -38,7 +32,6 @@ public class GroupVideoUDP {
     private VideoCapture camera;
     private int localPort = -1;
 
-    /** Mon propre numéro de téléphone, inclus dans chaque paquet envoyé. */
     private String monNumero = "";
 
     private final ConcurrentHashMap<String, InetSocketAddress> destinations = new ConcurrentHashMap<>();
@@ -53,7 +46,6 @@ public class GroupVideoUDP {
         this.localFrameCallback    = localFrameCallback;
     }
 
-    /** Définir le numéro local avant de démarrer. */
     public void setMonNumero(String numero) {
         this.monNumero = numero != null ? numero : "";
     }

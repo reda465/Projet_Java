@@ -26,19 +26,16 @@ import model.Utilisateur;
 public class AppelVideoGroupe {
 
     private final Map<String, StackPane> videoFeeds = new ConcurrentHashMap<>();
-
     private GridPane gridVideos;
     private Label statutLabel;
     private Stage stageFenetre;
     private boolean cameraActive = true;
     private boolean micActive = true;
-
     private GroupVideoUDP videoUDP;
     private GroupAudioUDP audioUDP; // Audio pour les appels vidéo groupe
     private int idGroupe;
     private int localAudioPort = -1;
 
-    /** Callback appelé quand l'utilisateur quitte l'appel (bouton ou fermeture fenêtre). */
     private Runnable onTermine;
 
     public int getIdGroupe() { return idGroupe; }
@@ -52,12 +49,11 @@ public class AppelVideoGroupe {
         instance.afficherFenetre(parent, groupe, idConversationGroupe);
         return instance;
     }
-
     private void afficherFenetre(Stage parent, Groupe groupe, int idConversationGroupe) {
         this.stageFenetre = new Stage();
         stageFenetre.initModality(Modality.NONE); // Non-bloquant
         stageFenetre.initOwner(parent);
-        stageFenetre.setTitle("Visioconférence — " + groupe.getNomGroupe());
+        stageFenetre.setTitle(" " + groupe.getNomGroupe());
         stageFenetre.setOnCloseRequest(e -> quitterAppel());
 
         // Header
@@ -73,21 +69,17 @@ public class AppelVideoGroupe {
         header.setPadding(new Insets(10, 15, 10, 15));
         header.setStyle("-fx-background-color: #25D366;");
         HBox.setHgrow(header.getChildren().get(1), Priority.ALWAYS);
-
         // Grille vidéos
         gridVideos = new GridPane();
         gridVideos.setHgap(10);
         gridVideos.setVgap(10);
         gridVideos.setPadding(new Insets(15));
         gridVideos.setStyle("-fx-background-color: #1a1a1a;");
-
         // Vidéo locale
-        ajouterVideoLocale("Moi (Local)");
-
+        ajouterVideoLocale("Moi");
         ScrollPane scroll = new ScrollPane(gridVideos);
         scroll.setFitToWidth(true);
         scroll.setStyle("-fx-background: #1a1a1a; -fx-background-color: transparent;");
-
         // Contrôles
         Button btnMic = new Button("🎤");
         btnMic.setStyle("-fx-background-color: #333; -fx-text-fill: white; -fx-background-radius: 50%; -fx-min-width: 50px; -fx-min-height: 50px;");
@@ -184,7 +176,6 @@ public class AppelVideoGroupe {
             }
         });
     }
-
     private void surFluxVideoLocalRecu(Image image) {
         Platform.runLater(() -> {
             StackPane wrapper = videoFeeds.get("local");
@@ -258,11 +249,9 @@ public class AppelVideoGroupe {
             Platform.runLater(onTermine);
         }
     }
-
     public void fermerFenetre() {
         quitterAppel();
     }
-
     /** Ramène la fenêtre d'appel au premier plan si elle est ouverte. */
     public void afficherFenetre() {
         Platform.runLater(() -> {

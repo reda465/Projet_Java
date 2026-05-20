@@ -5,11 +5,6 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * UDP audio pour les appels de groupe.
- * Chaque paquet est préfixé : [1 octet longueur numéro][numéro UTF-8][PCM]
- * Cela permet d'identifier l'expéditeur sans ambiguïté.
- */
 public class GroupAudioUDP {
     private static final int TAILLE_BUFFER = 4096;
 

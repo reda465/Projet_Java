@@ -8,7 +8,9 @@ public class ServeurMT extends Thread{
     public static void main(String[] args) {
         new ServeurMT().start();
     }
-
+    /*public static void demarrerServeur() {
+        new ServeurMT().start();
+    }*/
     @Override
     public void run() {
         try (

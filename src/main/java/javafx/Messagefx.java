@@ -16,7 +16,6 @@ import javafx.stage.Stage;
 import util.FileActions;
 
 import java.io.File;
-//je dois voir etat de message mn ba3d
 public class Messagefx {
 
     private static Stage stageRef;

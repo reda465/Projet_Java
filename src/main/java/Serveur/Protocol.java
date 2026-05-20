@@ -1,6 +1,6 @@
 package Serveur;
 
-public class Protocol {
+public enum Protocol {
     // Auth
     LOGIN ,
     REGISTER,

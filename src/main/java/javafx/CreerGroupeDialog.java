@@ -10,25 +10,20 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import model.Contact;
-
 import java.util.ArrayList;
 import java.util.List;
-
 public class CreerGroupeDialog extends Dialog<CreerGroupeDialog.ResultatCreation> {
-    private final TextField nomField = new TextField();
-    private final List<CheckBox> membres = new ArrayList<>();
-    private List<Contact> contacts = null;
-
+    private final TextField nomField = new TextField();//le nom de groupe
+    private final List<CheckBox> membres = new ArrayList<>();//liste des cases coche
+    private List<Contact> contacts = null;//liste des contactes disonibles
     public CreerGroupeDialog(List<Contact> contacts) {
         this.contacts = contacts != null ? contacts : new ArrayList<>();
         setTitle("Créer un groupe");
         getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-
         VBox root = new VBox(10);
         root.setPadding(new Insets(12));
         root.getChildren().add(new Label("Nom du groupe"));
         root.getChildren().add(nomField);
-
         root.getChildren().add(new Label("Choisir au moins 2 membres"));
         for (Contact contact : this.contacts) {
             String numero = contact.getNumeroTelephone() != null ? contact.getNumeroTelephone().trim() : "";
@@ -36,12 +31,11 @@ public class CreerGroupeDialog extends Dialog<CreerGroupeDialog.ResultatCreation
             String nom = contact.getNomComplet() != null && !contact.getNomComplet().isBlank()
                     ? contact.getNomComplet().trim() : numero;
             CheckBox c = new CheckBox(nom + " (" + numero + ")");
-            c.setUserData(numero);
+            c.setUserData(numero);//stocker le numero
             membres.add(c);
             root.getChildren().add(c);
         }
         getDialogPane().setContent(root);
-
         Button okBtn = (Button) getDialogPane().lookupButton(ButtonType.OK);
         okBtn.addEventFilter(ActionEvent.ACTION, ev -> {
             String nom = nomField.getText() != null ? nomField.getText().trim() : "";
@@ -55,7 +49,6 @@ public class CreerGroupeDialog extends Dialog<CreerGroupeDialog.ResultatCreation
                 ev.consume();
             }
         });
-
         setResultConverter(btn -> {
             if (btn == ButtonType.OK) {
                 List<String> selection = new ArrayList<>();
@@ -65,14 +58,12 @@ public class CreerGroupeDialog extends Dialog<CreerGroupeDialog.ResultatCreation
             return null;
         });
     }
-
     public CreerGroupeDialog() {
-
     }
     public static class ResultatCreation {
         public final String nomGroupe;
         public final String[] numeros;
-
+      //c'est l'objet retourner qu'on utilisateur clique ok
         public ResultatCreation(String nomGroupe, String[] numeros) {
             this.nomGroupe = nomGroupe;
             this.numeros = numeros;
